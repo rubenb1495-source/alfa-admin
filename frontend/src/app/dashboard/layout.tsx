@@ -95,7 +95,8 @@ export default function DisenoDashboard({
       (rutaActual.startsWith("/dashboard/finanzas") &&
         !(esDir && rutaActual.startsWith("/dashboard/finanzas/tesoreria"))) ||
       rutaActual.startsWith("/dashboard/usuarios") ||
-      (rutaActual.startsWith("/dashboard/direccion") && !esDir);
+      (rutaActual.startsWith("/dashboard/direccion") && !esDir) ||
+      (rutaActual.startsWith("/dashboard/administracion") && !esDir);
     if (rutaRestringidaAdmin && !esAdm) {
       setAvisoPermiso("No tienes permisos para acceder a esta sección.");
       router.replace(esDir ? "/dashboard/direccion" : "/dashboard/ventas/nueva");
@@ -260,6 +261,12 @@ export default function DisenoDashboard({
     {
       titulo: "Finanzas",
       enlaces: [
+        {
+          href: "/dashboard/administracion",
+          etiqueta: "Depto. Administración",
+          icono: <FileSpreadsheet className="w-4 h-4 shrink-0" />,
+          visible: esAdmin || esDirector,
+        },
         {
           href: "/dashboard/finanzas/tesoreria",
           etiqueta: "Tesorería y Cambios",

@@ -9,11 +9,12 @@ from sqlalchemy import inspect, text
 
 from app.base_datos import Base, SesionLocal, motor
 from app.configuracion import configuracion
+from app import modelos_admin as _modelos_admin  # noqa: F401
 from app import modelos_finanzas as _modelos_finanzas  # noqa: F401
 from app import modelos_logistica as _modelos_logistica  # noqa: F401
 from app import modelos_operaciones as _modelos_operaciones  # noqa: F401
 from app import modelos_taller as _modelos_taller  # noqa: F401
-from app.rutas import alertas, autenticacion, catalogo, cierre_diario, direccion, finanzas, logistica, logistica_avanzada, operaciones, taller, tasas, tesoreria, usuarios, ventas
+from app.rutas import admin_importacion, administracion, alertas, autenticacion, catalogo, cierre_diario, direccion, finanzas, logistica, logistica_avanzada, operaciones, taller, tasas, tesoreria, usuarios, ventas
 from app.semilla import ejecutar_semilla
 from app.semilla_finanzas import ejecutar_semilla_finanzas
 
@@ -106,6 +107,13 @@ def asegurar_columnas_compatibles() -> None:
             ("cedula", "VARCHAR(40) NOT NULL DEFAULT ''"),
             ("tiene_acceso", "BOOLEAN NOT NULL DEFAULT TRUE"),
             ("debe_cambiar_clave", "BOOLEAN NOT NULL DEFAULT FALSE"),
+            ("fecha_ingreso", "DATE NULL"),
+            ("cargo", "VARCHAR(120) NOT NULL DEFAULT ''"),
+            ("salario_base_usd", "NUMERIC(12, 2) NOT NULL DEFAULT 0"),
+            ("bono_alimentacion_usd", "NUMERIC(12, 2) NOT NULL DEFAULT 0"),
+            ("bonos_fijos_usd", "NUMERIC(12, 2) NOT NULL DEFAULT 0"),
+            ("tipo_contrato", "VARCHAR(40) NOT NULL DEFAULT ''"),
+            ("cuenta_bancaria_pago", "VARCHAR(120) NOT NULL DEFAULT ''"),
         ]
         for nombre_col, ddl_col in nuevas_usuarios:
             if nombre_col not in columnas_usr:
@@ -230,5 +238,7 @@ app.include_router(finanzas.enrutador_comisiones)
 app.include_router(tesoreria.enrutador)
 app.include_router(direccion.enrutador)
 app.include_router(alertas.enrutador)
+app.include_router(administracion.enrutador)
+app.include_router(admin_importacion.enrutador)
 app.include_router(cierre_diario.enrutador)
 app.include_router(operaciones.enrutador)

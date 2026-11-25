@@ -17,11 +17,22 @@ export type TipoCargaMasiva =
   | "COMPRA_INTERNACIONAL"
   | "CONSIGNACION"
   | "TRASLADO"
-  | "PREPARACION_ESTADOS";
+  | "PREPARACION_ESTADOS"
+  | "FACTURAS_GASTOS_CXP"
+  | "EXTRACTO_BANCARIO"
+  | "NOMINA_PERSONAL"
+  | "OBLIGACIONES_FISCALES"
+  | "ACTIVOS_FIJOS";
 
 interface SucursalSimple {
   id: number;
   nombre: string;
+}
+
+interface InstrumentoSimple {
+  id: number;
+  nombre: string;
+  moneda: string;
 }
 
 interface FilaPreview {
@@ -55,7 +66,9 @@ interface PropsModalCargaMasiva {
   alCerrar: () => void;
   tipo: TipoCargaMasiva;
   titulo: string;
+  prefijoRuta?: "/api/logistica" | "/api/admin";
   sucursales?: SucursalSimple[];
+  instrumentos?: InstrumentoSimple[];
   alCompletar?: (resultado: Record<string, unknown>) => void;
 }
 
@@ -64,9 +77,12 @@ const URL_BASE_API =
   process.env.NEXT_PUBLIC_URL_API_PYTHON?.replace(/\/+$/, "") ||
   "http://localhost:8000";
 
-export async function descargarPlantillaLogistica(tipo: TipoCargaMasiva): Promise<void> {
+export async function descargarPlantillaLogistica(
+  tipo: TipoCargaMasiva,
+  prefijoRuta: "/api/logistica" | "/api/admin" = "/api/logistica"
+): Promise<void> {
   const token = obtenerToken();
-  const res = await fetch(`${URL_BASE_API}/api/logistica/plantilla/${tipo}`, {
+  const res = await fetch(`${URL_BASE_API}${prefijoRuta}/plantilla/${tipo}`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
   if (!res.ok) {
@@ -88,10 +104,15 @@ export default function ModalCargaMasiva({
   alCerrar,
   tipo,
   titulo,
+  prefijoRuta = "/api/logistica",
   sucursales = [],
+  instrumentos = [],
   alCompletar,
 }: PropsModalCargaMasiva) {
   const [archivo, setArchivo] = useState<File | null>(null);
+  const [instrumentoId, setInstrumentoId] = useState<string>(
+    instrumentos[0] ? String(instrumentos[0].id) : ""
+  );
   const [almacenOrigenId, setAlmacenOrigenId] = useState<string>("");
   const [almacenDestinoId, setAlmacenDestinoId] = useState<string>(
     sucursales[0] ? String(sucursales[0].id) : ""
@@ -118,10 +139,12 @@ export default function ModalCargaMasiva({
     tipo === "CONSIGNACION";
   const esInternacional = tipo === "COMPRA_INTERNACIONAL";
   const esTraslado = tipo === "TRASLADO";
+  const esExtracto = tipo === "EXTRACTO_BANCARIO";
 
   const construirFormData = (): FormData => {
     const fd = new FormData();
     if (archivo) fd.append("archivo", archivo);
+    if (instrumentoId) fd.append("instrumento_id", instrumentoId);
     if (almacenOrigenId) fd.append("almacen_origen_id", almacenOrigenId);
     if (almacenDestinoId) fd.append("almacen_destino_id", almacenDestinoId);
     if (proveedorNombre.trim()) fd.append("proveedor_nombre", proveedorNombre.trim());
@@ -139,7 +162,7 @@ export default function ModalCargaMasiva({
     setDescargando(true);
     setErrorMsg(null);
     try {
-      await descargarPlantillaLogistica(tipo);
+      await descargarPlantillaLogistica(tipo, prefijoRuta);
     } catch (e) {
       setErrorMsg(e instanceof Error ? e.message : "Error al descargar plantilla.");
     } finally {
@@ -162,7 +185,7 @@ export default function ModalCargaMasiva({
     setPreview(null);
     try {
       const token = obtenerToken();
-      const res = await fetch(`${URL_BASE_API}/api/logistica/importar/${tipo}/preview`, {
+      const res = await fetch(`${URL_BASE_API}${prefijoRuta}/importar/${tipo}/preview`, {
         method: "POST",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: construirFormData(),
@@ -199,7 +222,7 @@ export default function ModalCargaMasiva({
     setErrorMsg(null);
     try {
       const token = obtenerToken();
-      const res = await fetch(`${URL_BASE_API}/api/logistica/importar/${tipo}/confirmar`, {
+      const res = await fetch(`${URL_BASE_API}${prefijoRuta}/importar/${tipo}/confirmar`, {
         method: "POST",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: construirFormData(),
@@ -272,6 +295,29 @@ export default function ModalCargaMasiva({
               Descargar Plantilla (.xlsx)
             </button>
           </div>
+
+          {esExtracto && (
+            <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+              <label className="mb-1 block text-xs font-semibold text-slate-700">
+                Cuenta Bancaria / Instrumento *
+              </label>
+              <select
+                value={instrumentoId}
+                onChange={(e) => {
+                  setInstrumentoId(e.target.value);
+                  setPreview(null);
+                }}
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+              >
+                <option value="">Selecciona cuenta bancaria...</option>
+                {instrumentos.map((i) => (
+                  <option key={i.id} value={i.id}>
+                    {i.nombre} ({i.moneda})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Paso 2: Datos de contexto */}
           {(esIngreso || esTraslado) && (

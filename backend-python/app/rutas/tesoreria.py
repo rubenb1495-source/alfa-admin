@@ -427,6 +427,17 @@ def anular_movimiento_tesoreria(
         mov.pago_entrada.anulado = True
         mov.pago_entrada.nota = f"{mov.pago_entrada.nota} | ANULADO: {datos.motivo.strip()}"
 
+    from app.rutas.administracion import registrar_auditoria
+    registrar_auditoria(
+        bd,
+        usuario_actual,
+        "TESORERIA",
+        "ANULAR",
+        mov.id,
+        datos_anteriores={"estado": "CONFIRMADO", "codigo": mov.codigo},
+        datos_nuevos={"estado": "ANULADO", "motivo": datos.motivo.strip()},
+    )
+
     bd.commit()
     bd.refresh(mov)
     return _serializar_movimiento(mov)
