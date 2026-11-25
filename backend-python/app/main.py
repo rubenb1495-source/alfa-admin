@@ -120,6 +120,31 @@ def asegurar_columnas_compatibles() -> None:
                 conexion.execute(
                     text("ALTER TABLE usuarios ALTER COLUMN clave_hash DROP NOT NULL")
                 )
+    if inspector.has_table("pagos"):
+        columnas_pagos = {col["name"] for col in inspector.get_columns("pagos")}
+        nuevas_pagos = [
+            ("categoria", "VARCHAR(80) NOT NULL DEFAULT ''"),
+            ("origen_tipo", "VARCHAR(40) NOT NULL DEFAULT ''"),
+            ("origen_id", "INTEGER NULL"),
+        ]
+        for nombre_col, ddl_col in nuevas_pagos:
+            if nombre_col not in columnas_pagos:
+                with motor.begin() as conexion:
+                    conexion.execute(
+                        text(f"ALTER TABLE pagos ADD COLUMN {nombre_col} {ddl_col}")
+                    )
+    if inspector.has_table("liquidaciones_comisiones"):
+        columnas_liq = {col["name"] for col in inspector.get_columns("liquidaciones_comisiones")}
+        nuevas_liq = [
+            ("instrumento_pago_id", "INTEGER NULL"),
+            ("movimiento_financiero_id", "INTEGER NULL"),
+        ]
+        for nombre_col, ddl_col in nuevas_liq:
+            if nombre_col not in columnas_liq:
+                with motor.begin() as conexion:
+                    conexion.execute(
+                        text(f"ALTER TABLE liquidaciones_comisiones ADD COLUMN {nombre_col} {ddl_col}")
+                    )
 
 
 @asynccontextmanager

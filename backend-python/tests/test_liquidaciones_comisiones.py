@@ -205,3 +205,157 @@ def test_liquidacion_exitosa_bloqueo_doble_pago_y_anulacion(cliente: TestClient)
     ).json()
     assert rep_rev["resumen_general"]["pendiente_usd"] == pytest.approx(26.0)
     assert len(rep_rev["detalle_ventas"]) == 2
+
+
+def test_integracion_liquidacion_con_finanzas_usd_bs_reversion_y_bloqueo(cliente: TestClient) -> None:
+    """
+    Valida la integración atómica Liquidaciones <-> Caja/Finanzas:
+    1. Liquidación en USD descuenta saldo del instrumento USD y crea egreso en Finanzas.
+    2. Bloqueo de eliminación manual (403) del egreso desde DELETE /api/finanzas/pagos/{id}.
+    3. Liquidación en Bs calcula monto_bs con tasa BCV y descuenta saldo del instrumento Bs.
+    4. Anulación de liquidación revierte ventas a PENDIENTE y restaura el saldo del instrumento.
+    """
+    cab = _login_dir(cliente)
+    hoy = obtener_fecha_hoy()
+    sucs = {s["nombre"]: s["id"] for s in cliente.get("/api/sucursales", headers=cab).json()}
+    t38_id = sucs["Local T38"]
+
+    asesor = cliente.post(
+        "/api/usuarios",
+        headers=cab,
+        json={
+            "nombre": "Diego Online",
+            "rol": "ASESORA",
+            "modalidad": "ONLINE",
+            "tiene_acceso": False,
+        },
+    ).json()
+
+    cliente.post(
+        "/api/tasas",
+        headers=cab,
+        json={
+            "fecha": hoy.isoformat(),
+            "tasa_bcv": 100.0,
+            "tasa_usdt": 120.0,
+            "recargo_porcentaje": 20.0,
+        },
+    )
+
+    cliente.post(
+        "/api/logistica/compras",
+        headers=cab,
+        json={
+            "origen": "NACIONAL",
+            "fecha": hoy.isoformat(),
+            "llega_preparada": True,
+            "equipos": [
+                {"serial": "FIN-EQ-1", "modelo": "Dell 1", "ubicacion_id": t38_id, "costo_compra_usd": 140.0, "precio_promo_usd": 200.0},
+                {"serial": "FIN-EQ-2", "modelo": "Dell 2", "ubicacion_id": t38_id, "costo_compra_usd": 200.0, "precio_promo_usd": 300.0},
+            ],
+        },
+    )
+    eqs = {
+        e["serial"]: e
+        for e in cliente.get("/api/logistica/inventario/equipos?busqueda=FIN-EQ-", headers=cab).json()
+    }
+    insts = cliente.get("/api/finanzas/instrumentos", headers=cab).json()
+    inst_usd = next(i for i in insts if i["moneda"] == "USD" and i["tipo_precio"] == "PROMO")
+    inst_bs = next(i for i in insts if i["moneda"] == "BS" and "cashea" not in i["nombre"].lower())
+
+    # Venta 1: $200 Promo en USD -> Lead 8% = $16.00 (ingresa $200 al inst_usd)
+    v1 = cliente.post(
+        "/api/ventas",
+        headers=cab,
+        json={
+            "sucursal_id": t38_id,
+            "asesor_id": asesor["id"],
+            "canal_visita": "WhatsApp",
+            "origen_venta": "LEAD",
+            "entrega": "Tienda",
+            "items": [{"equipo_id": eqs["FIN-EQ-1"]["id"], "cantidad": 1}],
+            "pagos": [{"instrumento_id": inst_usd["id"], "monto_moneda_origen": 200.0}],
+        },
+    ).json()
+
+    # Venta 2: $300 Promo en USD -> Lead 8% = $24.00 (ingresa $300 al inst_usd)
+    v2 = cliente.post(
+        "/api/ventas",
+        headers=cab,
+        json={
+            "sucursal_id": t38_id,
+            "asesor_id": asesor["id"],
+            "canal_visita": "WhatsApp",
+            "origen_venta": "LEAD",
+            "entrega": "Tienda",
+            "items": [{"equipo_id": eqs["FIN-EQ-2"]["id"], "cantidad": 1}],
+            "pagos": [{"instrumento_id": inst_usd["id"], "monto_moneda_origen": 300.0}],
+        },
+    ).json()
+
+    def saldo_inst(inst_id: int) -> float:
+        lista = cliente.get("/api/finanzas/instrumentos", headers=cab).json()
+        return next(i["saldo_actual"] for i in lista if i["id"] == inst_id)
+
+    saldo_usd_antes = saldo_inst(inst_usd["id"])
+    assert saldo_usd_antes == pytest.approx(500.0)
+
+    # 1. Liquidar v1 ($16.00) en USD desde inst_usd
+    liq_usd = cliente.post(
+        "/api/comisiones/liquidaciones",
+        headers=cab,
+        json={
+            "personal_id": asesor["id"],
+            "venta_ids": [v1["id"]],
+            "fecha_inicio": hoy.isoformat(),
+            "fecha_fin": hoy.isoformat(),
+            "instrumento_pago_id": inst_usd["id"],
+            "referencia": "EFE-001",
+        },
+    ).json()
+    assert liq_usd["monto_total_usd"] == pytest.approx(16.0)
+    assert liq_usd["egreso_registrado"] is True
+    mov_usd_id = liq_usd["movimiento_financiero_id"]
+    assert mov_usd_id is not None
+    assert saldo_inst(inst_usd["id"]) == pytest.approx(484.0)
+
+    # Verificar el egreso en GET /api/finanzas/pagos
+    pagos = cliente.get("/api/finanzas/pagos", headers=cab).json()
+    egreso_usd = next(p for p in pagos if p["id"] == mov_usd_id)
+    assert egreso_usd["tipo_movimiento"] == "EGRESO"
+    assert egreso_usd["categoria"] == "Pago de Comisiones"
+    assert egreso_usd["origen_tipo"] == "LIQUIDACION_COMISION"
+    assert egreso_usd["monto_moneda_origen"] == pytest.approx(16.0)
+
+    # 2. Bloqueo de eliminación manual desde Finanzas -> 403 Forbidden
+    resp_del = cliente.delete(f"/api/finanzas/pagos/{mov_usd_id}", headers=cab)
+    assert resp_del.status_code == 403, resp_del.text
+
+    # 3. Liquidar v2 ($24.00) en Bs desde inst_bs con tasa BCV 100 -> 2400 Bs
+    saldo_bs_antes = saldo_inst(inst_bs["id"])
+    liq_bs = cliente.post(
+        "/api/comisiones/liquidaciones",
+        headers=cab,
+        json={
+            "personal_id": asesor["id"],
+            "venta_ids": [v2["id"]],
+            "fecha_inicio": hoy.isoformat(),
+            "fecha_fin": hoy.isoformat(),
+            "instrumento_pago_id": inst_bs["id"],
+            "tasa_bcv_aplicada": 100.0,
+            "referencia": "PM-2400",
+        },
+    ).json()
+    assert liq_bs["monto_total_usd"] == pytest.approx(24.0)
+    assert liq_bs["monto_bs"] == pytest.approx(2400.0)
+    assert saldo_inst(inst_bs["id"]) == pytest.approx(saldo_bs_antes - 2400.0)
+
+    # 4. Anular liquidación USD -> revierte v1 a PENDIENTE y restaura saldo USD a $500.00
+    resp_anular = cliente.post(
+        f"/api/comisiones/liquidaciones/{liq_usd['id']}/anular",
+        headers=cab,
+        json={"motivo": "Reversión de prueba integral"},
+    )
+    assert resp_anular.status_code == 200, resp_anular.text
+    assert resp_anular.json()["egreso_registrado"] is False
+    assert saldo_inst(inst_usd["id"]) == pytest.approx(500.0)

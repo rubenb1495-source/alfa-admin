@@ -899,7 +899,7 @@ export default function PaginaComisionesYCierre() {
                       </td>
                       <td className="px-4 py-3 text-xs">
                         <p className="font-semibold text-slate-700">
-                          {l.metodo_pago}
+                          {l.instrumento_pago_nombre || l.metodo_pago}
                         </p>
                         <p className="text-slate-500">
                           {l.referencia || "Sin referencia"}
@@ -915,15 +915,32 @@ export default function PaginaComisionesYCierre() {
                           </p>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-xs">
+                      <td className="px-4 py-3 text-xs space-y-1">
+                        <div>
+                          <span
+                            className={`px-2 py-0.5 rounded-full font-bold text-[11px] ${
+                              l.estado === "PAGADA"
+                                ? "bg-emerald-50 text-emerald-700"
+                                : "bg-red-50 text-red-700"
+                            }`}
+                          >
+                            {l.estado}
+                          </span>
+                        </div>
                         <span
-                          className={`px-2 py-0.5 rounded-full font-bold text-[11px] ${
-                            l.estado === "PAGADA"
-                              ? "bg-emerald-50 text-emerald-700"
-                              : "bg-red-50 text-red-700"
+                          className={`inline-block px-1.5 py-0.5 rounded-md font-semibold text-[10px] ${
+                            l.estado === "ANULADA"
+                              ? "bg-slate-100 text-slate-500"
+                              : l.egreso_registrado
+                              ? "bg-[#EDF3FA] text-[#003566]"
+                              : "bg-slate-100 text-slate-500"
                           }`}
                         >
-                          {l.estado}
+                          {l.estado === "ANULADA"
+                            ? "Egreso revertido"
+                            : l.egreso_registrado
+                            ? "Egreso registrado"
+                            : "Sin egreso"}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right whitespace-nowrap space-x-1">

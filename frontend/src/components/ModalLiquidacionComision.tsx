@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
   CheckCircle2,
   FileDown,
+  Info,
   Loader2,
   MessageCircle,
   Wallet,
@@ -24,15 +25,14 @@ import {
 import type {
   ComisionPorPersonaReporte,
   DetalleVentaComision,
+  InstrumentoFinanciero,
   LiquidacionComisionResumen,
 } from "@/tipos/finanzas";
 
-const METODOS_PAGO = [
-  { valor: "EFECTIVO_USD", etiqueta: "Efectivo USD", esBs: false },
-  { valor: "ZELLE", etiqueta: "Zelle (USD)", esBs: false },
-  { valor: "BINANCE", etiqueta: "Binance (USDT)", esBs: false },
-  { valor: "PAGO_MOVIL", etiqueta: "Pago Móvil (Bs)", esBs: true },
-  { valor: "TRANSFERENCIA_BS", etiqueta: "Transferencia Bancaria (Bs)", esBs: true },
+const INSTRUMENTOS_NO_LIQUIDABLES = [
+  "cashea",
+  "parte de pago",
+  "cuenta por cobrar",
 ];
 
 interface ModalLiquidacionComisionProps {
@@ -57,7 +57,9 @@ export default function ModalLiquidacionComision({
   const [seleccionadas, setSeleccionadas] = useState<Set<number>>(
     () => new Set(ventasPendientes.map((v) => v.venta_id))
   );
-  const [metodoPago, setMetodoPago] = useState("EFECTIVO_USD");
+  const [instrumentos, setInstrumentos] = useState<InstrumentoFinanciero[]>([]);
+  const [instrumentoId, setInstrumentoId] = useState<string>("");
+  const [cargandoInst, setCargandoInst] = useState(true);
   const [tasaBcv, setTasaBcv] = useState(
     tasaBcvInicial ? String(tasaBcvInicial) : ""
   );
@@ -68,8 +70,28 @@ export default function ModalLiquidacionComision({
   const [liquidacionCreada, setLiquidacionCreada] =
     useState<LiquidacionComisionResumen | null>(null);
 
-  const metodoActual = METODOS_PAGO.find((m) => m.valor === metodoPago);
-  const esMetodoBs = Boolean(metodoActual?.esBs);
+  useEffect(() => {
+    setCargandoInst(true);
+    solicitarApi<InstrumentoFinanciero[]>("/api/finanzas/instrumentos")
+      .then((lista) => {
+        const filtrados = lista.filter((inst) => {
+          const nom = inst.nombre.toLowerCase();
+          return !INSTRUMENTOS_NO_LIQUIDABLES.some((exc) => nom.includes(exc));
+        });
+        setInstrumentos(filtrados);
+        if (filtrados[0]) {
+          setInstrumentoId(String(filtrados[0].id));
+        }
+      })
+      .catch(() => setInstrumentos([]))
+      .finally(() => setCargandoInst(false));
+  }, []);
+
+  const instrumentoActual = useMemo(
+    () => instrumentos.find((i) => String(i.id) === instrumentoId) ?? null,
+    [instrumentos, instrumentoId]
+  );
+  const esMetodoBs = instrumentoActual?.moneda === "BS";
 
   const resumenSeleccion = useMemo(() => {
     let pasilloUsd = 0;
@@ -119,7 +141,14 @@ export default function ModalLiquidacionComision({
       setError("Debes seleccionar al menos una venta pendiente para liquidar.");
       return;
     }
-    if (esMetodoBs && (!Number.isFinite(Number(tasaBcv)) || Number(tasaBcv) <= 0)) {
+    if (!instrumentoActual) {
+      setError("Selecciona la cuenta o instrumento financiero de pago.");
+      return;
+    }
+    if (
+      esMetodoBs &&
+      (!Number.isFinite(Number(tasaBcv)) || Number(tasaBcv) <= 0)
+    ) {
       setError("Indica una tasa BCV válida mayor a 0 para pagos en bolívares.");
       return;
     }
@@ -135,7 +164,8 @@ export default function ModalLiquidacionComision({
             venta_ids: ids,
             fecha_inicio: fechaInicio,
             fecha_fin: fechaFin,
-            metodo_pago: metodoPago,
+            instrumento_pago_id: instrumentoActual.id,
+            metodo_pago: instrumentoActual.nombre,
             tasa_bcv_aplicada: esMetodoBs ? Number(tasaBcv) : null,
             referencia: referencia.trim(),
             observaciones: observaciones.trim(),
@@ -192,20 +222,24 @@ export default function ModalLiquidacionComision({
               </div>
               <div className="space-y-1">
                 <p className="text-xs font-bold uppercase tracking-wider text-emerald-700">
-                  Pago registrado exitosamente
+                  Liquidación pagada y egreso registrado en Caja/Finanzas
                 </p>
                 <p className="text-2xl font-black text-[#000814] cifra-tabular">
                   {formatearUsd(liquidacionCreada.monto_total_usd)}
                 </p>
                 {liquidacionCreada.monto_bs && (
                   <p className="text-xs font-semibold text-slate-600">
-                    Equivalente pagado: {formatearBs(liquidacionCreada.monto_bs)}{" "}
+                    Descontado en Bs: {formatearBs(liquidacionCreada.monto_bs)}{" "}
                     (BCV {liquidacionCreada.tasa_bcv_aplicada})
                   </p>
                 )}
                 <p className="text-xs text-slate-500">
-                  Código <strong>{liquidacionCreada.codigo}</strong> ·{" "}
-                  {liquidacionCreada.cantidad_ventas} venta(s) marcadas como{" "}
+                  Código <strong>{liquidacionCreada.codigo}</strong> · Cuenta:{" "}
+                  <strong>
+                    {liquidacionCreada.instrumento_pago_nombre ||
+                      liquidacionCreada.metodo_pago}
+                  </strong>{" "}
+                  · {liquidacionCreada.cantidad_ventas} venta(s) marcadas como{" "}
                   <strong>PAGADA</strong>.
                 </p>
               </div>
@@ -308,7 +342,7 @@ export default function ModalLiquidacionComision({
                   </button>
                 </div>
 
-                <div className="max-h-48 overflow-y-auto rounded-xl border border-slate-200 divide-y divide-slate-100">
+                <div className="max-h-44 overflow-y-auto rounded-xl border border-slate-200 divide-y divide-slate-100">
                   {ventasPendientes.map((v) => {
                     const checked = seleccionadas.has(v.venta_id);
                     return (
@@ -346,20 +380,30 @@ export default function ModalLiquidacionComision({
                 </div>
               </div>
 
-              {/* Datos de pago */}
+              {/* Cuenta / Instrumento real de Finanzas */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Método de pago *
+                    Cuenta / Instrumento de Pago *
                   </label>
                   <select
-                    value={metodoPago}
-                    onChange={(e) => setMetodoPago(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm bg-white"
+                    required
+                    disabled={cargandoInst}
+                    value={instrumentoId}
+                    onChange={(e) => setInstrumentoId(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-semibold bg-white text-[#000814]"
                   >
-                    {METODOS_PAGO.map((m) => (
-                      <option key={m.valor} value={m.valor}>
-                        {m.etiqueta}
+                    {instrumentos.map((inst) => (
+                      <option key={inst.id} value={String(inst.id)}>
+                        {inst.nombre} ({inst.moneda}
+                        {inst.saldo_actual !== undefined
+                          ? ` · Saldo: ${
+                              inst.moneda === "BS"
+                                ? formatearBs(inst.saldo_actual)
+                                : formatearUsd(inst.saldo_actual)
+                            }`
+                          : ""}
+                        )
                       </option>
                     ))}
                   </select>
@@ -367,7 +411,7 @@ export default function ModalLiquidacionComision({
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Referencia (opcional)
+                    Referencia bancaria (opcional)
                   </label>
                   <input
                     type="text"
@@ -397,7 +441,7 @@ export default function ModalLiquidacionComision({
                   </div>
                   <div className="sm:text-right">
                     <p className="text-[11px] font-bold uppercase text-amber-800">
-                      Equivalente a transferir en Bs
+                      Total en Bs a descontar de la cuenta
                     </p>
                     <p className="text-lg font-black text-amber-950 cifra-tabular">
                       {resumenSeleccion.totalBs !== null
@@ -421,7 +465,18 @@ export default function ModalLiquidacionComision({
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-2">
+              {/* Aviso de integración automática con Caja/Finanzas */}
+              <div className="flex items-start gap-2 px-3.5 py-2.5 rounded-xl bg-[#EDF3FA]/70 border border-[#003566]/20 text-[11px] text-[#003566] font-medium">
+                <Info className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>
+                  Al confirmar, se registrará automáticamente un{" "}
+                  <strong>egreso en Caja/Finanzas</strong> en la cuenta{" "}
+                  <strong>{instrumentoActual?.nombre || "seleccionada"}</strong>{" "}
+                  bajo la categoría <strong>Pago de Comisiones</strong>.
+                </span>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-1">
                 <button
                   type="button"
                   onClick={alCerrar}
@@ -431,7 +486,9 @@ export default function ModalLiquidacionComision({
                 </button>
                 <button
                   type="submit"
-                  disabled={guardando || seleccionadas.size === 0}
+                  disabled={
+                    guardando || seleccionadas.size === 0 || !instrumentoActual
+                  }
                   className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#003566] hover:bg-[#001D3D] disabled:opacity-60 text-white text-xs font-bold cursor-pointer"
                 >
                   {guardando ? (
@@ -439,7 +496,8 @@ export default function ModalLiquidacionComision({
                   ) : (
                     <Wallet className="w-4 h-4" />
                   )}
-                  Confirmar liquidación ({formatearUsd(resumenSeleccion.totalUsd)})
+                  Confirmar liquidación (
+                  {formatearUsd(resumenSeleccion.totalUsd)})
                 </button>
               </div>
             </form>

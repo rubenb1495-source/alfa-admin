@@ -70,6 +70,7 @@ class TipoDocumentoPago(str, Enum):
     GUIA = "GUIA"
     PARTE_DE_PAGO = "PARTE_DE_PAGO"
     DEVOLUCION = "DEVOLUCION"
+    COMISION = "COMISION"
 
 
 class EstadoVerificacionPago(str, Enum):
@@ -205,6 +206,9 @@ class Pago(Base):
     conciliado: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     extracto_id: Mapped[int | None] = mapped_column(ForeignKey("extractos_bancarios.id"), nullable=True)
     anulado: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    categoria: Mapped[str] = mapped_column(String(80), default="", nullable=False)
+    origen_tipo: Mapped[str] = mapped_column(String(40), default="", nullable=False, index=True)
+    origen_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     nota: Mapped[str] = mapped_column(Text, default="", nullable=False)
 
     venta = relationship("Venta", back_populates="pagos")
@@ -279,6 +283,12 @@ class LiquidacionComision(Base):
     monto_lead_usd: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"), nullable=False)
     monto_total_usd: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"), nullable=False)
     metodo_pago: Mapped[str] = mapped_column(String(40), nullable=False)
+    instrumento_pago_id: Mapped[int | None] = mapped_column(
+        ForeignKey("instrumentos_financieros.id"), nullable=True, index=True
+    )
+    movimiento_financiero_id: Mapped[int | None] = mapped_column(
+        ForeignKey("pagos.id"), nullable=True, index=True
+    )
     tasa_bcv_aplicada: Mapped[Decimal | None] = mapped_column(Numeric(14, 4), nullable=True)
     monto_bs: Mapped[Decimal | None] = mapped_column(Numeric(16, 2), nullable=True)
     referencia: Mapped[str] = mapped_column(String(120), default="", nullable=False)
@@ -292,4 +302,6 @@ class LiquidacionComision(Base):
 
     personal = relationship("Usuario", foreign_keys=[personal_id])
     pagado_por = relationship("Usuario", foreign_keys=[pagado_por_id])
+    instrumento_pago = relationship("InstrumentoFinanciero", foreign_keys=[instrumento_pago_id])
+    movimiento_financiero = relationship("Pago", foreign_keys=[movimiento_financiero_id])
     ventas = relationship("Venta", foreign_keys="Venta.liquidacion_id")

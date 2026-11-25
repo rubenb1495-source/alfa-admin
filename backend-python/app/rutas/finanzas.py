@@ -70,6 +70,14 @@ def listar_instrumentos(
         .order_by(InstrumentoFinanciero.id.asc())
         .all()
     )
+    pagos_activos = bd.query(Pago).filter(Pago.anulado.is_(False)).all()
+    neto_por_inst: dict[int, Decimal] = {}
+    for p in pagos_activos:
+        signo = Decimal("-1") if p.tipo_movimiento == TipoMovimientoPago.EGRESO.value else Decimal("1")
+        neto_por_inst[p.instrumento_id] = neto_por_inst.get(p.instrumento_id, Decimal("0")) + (
+            p.monto_moneda_origen * signo
+        )
+
     return [
         {
             "id": i.id,
@@ -78,6 +86,9 @@ def listar_instrumentos(
             "tipo_precio": i.tipo_precio,
             "requiere_verificacion": i.requiere_verificacion,
             "liquida_en_bs": i.liquida_en_bs,
+            "saldo_actual": redondear_usd(
+                (i.saldo_inicial or Decimal("0")) + neto_por_inst.get(i.id, Decimal("0"))
+            ),
         }
         for i in filas
     ]
@@ -113,7 +124,11 @@ def listar_pagos(
             "instrumento_id": p.instrumento_id,
             "instrumento": p.instrumento.nombre if p.instrumento else None,
             "fecha": p.fecha.isoformat(),
+            "tipo_movimiento": p.tipo_movimiento,
             "tipo_documento": p.tipo_documento,
+            "categoria": getattr(p, "categoria", "") or "",
+            "origen_tipo": getattr(p, "origen_tipo", "") or "",
+            "origen_id": getattr(p, "origen_id", None),
             "monto_moneda_origen": redondear_usd(p.monto_moneda_origen),
             "moneda": p.moneda,
             "usd_nominal": redondear_usd(p.usd_nominal),
@@ -138,6 +153,11 @@ def confirmar_pago_digital(
     pago = bd.query(Pago).filter(Pago.id == pago_id).first()
     if pago is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pago no encontrado.")
+    if getattr(pago, "origen_tipo", "") == "LIQUIDACION_COMISION":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Este egreso fue generado por una liquidación de comisiones. Debe gestionarse desde el Historial de Liquidaciones.",
+        )
 
     verificar_mes_abierto(bd, pago.fecha)
 
@@ -156,6 +176,28 @@ def confirmar_pago_digital(
         "estado_verificacion": pago.estado_verificacion,
         "verificado_por": usuario_actual.nombre,
     }
+
+
+@enrutador.delete("/pagos/{pago_id}")
+def eliminar_movimiento_financiero(
+    pago_id: int,
+    _usuario: Usuario = Depends(requerir_roles(*ROLES_ADMINISTRATIVOS)),
+    bd: Session = Depends(obtener_bd),
+) -> dict[str, Any]:
+    """Anula un movimiento financiero manual, bloqueando egresos generados por liquidaciones de comisiones."""
+    pago = bd.query(Pago).filter(Pago.id == pago_id).first()
+    if pago is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Movimiento financiero no encontrado.")
+    if getattr(pago, "origen_tipo", "") == "LIQUIDACION_COMISION":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No puedes eliminar manualmente un egreso generado por liquidación de comisiones. Anúlalo desde el Historial de Liquidaciones.",
+        )
+
+    verificar_mes_abierto(bd, pago.fecha)
+    pago.anulado = True
+    bd.commit()
+    return {"id": pago.id, "anulado": True}
 
 
 # ---------------- Cuentas por Cobrar y Cashea ----------------
@@ -1057,6 +1099,8 @@ def _calcular_comision_venta_individual(venta: Venta, usuario: Usuario) -> tuple
 
 def _serializar_liquidacion(liq: LiquidacionComision, incluir_ventas: bool = False) -> dict[str, Any]:
     personal = liq.personal
+    inst = getattr(liq, "instrumento_pago", None)
+    mov = getattr(liq, "movimiento_financiero", None)
     datos: dict[str, Any] = {
         "id": liq.id,
         "codigo": liq.codigo,
@@ -1074,6 +1118,15 @@ def _serializar_liquidacion(liq: LiquidacionComision, incluir_ventas: bool = Fal
         "monto_lead_usd": redondear_usd(liq.monto_lead_usd),
         "monto_total_usd": redondear_usd(liq.monto_total_usd),
         "metodo_pago": liq.metodo_pago,
+        "instrumento_pago_id": getattr(liq, "instrumento_pago_id", None),
+        "instrumento_pago_nombre": inst.nombre if inst else liq.metodo_pago,
+        "instrumento_pago_moneda": inst.moneda if inst else ("BS" if liq.monto_bs else "USD"),
+        "movimiento_financiero_id": getattr(liq, "movimiento_financiero_id", None),
+        "egreso_registrado": bool(
+            getattr(liq, "movimiento_financiero_id", None)
+            and (mov is None or not mov.anulado)
+            and liq.estado == EstadoLiquidacionComision.PAGADA.value
+        ),
         "tasa_bcv_aplicada": float(liq.tasa_bcv_aplicada) if liq.tasa_bcv_aplicada is not None else None,
         "monto_bs": redondear_usd(liq.monto_bs) if liq.monto_bs is not None else None,
         "referencia": liq.referencia,
@@ -1187,49 +1240,140 @@ def crear_liquidacion_comisiones(
             detail="Las ventas seleccionadas no generan comisión pendiente mayor a $0.00.",
         )
 
+    # Resolver y validar instrumento financiero de pago
+    instrumento: InstrumentoFinanciero | None = None
+    if datos.instrumento_pago_id is not None:
+        instrumento = (
+            bd.query(InstrumentoFinanciero)
+            .filter(
+                InstrumentoFinanciero.id == datos.instrumento_pago_id,
+                InstrumentoFinanciero.activo.is_(True),
+            )
+            .first()
+        )
+        if instrumento is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="El instrumento financiero seleccionado no existe o está inactivo.",
+            )
+    else:
+        # Compatibilidad si se envía solo metodo_pago (ej. PAGO_MOVIL / ZELLE / EFECTIVO_USD)
+        metodo_up = (datos.metodo_pago or "").strip().upper()
+        quiere_bs = metodo_up in ("PAGO_MOVIL", "TRANSFERENCIA_BS", "EFECTIVO_BS") or "BS" in metodo_up
+        consulta_inst = bd.query(InstrumentoFinanciero).filter(InstrumentoFinanciero.activo.is_(True))
+        if quiere_bs:
+            instrumento = consulta_inst.filter(InstrumentoFinanciero.moneda == MonedaInstrumento.BS.value).first()
+        else:
+            instrumento = consulta_inst.filter(InstrumentoFinanciero.moneda != MonedaInstrumento.BS.value).first()
+        if instrumento is None:
+            instrumento = consulta_inst.first()
+        if instrumento is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No hay instrumentos financieros activos disponibles para registrar el egreso.",
+            )
+
+    hoy = obtener_fecha_hoy()
+    es_bs = instrumento.moneda == MonedaInstrumento.BS.value
     tasa_bcv = datos.tasa_bcv_aplicada
+    if es_bs and tasa_bcv is None:
+        tasa_dia = bd.query(TasaDiaria).order_by(TasaDiaria.fecha.desc()).first()
+        if tasa_dia and tasa_dia.tasa_bcv > 0:
+            tasa_bcv = tasa_dia.tasa_bcv
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Debes indicar una tasa BCV válida para pagos en bolívares.",
+            )
+
     monto_bs = (
         (monto_total * tasa_bcv).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-        if tasa_bcv is not None
+        if es_bs and tasa_bcv is not None
         else None
     )
 
-    hoy = obtener_fecha_hoy()
     codigo = _generar_codigo_liquidacion(bd, hoy.year)
+    metodo_etiqueta = datos.metodo_pago.strip() or instrumento.nombre
 
-    liq = LiquidacionComision(
-        codigo=codigo,
-        personal_id=personal.id,
-        fecha_inicio=datos.fecha_inicio,
-        fecha_fin=datos.fecha_fin,
-        cantidad_ventas=cantidad_pasillo + cantidad_lead,
-        cantidad_pasillo=cantidad_pasillo,
-        cantidad_lead=cantidad_lead,
-        monto_pasillo_usd=monto_pasillo,
-        monto_lead_usd=monto_lead,
-        monto_total_usd=monto_total,
-        metodo_pago=datos.metodo_pago.strip().upper(),
-        tasa_bcv_aplicada=tasa_bcv,
-        monto_bs=monto_bs,
-        referencia=datos.referencia.strip(),
-        observaciones=datos.observaciones.strip(),
-        estado=EstadoLiquidacionComision.PAGADA.value,
-        pagado_por_id=usuario_actual.id,
-    )
-    bd.add(liq)
-    bd.flush()
+    try:
+        liq = LiquidacionComision(
+            codigo=codigo,
+            personal_id=personal.id,
+            fecha_inicio=datos.fecha_inicio,
+            fecha_fin=datos.fecha_fin,
+            cantidad_ventas=cantidad_pasillo + cantidad_lead,
+            cantidad_pasillo=cantidad_pasillo,
+            cantidad_lead=cantidad_lead,
+            monto_pasillo_usd=monto_pasillo,
+            monto_lead_usd=monto_lead,
+            monto_total_usd=monto_total,
+            metodo_pago=metodo_etiqueta,
+            instrumento_pago_id=instrumento.id,
+            tasa_bcv_aplicada=tasa_bcv if es_bs else None,
+            monto_bs=monto_bs,
+            referencia=datos.referencia.strip(),
+            observaciones=datos.observaciones.strip(),
+            estado=EstadoLiquidacionComision.PAGADA.value,
+            pagado_por_id=usuario_actual.id,
+        )
+        bd.add(liq)
+        bd.flush()
 
-    for v in ventas:
-        v.estado_comision = EstadoComision.PAGADA.value
-        v.liquidacion_id = liq.id
+        # Registrar automáticamente el EGRESO en Caja/Finanzas en la misma transacción
+        descripcion_egreso = (
+            f"Pago de comisiones {codigo} - {personal.nombre} "
+            f"({datos.fecha_inicio.isoformat()} al {datos.fecha_fin.isoformat()})"
+        )
+        pago_egreso = Pago(
+            venta_id=None,
+            instrumento_id=instrumento.id,
+            fecha=hoy,
+            tipo_movimiento=TipoMovimientoPago.EGRESO.value,
+            tipo_documento=TipoDocumentoPago.COMISION.value,
+            monto_moneda_origen=monto_bs if es_bs and monto_bs is not None else monto_total,
+            moneda=instrumento.moneda,
+            tasa_bcv_dia=tasa_bcv if es_bs and tasa_bcv is not None else Decimal("0"),
+            tasa_usdt_dia=Decimal("0"),
+            usd_nominal=monto_total,
+            usd_real=monto_total,
+            cubre_promo_usd=Decimal("0"),
+            referencia=datos.referencia.strip() or codigo,
+            estado_verificacion=EstadoVerificacionPago.CONFIRMADO.value,
+            verificado_por_id=usuario_actual.id,
+            conciliado=False,
+            anulado=False,
+            categoria="Pago de Comisiones",
+            origen_tipo="LIQUIDACION_COMISION",
+            origen_id=liq.id,
+            nota=descripcion_egreso,
+        )
+        bd.add(pago_egreso)
+        bd.flush()
 
-    bd.commit()
+        liq.movimiento_financiero_id = pago_egreso.id
+
+        for v in ventas:
+            v.estado_comision = EstadoComision.PAGADA.value
+            v.liquidacion_id = liq.id
+
+        bd.commit()
+    except HTTPException:
+        bd.rollback()
+        raise
+    except Exception as exc:
+        bd.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al registrar la liquidación y su egreso financiero: {exc}",
+        ) from exc
 
     liq_completa = (
         bd.query(LiquidacionComision)
         .options(
             joinedload(LiquidacionComision.personal),
             joinedload(LiquidacionComision.pagado_por),
+            joinedload(LiquidacionComision.instrumento_pago),
+            joinedload(LiquidacionComision.movimiento_financiero),
             joinedload(LiquidacionComision.ventas).joinedload(Venta.cliente),
             joinedload(LiquidacionComision.ventas).joinedload(Venta.detalles).joinedload(VentaDetalle.articulo),
         )
@@ -1251,6 +1395,8 @@ def listar_liquidaciones_comisiones(
     consulta = bd.query(LiquidacionComision).options(
         joinedload(LiquidacionComision.personal),
         joinedload(LiquidacionComision.pagado_por),
+        joinedload(LiquidacionComision.instrumento_pago),
+        joinedload(LiquidacionComision.movimiento_financiero),
     )
     if personal_id is not None:
         consulta = consulta.filter(LiquidacionComision.personal_id == personal_id)
@@ -1276,6 +1422,8 @@ def obtener_liquidacion_detalle(
         .options(
             joinedload(LiquidacionComision.personal),
             joinedload(LiquidacionComision.pagado_por),
+            joinedload(LiquidacionComision.instrumento_pago),
+            joinedload(LiquidacionComision.movimiento_financiero),
             joinedload(LiquidacionComision.ventas).joinedload(Venta.cliente),
             joinedload(LiquidacionComision.ventas).joinedload(Venta.detalles).joinedload(VentaDetalle.articulo),
         )
@@ -1294,12 +1442,14 @@ def anular_liquidacion_comision(
     _usuario: Usuario = Depends(requerir_roles(*ROLES_ADMINISTRATIVOS)),
     bd: Session = Depends(obtener_bd),
 ) -> dict[str, Any]:
-    """Anula una liquidación y devuelve todas sus ventas asociadas a estado_comision = PENDIENTE."""
+    """Anula una liquidación, devuelve sus ventas a PENDIENTE y revierte automáticamente el egreso en Finanzas."""
     liq = (
         bd.query(LiquidacionComision)
         .options(
             joinedload(LiquidacionComision.personal),
             joinedload(LiquidacionComision.pagado_por),
+            joinedload(LiquidacionComision.instrumento_pago),
+            joinedload(LiquidacionComision.movimiento_financiero),
             joinedload(LiquidacionComision.ventas),
         )
         .filter(LiquidacionComision.id == liq_id)
@@ -1317,6 +1467,12 @@ def anular_liquidacion_comision(
     for v in ventas_asociadas:
         v.estado_comision = EstadoComision.PENDIENTE.value
         v.liquidacion_id = None
+
+    # Revertir automáticamente el egreso vinculado en Caja/Finanzas para restaurar el saldo
+    if liq.movimiento_financiero_id is not None:
+        pago_egreso = bd.query(Pago).filter(Pago.id == liq.movimiento_financiero_id).first()
+        if pago_egreso is not None:
+            pago_egreso.anulado = True
 
     liq.estado = EstadoLiquidacionComision.ANULADA.value
     liq.motivo_anulacion = datos.motivo.strip()

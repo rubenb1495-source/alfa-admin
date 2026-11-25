@@ -5,6 +5,7 @@ export interface InstrumentoFinanciero {
   tipo_precio: "PROMO" | "REGULAR";
   requiere_verificacion: boolean;
   liquida_en_bs: boolean;
+  saldo_actual?: number;
   activo?: boolean;
 }
 
@@ -117,7 +118,11 @@ export interface PagoBandeja {
   instrumento_id: number;
   instrumento: string | null;
   fecha: string;
+  tipo_movimiento?: "INGRESO" | "EGRESO" | "TRASLADO" | string;
   tipo_documento: string;
+  categoria?: string;
+  origen_tipo?: string;
+  origen_id?: number | null;
   monto_moneda_origen: number;
   moneda: string;
   usd_nominal: number;
@@ -277,6 +282,11 @@ export interface LiquidacionComisionResumen {
   monto_lead_usd: number;
   monto_total_usd: number;
   metodo_pago: string;
+  instrumento_pago_id?: number | null;
+  instrumento_pago_nombre?: string;
+  instrumento_pago_moneda?: string;
+  movimiento_financiero_id?: number | null;
+  egreso_registrado?: boolean;
   tasa_bcv_aplicada: number | null;
   monto_bs: number | null;
   referencia: string;

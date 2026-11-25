@@ -105,7 +105,8 @@ class LiquidacionCrearEntrada(BaseModel):
     venta_ids: list[int] = Field(min_length=1)
     fecha_inicio: date
     fecha_fin: date
-    metodo_pago: str = Field(min_length=2, max_length=40)
+    instrumento_pago_id: int | None = None
+    metodo_pago: str = Field(default="", max_length=40)
     tasa_bcv_aplicada: Decimal | None = Field(default=None, gt=0)
     referencia: str = Field(default="", max_length=120)
     observaciones: str = Field(default="", max_length=500)

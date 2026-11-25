@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle, CheckCircle2, CheckSquare, Copy } from "lucide-react";
+import { AlertCircle, CheckCircle2, CheckSquare, Copy, Lock } from "lucide-react";
 import BuscadorTabla from "@/componentes/BuscadorTabla";
 import { usarSesion } from "@/contexto/SesionContexto";
 import {
@@ -273,19 +273,48 @@ export default function PaginaFinanzasPagos() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {pagosFiltrados.map((p) => (
-                  <tr key={p.id}>
+                {pagosFiltrados.map((p) => {
+                  const esComision = p.origen_tipo === "LIQUIDACION_COMISION";
+                  const esEgreso = p.tipo_movimiento === "EGRESO";
+                  const codigoLiq = esComision
+                    ? p.nota?.match(/LIQ-\d{4}-\d+/)?.[0] || p.referencia
+                    : null;
+                  return (
+                  <tr key={p.id} className={esEgreso ? "bg-rose-50/30" : ""}>
                     <td className="px-4 py-3 text-xs">
                       <p className="font-bold">{p.fecha}</p>
-                      <p className="font-mono text-slate-500">
-                        {p.numero_venta || p.tipo_documento}
-                      </p>
+                      {esComision ? (
+                        <div className="flex flex-wrap items-center gap-1 mt-0.5">
+                          <span className="px-1.5 py-0.5 rounded-md bg-[#EDF3FA] text-[#003566] font-bold text-[10px]">
+                            {p.categoria || "Pago de Comisiones"}
+                          </span>
+                          {codigoLiq && (
+                            <span className="px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-700 font-mono font-bold text-[10px]">
+                              {codigoLiq}
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="font-mono text-slate-500">
+                          {p.numero_venta || p.tipo_documento}
+                        </p>
+                      )}
+                      {esComision && p.nota && (
+                        <p className="text-[11px] text-slate-500 mt-0.5 max-w-xs truncate" title={p.nota}>
+                          {p.nota}
+                        </p>
+                      )}
                     </td>
                     <td className="px-4 py-3 font-semibold">{p.instrumento}</td>
                     <td className="px-4 py-3 font-mono text-xs">
                       {p.referencia || "—"}
                     </td>
-                    <td className="px-4 py-3 text-right font-bold">
+                    <td
+                      className={`px-4 py-3 text-right font-bold ${
+                        esEgreso ? "text-red-700" : "text-slate-900"
+                      }`}
+                    >
+                      {esEgreso ? "-" : ""}
                       {p.monto_moneda_origen.toLocaleString("es-VE", {
                         minimumFractionDigits: 2,
                       })}{" "}
@@ -294,12 +323,14 @@ export default function PaginaFinanzasPagos() {
                     <td className="px-4 py-3">
                       <span
                         className={`px-2 py-0.5 rounded-full text-xs font-bold ${
-                          p.estado_verificacion === "CONFIRMADO"
+                          esEgreso
+                            ? "bg-red-50 text-red-700"
+                            : p.estado_verificacion === "CONFIRMADO"
                             ? "bg-emerald-50 text-emerald-700"
                             : "bg-amber-100 text-amber-800"
                         }`}
                       >
-                        {p.estado_verificacion}
+                        {esEgreso ? "EGRESO" : p.estado_verificacion}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right space-x-1.5 whitespace-nowrap">
@@ -311,19 +342,32 @@ export default function PaginaFinanzasPagos() {
                         <Copy className="w-3.5 h-3.5" />
                         {copiadoPagoId === p.id ? "¡Copiado!" : "WhatsApp"}
                       </button>
-                      {p.estado_verificacion === "PENDIENTE" && (
+                      {esComision ? (
                         <button
                           type="button"
-                          onClick={() => void confirmarPago(p.id)}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold cursor-pointer"
+                          disabled
+                          title="Generado por liquidación de comisiones — anular desde Comisiones"
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-100 text-slate-400 text-xs font-bold cursor-not-allowed"
                         >
-                          <CheckSquare className="w-3.5 h-3.5" />
-                          Confirmar
+                          <Lock className="w-3.5 h-3.5" />
+                          Protegido
                         </button>
+                      ) : (
+                        p.estado_verificacion === "PENDIENTE" && (
+                          <button
+                            type="button"
+                            onClick={() => void confirmarPago(p.id)}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold cursor-pointer"
+                          >
+                            <CheckSquare className="w-3.5 h-3.5" />
+                            Confirmar
+                          </button>
+                        )
                       )}
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
