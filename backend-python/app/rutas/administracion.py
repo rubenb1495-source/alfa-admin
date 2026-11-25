@@ -49,9 +49,34 @@ from app.modelos_finanzas import (
 from app.rutas.logistica import generar_correlativo
 from app.rutas.tasas import obtener_fecha_hoy
 from app.seguridad import requerir_admin, requerir_direccion_lectura
+from app.servicios.contabilidad import crear_asiento_contable
+from app.servicios.limpieza_simulacion import limpiar_datos_simulacion
 
 
 enrutador = APIRouter(prefix="/api/admin", tags=["Departamento de Administración y Finanzas"])
+
+
+def _cuenta_gasto_por_categoria(categoria: str, descripcion: str = "") -> str:
+    txt = f"{categoria} {descripcion}".upper()
+    if any(k in txt for k in ("ENVIO", "ENVÍO", "DELIVERY", "DESPACHO", "FLETE")):
+        return "6.1.02"
+    if "ALQUILER" in txt and ("ALMACEN" in txt or "ALMACÉN" in txt):
+        return "7.2.02"
+    if "ALQUILER" in txt:
+        return "7.2.01"
+    if "CONDOMINIO" in txt:
+        return "7.2.03"
+    if any(k in txt for k in ("SENIAT", "ISLR", "IGTF", "IVA")):
+        return "9.1.01"
+    if any(k in txt for k in ("ALCALDIA", "ALCALDÍA", "MUNICIPAL", "PATENTE", "ISAE")):
+        return "9.1.02"
+    if any(k in txt for k in ("SERVICIO", "INTERNET", "ELECTRICIDAD", "AGUA", "TELEFON")):
+        return "7.3.01"
+    if "GARANTIA" in txt or "GARANTÍA" in txt:
+        return "6.1.03"
+    if "COMISION" in txt and "BANC" in txt:
+        return "8.1.01"
+    return "7.3.02"
 
 
 def _q2(valor: Decimal) -> Decimal:
@@ -319,6 +344,20 @@ def pagar_factura_gasto(
     )
     gasto.monto_pagado_usd = _q2(gasto.monto_pagado_usd + datos.monto_usd)
     gasto.estado = "PAGADA" if gasto.monto_pagado_usd >= gasto.monto_total_usd - Decimal("0.01") else "PARCIAL"
+
+    cta_gasto = _cuenta_gasto_por_categoria(gasto.categoria, gasto.observaciones)
+    crear_asiento_contable(
+        bd=bd,
+        usuario=usuario_actual,
+        fecha_op=obtener_fecha_hoy(),
+        descripcion=f"Pago Gasto ({gasto.categoria}): {gasto.razon_social} - {gasto.observaciones[:80]}",
+        origen_tipo="FACTURA_GASTO",
+        origen_id=gasto.id,
+        lineas=[
+            {"cuenta_codigo": cta_gasto, "debe_usd": datos.monto_usd, "haber_usd": 0, "nota": gasto.observaciones[:120]},
+            {"cuenta_codigo": "1.1.01", "debe_usd": 0, "haber_usd": datos.monto_usd, "nota": f"Egreso pago {gasto.numero_factura}"},
+        ],
+    )
 
     registrar_auditoria(
         bd,
@@ -738,6 +777,21 @@ def pagar_obligacion(
     ob.referencia_pago = datos.referencia_pago.strip()
     ob.fecha_pago = hoy
 
+    org_up = (ob.organismo or "").upper()
+    cta_ob = "9.1.01" if "SENIAT" in org_up else ("9.1.02" if "ALCALD" in org_up else "7.1.05")
+    crear_asiento_contable(
+        bd=bd,
+        usuario=usuario_actual,
+        fecha_op=hoy,
+        descripcion=f"Pago Obligación {ob.organismo} - {ob.tipo_obligacion} ({ob.periodo})",
+        origen_tipo="OBLIGACION_LEGAL",
+        origen_id=ob.id,
+        lineas=[
+            {"cuenta_codigo": cta_ob, "debe_usd": datos.monto_pagado_usd, "haber_usd": 0, "nota": f"{ob.organismo} {ob.tipo_obligacion}"},
+            {"cuenta_codigo": "1.1.01", "debe_usd": 0, "haber_usd": datos.monto_pagado_usd, "nota": f"Egreso {ob.organismo}"},
+        ],
+    )
+
     registrar_auditoria(
         bd,
         usuario_actual,
@@ -940,6 +994,46 @@ def pagar_nomina(
     nom.instrumento_pago_id = datos.instrumento_pago_id
     nom.pago_id = pago.id
     nom.referencia_pago = datos.referencia_pago.strip()
+
+    # Contabilizar nómina desglosada por cuenta 7.1.01–7.1.04
+    detalles_nom = (
+        bd.query(NominaDetalle)
+        .options(joinedload(NominaDetalle.personal))
+        .filter(NominaDetalle.nomina_id == nom.id)
+        .all()
+    )
+    grupos_nom: dict[str, Decimal] = {}
+    for det in detalles_nom:
+        rol = (det.personal.rol if det.personal else "").upper()
+        cargo = (det.cargo or (det.personal.nombre if det.personal else "")).upper()
+        if rol in ("ENCARGADO_TIENDA", "LIDER") or "ENCARGADO" in cargo:
+            cta_n = "7.1.01"
+        elif rol == "ADMINISTRACION" or "ADMINISTRAD" in cargo:
+            cta_n = "7.1.02"
+        elif rol in ("DIRECCION", "DIRECTOR") or any(k in cargo for k in ("DIRECTOR", "SOCIO", "ACCIONISTA")):
+            cta_n = "7.1.03"
+        else:
+            cta_n = "7.1.04"
+        grupos_nom[cta_n] = grupos_nom.get(cta_n, Decimal("0")) + Decimal(det.neto_pagar_usd or 0)
+
+    if grupos_nom and nom.total_neto_usd > 0:
+        lineas_nom = [
+            {"cuenta_codigo": cta_c, "debe_usd": m_c, "haber_usd": 0, "nota": f"Nómina {nom.codigo} ({cta_c})"}
+            for cta_c, m_c in sorted(grupos_nom.items())
+            if m_c > 0
+        ]
+        lineas_nom.append(
+            {"cuenta_codigo": "1.1.01", "debe_usd": 0, "haber_usd": nom.total_neto_usd, "nota": f"Pago Nómina {nom.codigo}"}
+        )
+        crear_asiento_contable(
+            bd=bd,
+            usuario=usuario_actual,
+            fecha_op=obtener_fecha_hoy(),
+            descripcion=f"Pago Nómina {nom.codigo} ({nom.fecha_inicio} al {nom.fecha_fin}) {nom.observaciones[:60]}",
+            origen_tipo="NOMINA",
+            origen_id=nom.id,
+            lineas=lineas_nom,
+        )
 
     registrar_auditoria(
         bd,
@@ -1521,3 +1615,23 @@ def exportar_pnl_pdf(
         media_type="application/pdf",
         headers={"Content-Disposition": 'inline; filename="estado_resultados_alfa.pdf"'},
     )
+
+
+class LimpiarSimulacionEntrada(BaseModel):
+    confirmacion: str = Field(min_length=5, max_length=60)
+    prefijo: str = Field(default="[SIM-ALFA]", min_length=4, max_length=40)
+
+
+@enrutador.post("/limpiar-simulacion")
+def ejecutar_limpieza_simulacion(
+    datos: LimpiarSimulacionEntrada,
+    _usuario_actual: Usuario = Depends(requerir_admin),
+    bd: Session = Depends(obtener_bd),
+) -> dict[str, Any]:
+    """Elimina únicamente registros etiquetados con `[SIM-ALFA]` sin tocar datos de producción."""
+    if datos.confirmacion.strip() != "ELIMINAR-SIM-ALFA":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Confirmación inválida. Envía confirmacion='ELIMINAR-SIM-ALFA'.",
+        )
+    return limpiar_datos_simulacion(bd, prefijo=datos.prefijo.strip())

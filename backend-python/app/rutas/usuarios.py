@@ -122,6 +122,10 @@ def crear_usuario(
         cedula=datos.cedula.strip(),
         tiene_acceso=tiene_acceso,
         sucursal_id=datos.sucursal_id,
+        cargo=datos.cargo.strip(),
+        salario_base_usd=datos.salario_base_usd,
+        bono_alimentacion_usd=datos.bono_alimentacion_usd,
+        bonos_fijos_usd=datos.bonos_fijos_usd,
         activo=True,
     )
     bd.add(nuevo)

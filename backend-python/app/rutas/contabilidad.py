@@ -524,6 +524,35 @@ def obtener_balance_general(
     total_pasivos = cxp_total + com_pend + imp_pend + prestamos_pend
     patrimonio_neto = total_activos - total_pasivos
 
+    # Desglose de Patrimonio desde asientos en 3.1.01 (Capital Social) y 3.2.01 (Dividendos / Repartición)
+    capital_social = Decimal("0")
+    reparticion_socios = Decimal("0")
+    det_pat = (
+        bd.query(AsientoDetalle)
+        .join(AsientoContable, AsientoDetalle.asiento_id == AsientoContable.id)
+        .join(PlanCuenta, AsientoDetalle.cuenta_contable_id == PlanCuenta.id)
+        .options(joinedload(AsientoDetalle.cuenta))
+        .filter(
+            AsientoContable.estado == "CONTABILIZADO",
+            PlanCuenta.codigo.in_(["3.1.01", "3.2.01"]),
+        )
+        .all()
+    )
+    for dp in det_pat:
+        if dp.cuenta and dp.cuenta.codigo == "3.1.01":
+            capital_social += Decimal(dp.haber_usd or 0) - Decimal(dp.debe_usd or 0)
+        elif dp.cuenta and dp.cuenta.codigo == "3.2.01":
+            reparticion_socios += Decimal(dp.debe_usd or 0) - Decimal(dp.haber_usd or 0)
+    resultado_ejercicio = patrimonio_neto - capital_social + reparticion_socios
+    detalle_patrimonio = [
+        {"codigo": "3.1.01", "nombre": "Capital Social / Aportes de Socios", "saldo_usd": _r2(capital_social)},
+        {"codigo": "3.2.01", "nombre": "Resultado del Ejercicio / Utilidades Acumuladas", "saldo_usd": _r2(resultado_ejercicio)},
+    ]
+    if reparticion_socios != 0:
+        detalle_patrimonio.append(
+            {"codigo": "3.2.01-DIV", "nombre": "(-) Repartición de Ganancias / Dividendos a Socios", "saldo_usd": _r2(-reparticion_socios)}
+        )
+
     return {
         "fecha_corte": hoy.isoformat(),
         "activos": {
@@ -548,11 +577,10 @@ def obtener_balance_general(
         },
         "patrimonio": {
             "total_usd": _r2(patrimonio_neto),
-            "detalle": [
-                {"codigo": "3.1.01 / 3.2.01", "nombre": "Patrimonio Neto y Resultado del Ejercicio", "saldo_usd": _r2(patrimonio_neto)},
-            ],
+            "detalle": detalle_patrimonio,
         },
-        "ecuacion_cuadrada": True,
+        "diferencia_cuadre_usd": _r2(total_activos - (total_pasivos + patrimonio_neto)),
+        "ecuacion_cuadrada": abs(total_activos - (total_pasivos + patrimonio_neto)) <= Decimal("0.01"),
     }
 
 
@@ -604,10 +632,10 @@ def obtener_estado_resultados_contable(
         bucket["monto_usd"] += saldo_lin
 
     utilidad_bruta = totales_tipo["INGRESO"] - totales_tipo["COSTO"]
+    margen_contribucion = utilidad_bruta - totales_tipo["GASTO_VARIABLE"]
+    utilidad_operativa_ebit = margen_contribucion - totales_tipo["GASTO_FIJO"]
     utilidad_neta = (
-        utilidad_bruta
-        - totales_tipo["GASTO_VARIABLE"]
-        - totales_tipo["GASTO_FIJO"]
+        utilidad_operativa_ebit
         - totales_tipo["GASTO_FINANCIERO"]
         - totales_tipo["IMPUESTO"]
     )
@@ -618,7 +646,9 @@ def obtener_estado_resultados_contable(
         "costo_ventas_usd": _r2(totales_tipo["COSTO"]),
         "utilidad_bruta_usd": _r2(utilidad_bruta),
         "gastos_variables_usd": _r2(totales_tipo["GASTO_VARIABLE"]),
+        "margen_contribucion_usd": _r2(margen_contribucion),
         "gastos_fijos_usd": _r2(totales_tipo["GASTO_FIJO"]),
+        "utilidad_operativa_ebit_usd": _r2(utilidad_operativa_ebit),
         "gastos_financieros_usd": _r2(totales_tipo["GASTO_FINANCIERO"]),
         "impuestos_usd": _r2(totales_tipo["IMPUESTO"]),
         "utilidad_neta_usd": _r2(utilidad_neta),
@@ -626,6 +656,98 @@ def obtener_estado_resultados_contable(
             [{**v, "monto_usd": _r2(v["monto_usd"])} for v in por_cuenta.values()],
             key=lambda x: x["codigo"],
         ),
+    }
+
+
+class MovimientoPatrimonialEntrada(BaseModel):
+    tipo: str = Field(pattern="^(APORTE_CAPITAL|REPARTICION_GANANCIAS)$")
+    instrumento_pago_id: int
+    monto_usd: Decimal = Field(gt=Decimal("0"))
+    socio_nombre: str = Field(default="", max_length=160)
+    referencia: str = Field(default="", max_length=120)
+    descripcion: str = Field(default="", max_length=255)
+    fecha: date | None = None
+
+
+@enrutador.post("/movimiento-patrimonial", status_code=status.HTTP_201_CREATED)
+def registrar_movimiento_patrimonial(
+    datos: MovimientoPatrimonialEntrada,
+    usuario_actual: Usuario = Depends(requerir_admin),
+    bd: Session = Depends(obtener_bd),
+) -> dict[str, Any]:
+    """Registra aportes de capital (3.1.01) o repartición de ganancias/dividendos (3.2.01) con movimiento real en Tesorería."""
+    inst = (
+        bd.query(InstrumentoFinanciero)
+        .filter(InstrumentoFinanciero.id == datos.instrumento_pago_id, InstrumentoFinanciero.activo.is_(True))
+        .first()
+    )
+    if inst is None:
+        raise HTTPException(status_code=404, detail="Instrumento financiero no encontrado.")
+
+    fecha_op = datos.fecha or obtener_fecha_hoy()
+    tasa = _tasa_bcv_hoy(bd)
+    es_bs = inst.moneda == MonedaInstrumento.BS.value
+    monto_orig = _q2(datos.monto_usd * tasa) if es_bs else _q2(datos.monto_usd)
+    es_aporte = datos.tipo == "APORTE_CAPITAL"
+
+    pago = Pago(
+        venta_id=None,
+        instrumento_id=inst.id,
+        fecha=fecha_op,
+        tipo_movimiento=TipoMovimientoPago.INGRESO.value if es_aporte else TipoMovimientoPago.EGRESO.value,
+        tipo_documento=TipoDocumentoPago.TESORERIA.value,
+        monto_moneda_origen=monto_orig,
+        moneda=inst.moneda,
+        tasa_bcv_dia=tasa if es_bs else Decimal("0"),
+        tasa_usdt_dia=Decimal("0"),
+        usd_nominal=_q2(datos.monto_usd),
+        usd_real=_q2(datos.monto_usd),
+        cubre_promo_usd=Decimal("0"),
+        referencia=datos.referencia.strip() or datos.tipo,
+        estado_verificacion=EstadoVerificacionPago.CONFIRMADO.value,
+        verificado_por_id=usuario_actual.id,
+        conciliado=False,
+        anulado=False,
+        categoria="Aporte de Capital" if es_aporte else "Repartición de Ganancias",
+        origen_tipo=datos.tipo,
+        origen_id=0,
+        nota=datos.descripcion.strip() or f"{datos.tipo} · {datos.socio_nombre}",
+    )
+    bd.add(pago)
+    bd.flush()
+
+    desc_asiento = datos.descripcion.strip() or (
+        f"Aporte de Capital Social ({datos.socio_nombre or 'Socios'})"
+        if es_aporte
+        else f"Repartición de Ganancias / Dividendos ({datos.socio_nombre or 'Socios'})"
+    )
+    lineas = (
+        [
+            {"cuenta_codigo": "1.1.01", "debe_usd": datos.monto_usd, "haber_usd": 0, "nota": f"Ingreso a {inst.nombre}"},
+            {"cuenta_codigo": "3.1.01", "debe_usd": 0, "haber_usd": datos.monto_usd, "nota": datos.socio_nombre or "Capital Social"},
+        ]
+        if es_aporte
+        else [
+            {"cuenta_codigo": "3.2.01", "debe_usd": datos.monto_usd, "haber_usd": 0, "nota": f"Dividendo {datos.socio_nombre or 'Socios'}"},
+            {"cuenta_codigo": "1.1.01", "debe_usd": 0, "haber_usd": datos.monto_usd, "nota": f"Egreso de {inst.nombre}"},
+        ]
+    )
+    asiento = crear_asiento_contable(
+        bd=bd,
+        usuario=usuario_actual,
+        fecha_op=fecha_op,
+        descripcion=desc_asiento,
+        origen_tipo=datos.tipo,
+        origen_id=pago.id,
+        lineas=lineas,
+    )
+    bd.commit()
+    return {
+        "pago_id": pago.id,
+        "asiento_id": asiento.id,
+        "tipo": datos.tipo,
+        "monto_usd": _r2(datos.monto_usd),
+        "instrumento": inst.nombre,
     }
 
 

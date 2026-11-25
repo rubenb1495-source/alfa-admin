@@ -1364,6 +1364,22 @@ def crear_liquidacion_comisiones(
             v.estado_comision = EstadoComision.PAGADA.value
             v.liquidacion_id = liq.id
 
+        # Asiento contable: Debe 2.1.02 Comisiones por Pagar / Haber 1.1.01 Cajas y Bancos
+        from app.servicios.contabilidad import crear_asiento_contable
+
+        crear_asiento_contable(
+            bd=bd,
+            usuario=usuario_actual,
+            fecha_op=hoy,
+            descripcion=f"Liquidación de Comisiones {codigo} - {personal.nombre} {datos.observaciones[:60]}",
+            origen_tipo="LIQUIDACION_COMISION",
+            origen_id=liq.id,
+            lineas=[
+                {"cuenta_codigo": "2.1.02", "debe_usd": monto_total, "haber_usd": 0, "nota": f"Cancelación comisiones {personal.nombre}"},
+                {"cuenta_codigo": "1.1.01", "debe_usd": 0, "haber_usd": monto_total, "nota": f"Egreso {instrumento.nombre} ({codigo})"},
+            ],
+        )
+
         bd.commit()
     except HTTPException:
         bd.rollback()

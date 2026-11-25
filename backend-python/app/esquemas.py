@@ -48,6 +48,10 @@ class UsuarioSalida(BaseModel):
     cedula: str = ""
     tiene_acceso: bool = True
     debe_cambiar_clave: bool = False
+    cargo: str = ""
+    salario_base_usd: Decimal = Decimal("0")
+    bono_alimentacion_usd: Decimal = Decimal("0")
+    bonos_fijos_usd: Decimal = Decimal("0")
     activo: bool
     motivo_estado: str | None = None
     creado_en: datetime
@@ -70,6 +74,10 @@ class UsuarioCrearEntrada(BaseModel):
     correo: EmailStr | None = None
     clave: str | None = Field(default=None, max_length=128)
     sucursal_id: int | None = None
+    cargo: str = Field(default="", max_length=120)
+    salario_base_usd: Decimal = Field(default=Decimal("0"), ge=Decimal("0"))
+    bono_alimentacion_usd: Decimal = Field(default=Decimal("0"), ge=Decimal("0"))
+    bonos_fijos_usd: Decimal = Field(default=Decimal("0"), ge=Decimal("0"))
 
     @field_validator("correo", "clave", mode="before")
     @classmethod
@@ -112,6 +120,10 @@ class UsuarioActualizarEntrada(BaseModel):
     correo: EmailStr | None = None
     clave: str | None = Field(default=None, max_length=128)
     sucursal_id: int | None = None
+    cargo: str = Field(default="", max_length=120)
+    salario_base_usd: Decimal = Field(default=Decimal("0"), ge=Decimal("0"))
+    bono_alimentacion_usd: Decimal = Field(default=Decimal("0"), ge=Decimal("0"))
+    bonos_fijos_usd: Decimal = Field(default=Decimal("0"), ge=Decimal("0"))
 
     @field_validator("correo", "clave", mode="before")
     @classmethod
