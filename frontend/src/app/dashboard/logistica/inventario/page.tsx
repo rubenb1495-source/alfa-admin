@@ -43,15 +43,33 @@ const ESTADOS_EQUIPO: EstadoEquipo[] = [
   "VENDIDO",
 ];
 
+const OPCIONES_CAMBIO_ESTADO: { valor: string; etiqueta: string }[] = [
+  { valor: "PENDIENTE_REVISION", etiqueta: "Pendiente Revisión" },
+  { valor: "POR_PREPARAR", etiqueta: "Por Preparar" },
+  { valor: "EN_PREPARACION", etiqueta: "En Preparación" },
+  { valor: "DISPONIBLE", etiqueta: "Disponible (POS)" },
+  { valor: "DEFECTUOSO", etiqueta: "Defectuoso" },
+  { valor: "RESERVADO", etiqueta: "Reservado" },
+  { valor: "EN_GARANTIA", etiqueta: "En Garantía" },
+];
+
 export default function PaginaInventario() {
   const { usuario } = usarSesion();
   const verCostos = usuario ? puedeVerCostos(usuario.rol) : false;
   const esDireccion = usuario?.rol === "DIRECCION";
   const puedeSolicitarAjuste = usuario ? usuario.rol !== "ASESORA" : false;
+  const puedeCambiarEstado = usuario
+    ? ["DIRECCION", "ADMINISTRACION", "LOGISTICA", "ENCARGADO_TIENDA", "LIDER", "TECNICO"].includes(
+        usuario.rol
+      )
+    : false;
 
   const [pestana, setPestana] = useState<
     "equipos" | "kardex" | "trazabilidad" | "ajustes"
   >("equipos");
+  const [seleccionadosEstado, setSeleccionadosEstado] = useState<number[]>([]);
+  const [estadoLote, setEstadoLote] = useState("DISPONIBLE");
+  const [cambiandoEstado, setCambiandoEstado] = useState(false);
 
   const [equipos, setEquipos] = useState<EquipoInventario[]>([]);
   const [kardex, setKardex] = useState<KardexRespuesta | null>(null);
@@ -192,6 +210,39 @@ export default function PaginaInventario() {
     }
   };
 
+  const cambiarEstadoEquipos = async (ids: number[], nuevoEstado: string) => {
+    if (ids.length === 0) return;
+    setCambiandoEstado(true);
+    setError(null);
+    setExito(null);
+    try {
+      const resp = await solicitarApi<{ actualizados: number; estado_etiqueta: string }>(
+        "/api/preparaciones/estado-masivo",
+        {
+          method: "PATCH",
+          body: JSON.stringify({
+            equipo_ids: ids,
+            nuevo_estado: nuevoEstado,
+            observacion: "Cambio de estado desde Inventario",
+          }),
+        }
+      );
+      setExito(
+        `${resp.actualizados} equipo(s) actualizados a "${resp.estado_etiqueta}".`
+      );
+      setSeleccionadosEstado([]);
+      await cargarTodo();
+    } catch (err) {
+      setError(
+        err instanceof ErrorApi
+          ? err.message
+          : "No se pudo cambiar el estado del equipo."
+      );
+    } finally {
+      setCambiandoEstado(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -302,6 +353,35 @@ export default function PaginaInventario() {
             </select>
           </div>
 
+          {puedeCambiarEstado && seleccionadosEstado.length > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#003566]/30 bg-[#EDF3FA] px-4 py-3 text-xs">
+              <span className="font-bold text-[#001D3D]">
+                {seleccionadosEstado.length} equipo(s) seleccionado(s)
+              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  value={estadoLote}
+                  onChange={(e) => setEstadoLote(e.target.value)}
+                  className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold"
+                >
+                  {OPCIONES_CAMBIO_ESTADO.map((o) => (
+                    <option key={o.valor} value={o.valor}>
+                      Cambiar a: {o.etiqueta}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  disabled={cambiandoEstado}
+                  onClick={() => void cambiarEstadoEquipos(seleccionadosEstado, estadoLote)}
+                  className="rounded-lg bg-[#003566] px-3.5 py-1.5 font-bold text-white hover:bg-[#001D3D] disabled:opacity-50 cursor-pointer"
+                >
+                  {cambiandoEstado ? "Aplicando..." : "Aplicar Cambio Masivo"}
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
             {cargando ? (
               <div className="p-6 space-y-3">
@@ -324,6 +404,7 @@ export default function PaginaInventario() {
                 <table className="w-full text-sm text-left">
                   <thead className="bg-slate-50 border-b border-slate-200 text-xs uppercase text-slate-500">
                     <tr>
+                      {puedeCambiarEstado && <th className="px-3 py-3 w-8"></th>}
                       <th className="px-4 py-3">Serial</th>
                       <th className="px-4 py-3">Modelo</th>
                       <th className="px-4 py-3">Ubicación</th>
@@ -340,8 +421,29 @@ export default function PaginaInventario() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {equipos.map((eq) => (
+                    {equipos.map((eq) => {
+                      const bloqueadoEstado =
+                        eq.estado === "VENDIDO" || eq.estado === "EN_TRANSITO";
+                      const valorSelect =
+                        eq.estado === "LISTO" ? "DISPONIBLE" : eq.estado;
+                      return (
                       <tr key={eq.id} className="hover:bg-slate-50">
+                        {puedeCambiarEstado && (
+                          <td className="px-3 py-3">
+                            <input
+                              type="checkbox"
+                              disabled={bloqueadoEstado}
+                              checked={seleccionadosEstado.includes(eq.id)}
+                              onChange={() =>
+                                setSeleccionadosEstado((prev) =>
+                                  prev.includes(eq.id)
+                                    ? prev.filter((x) => x !== eq.id)
+                                    : [...prev, eq.id]
+                                )
+                              }
+                            />
+                          </td>
+                        )}
                         <td className="px-4 py-3 font-mono font-bold text-slate-900">
                           <div>{eq.serial}</div>
                           {eq.es_consignacion && (
@@ -358,9 +460,26 @@ export default function PaginaInventario() {
                         </td>
                         <td className="px-4 py-3">{eq.ubicacion}</td>
                         <td className="px-4 py-3">
-                          <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-800">
-                            {eq.estado}
-                          </span>
+                          {puedeCambiarEstado && !bloqueadoEstado ? (
+                            <select
+                              disabled={cambiandoEstado}
+                              value={valorSelect}
+                              onChange={(e) =>
+                                void cambiarEstadoEquipos([eq.id], e.target.value)
+                              }
+                              className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs font-bold text-[#001D3D]"
+                            >
+                              {OPCIONES_CAMBIO_ESTADO.map((o) => (
+                                <option key={o.valor} value={o.valor}>
+                                  {o.etiqueta}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-800">
+                              {eq.estado === "LISTO" ? "Disponible (POS)" : eq.estado}
+                            </span>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-right font-bold text-emerald-700">
                           {formatearUsd(eq.precio_promo_usd)}
@@ -388,7 +507,8 @@ export default function PaginaInventario() {
                           </button>
                         </td>
                       </tr>
-                    ))}
+                    );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -411,6 +531,7 @@ export default function PaginaInventario() {
                   <tr>
                     <th className="px-4 py-3">SKU</th>
                     <th className="px-4 py-3">Descripción</th>
+                    <th className="px-4 py-3">Tipo</th>
                     <th className="px-4 py-3">Sucursal</th>
                     <th className="px-4 py-3 text-right">Stock actual</th>
                   </tr>
@@ -420,6 +541,11 @@ export default function PaginaInventario() {
                     <tr key={`${s.articulo_id}-${s.sucursal_id}`}>
                       <td className="px-4 py-3 font-mono font-bold">{s.sku}</td>
                       <td className="px-4 py-3">{s.descripcion}</td>
+                      <td className="px-4 py-3">
+                        <span className="inline-block rounded-full bg-sky-100 px-2.5 py-0.5 text-[11px] font-bold text-[#003566]">
+                          Stock por cantidad
+                        </span>
+                      </td>
                       <td className="px-4 py-3">{s.sucursal}</td>
                       <td className="px-4 py-3 text-right font-black">
                         {s.stock_actual}

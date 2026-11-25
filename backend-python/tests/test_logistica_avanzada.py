@@ -421,3 +421,59 @@ def test_6_ingreso_tolera_strings_vacios_y_comas_sin_422(entorno):
     assert resp.status_code == 201, resp.text
     assert resp.json()["productos_creados"] == 4
     assert resp.json()["total_compra_usd"] == 50.0
+
+
+def test_7_flujo_completo_ingreso_preparacion_disponible_y_pos(entorno):
+    client, Sesion = entorno
+    headers = _login_admin(client)
+    bd = Sesion()
+    suc = bd.query(Sucursal).first()
+    bd.close()
+
+    # 1. Cargar equipo por Ingreso de Inventario (estado inicial PENDIENTE_REVISION)
+    ing = client.post(
+        "/api/logistica/ingresos",
+        headers=headers,
+        json={
+            "tipo_ingreso": "COMPRA_NACIONAL",
+            "proveedor_nombre": "Proveedor E2E",
+            "almacen_destino_id": suc.id,
+            "items": [
+                {
+                    "sku": "LP-DELL-5420-TEST",
+                    "serial": "SN-E2E-POS-01",
+                    "cantidad": 1,
+                    "costo_unitario_usd": "195.00",
+                    "precio_venta_usd": "310.00",
+                }
+            ],
+        },
+    )
+    assert ing.status_code == 201, ing.text
+
+    eq = client.get("/api/logistica/inventario/equipos?busqueda=SN-E2E-POS-01", headers=headers).json()[0]
+    assert eq["estado"] == "PENDIENTE_REVISION"
+
+    # 2. Cambiar estado a EN_PREPARACION
+    r_prep = client.patch(
+        "/api/preparaciones/estado-masivo",
+        headers=headers,
+        json={"equipo_ids": [eq["id"]], "nuevo_estado": "EN_PREPARACION", "observacion": "Revisión inicial"},
+    )
+    assert r_prep.status_code == 200, r_prep.text
+    assert r_prep.json()["estado_aplicado"] == "EN_PREPARACION"
+
+    # 3. Cambiar estado a DISPONIBLE (mapeado a LISTO para el POS)
+    r_disp = client.patch(
+        "/api/preparaciones/estado-masivo",
+        headers=headers,
+        json={"equipo_ids": [eq["id"]], "nuevo_estado": "DISPONIBLE", "observacion": "Aprobado para venta"},
+    )
+    assert r_disp.status_code == 200, r_disp.text
+    assert r_disp.json()["estado_aplicado"] == "LISTO"
+
+    # 4. Verificar que filtrar inventario por estado=DISPONIBLE devuelve el equipo y sin 422
+    r_inv_disp = client.get("/api/logistica/inventario/equipos?estado=DISPONIBLE&busqueda=SN-E2E-POS-01", headers=headers)
+    assert r_inv_disp.status_code == 200, r_inv_disp.text
+    assert len(r_inv_disp.json()) == 1
+    assert r_inv_disp.json()[0]["estado"] == "LISTO"

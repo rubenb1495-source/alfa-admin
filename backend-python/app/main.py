@@ -169,6 +169,20 @@ def asegurar_columnas_compatibles() -> None:
                     conexion.execute(
                         text(f"ALTER TABLE equipos ADD COLUMN {nombre_col} {ddl_col}")
                     )
+        # Normalización segura de estados en equipos existentes
+        with motor.begin() as conexion:
+            conexion.execute(
+                text(
+                    "UPDATE equipos SET estado = 'PENDIENTE_REVISION' "
+                    "WHERE estado IS NULL OR TRIM(estado) = ''"
+                )
+            )
+            conexion.execute(
+                text(
+                    "UPDATE equipos SET estado = 'LISTO' "
+                    "WHERE UPPER(TRIM(estado)) = 'DISPONIBLE'"
+                )
+            )
     if inspector.has_table("compras"):
         columnas_cmp = {col["name"] for col in inspector.get_columns("compras")}
         nuevas_cmp = [

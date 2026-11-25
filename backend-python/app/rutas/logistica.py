@@ -1210,7 +1210,7 @@ def anular_traslado(
 @enrutador.get("/inventario/equipos")
 def listar_inventario_equipos(
     sucursal_id: int | None = Query(default=None),
-    estado: EstadoEquipo | None = Query(default=None),
+    estado: str | None = Query(default=None),
     busqueda: str | None = Query(default=None),
     usuario_actual: Usuario = Depends(obtener_usuario_actual),
     bd: Session = Depends(obtener_bd),
@@ -1226,8 +1226,11 @@ def listar_inventario_equipos(
     )
     if sucursal_id is not None:
         consulta = consulta.filter(Equipo.ubicacion_id == sucursal_id)
-    if estado is not None:
-        consulta = consulta.filter(Equipo.estado == estado.value)
+    if estado and estado.strip():
+        est_norm = estado.strip().upper()
+        if est_norm == "DISPONIBLE":
+            est_norm = EstadoEquipo.LISTO.value
+        consulta = consulta.filter(Equipo.estado == est_norm)
     if busqueda and busqueda.strip():
         texto = busqueda.strip()
         consulta = consulta.filter(
