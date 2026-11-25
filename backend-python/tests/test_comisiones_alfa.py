@@ -161,10 +161,11 @@ def test_comisiones_alfa_cuatro_escenarios_y_exclusiones(cliente: TestClient) ->
     }
     assert len(equipos_inv) == 6
 
-    # Obtener instrumentos: Efectivo divisas (USD Promo) y Pago móvil Mercantil (Bs Regular)
+    # Obtener instrumentos: Efectivo divisas (USD Promo), Pago móvil Mercantil (Bs Regular) y Cashea (Regular)
     insts = cliente.get("/api/finanzas/instrumentos", headers=cab_dir).json()
     inst_usd = next(i for i in insts if i["moneda"] == "USD" and i["tipo_precio"] == "PROMO")
-    inst_bs = next(i for i in insts if i["moneda"] == "BS")
+    inst_bs = next(i for i in insts if i["moneda"] == "BS" and "cashea" not in i["nombre"].lower())
+    inst_cashea = next(i for i in insts if "cashea" in i["nombre"].lower())
 
     def crear_venta_equipo(
         serial: str,
@@ -172,9 +173,19 @@ def test_comisiones_alfa_cuatro_escenarios_y_exclusiones(cliente: TestClient) ->
         asesor_id: int | None,
         origen_venta: str,
         pagar_en_bs: bool = False,
+        pagar_con_cashea: bool = False,
     ) -> dict:
         eq = equipos_inv[serial]
-        if pagar_en_bs:
+        if pagar_con_cashea:
+            # Cashea cobra a Precio Regular (promo * 1.30), 40% inicial en USD + 60% financiado Cashea en Bs (BCV=100)
+            regular_usd = promo_usd * 1.30
+            inicial_usd = round(regular_usd * 0.40, 2)
+            financiado_bs = round((regular_usd - inicial_usd) * 100.0, 2)
+            pagos = [
+                {"instrumento_id": inst_usd["id"], "monto_moneda_origen": inicial_usd},
+                {"instrumento_id": inst_cashea["id"], "monto_moneda_origen": financiado_bs, "referencia": f"CASH-{serial}"},
+            ]
+        elif pagar_en_bs:
             # Precio regular = promo * 1.30; en Bs = regular * 100 (BCV)
             monto_bs = promo_usd * 1.30 * 100.0
             pagos = [{"instrumento_id": inst_bs["id"], "monto_moneda_origen": monto_bs, "referencia": f"REF-{serial}"}]
@@ -202,11 +213,11 @@ def test_comisiones_alfa_cuatro_escenarios_y_exclusiones(cliente: TestClient) ->
     # Escenario 1: ASESORA en PASILLO ($200 Promo, pagado en Bs a $260 Regular) -> 1% de $200 = $2.00
     crear_venta_equipo("ALFA-COM-1", 200.0, asesora["id"], "PASILLO", pagar_en_bs=True)
 
-    # Escenario 2: ASESORA en LEAD ($300 Promo) -> 8% de $300 = $24.00
-    crear_venta_equipo("ALFA-COM-2", 300.0, asesora["id"], "LEAD", pagar_en_bs=False)
+    # Escenario 2: ASESORA en LEAD ($300 Promo, pagado con CASHEA a $390 Regular) -> 8% de $300 Promo = $24.00
+    crear_venta_equipo("ALFA-COM-2", 300.0, asesora["id"], "LEAD", pagar_con_cashea=True)
 
-    # Escenario 3: ENCARGADO_TIENDA en PASILLO ($400 Promo, pagado en Bs a $520 Regular) -> 5% de $400 = $20.00
-    crear_venta_equipo("ALFA-COM-3", 400.0, encargado["id"], "PASILLO", pagar_en_bs=True)
+    # Escenario 3: ENCARGADO_TIENDA en PASILLO ($400 Promo, pagado con CASHEA a $520 Regular) -> 5% de $400 Promo = $20.00
+    crear_venta_equipo("ALFA-COM-3", 400.0, encargado["id"], "PASILLO", pagar_con_cashea=True)
 
     # Escenario 4: ENCARGADO_TIENDA en LEAD ($500 Promo) -> 8% de $500 = $40.00
     crear_venta_equipo("ALFA-COM-4", 500.0, encargado["id"], "LEAD", pagar_en_bs=False)

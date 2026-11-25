@@ -18,11 +18,20 @@ const ROLES_DISPONIBLES: RolUsuario[] = [
   "DIRECCION",
   "ADMINISTRACION",
   "LOGISTICA",
-  "LIDER",
   "ENCARGADO_TIENDA",
   "ASESORA",
   "TECNICO",
 ];
+
+const ETIQUETAS_ROL: Record<string, string> = {
+  DIRECCION: "Dirección",
+  ADMINISTRACION: "Administración",
+  LOGISTICA: "Logística",
+  ENCARGADO_TIENDA: "Encargado de Tienda (5% Pasillo / 8% Lead)",
+  LIDER: "Encargado de Tienda (5% Pasillo / 8% Lead)",
+  ASESORA: "Asesor (1% Pasillo / 8% Lead)",
+  TECNICO: "Técnico",
+};
 
 export default function PaginaUsuarios() {
   const { usuario } = usarSesion();
@@ -429,7 +438,7 @@ export default function PaginaUsuarios() {
                   >
                     {ROLES_DISPONIBLES.map((r) => (
                       <option key={r} value={r}>
-                        {r}
+                        {ETIQUETAS_ROL[r] || r}
                       </option>
                     ))}
                   </select>

@@ -49,7 +49,7 @@ def listar_usuarios_operativos(
             "nombre": u.nombre,
             "rol": u.rol,
             "es_lider": u.rol == RolUsuario.LIDER.value,
-            "es_encargado": u.rol == RolUsuario.ENCARGADO_TIENDA.value,
+            "es_encargado": u.rol in (RolUsuario.ENCARGADO_TIENDA.value, RolUsuario.LIDER.value),
             "sucursal_id": u.sucursal_id,
         }
         for u in usuarios

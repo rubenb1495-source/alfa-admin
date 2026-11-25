@@ -87,9 +87,10 @@ export default function PaginaComisionesYCierre() {
             Tablero Financiero, Comisiones y Cierre de Mes
           </h2>
           <p className="text-sm text-slate-500">
-            Solo Dirección y Administración. Cálculo sobre Precio Promo USD
-            excluyendo ventas anuladas/devueltas (Asesor: 1% Pasillo / 8% Lead ·
-            Encargado de Tienda: 5% Pasillo / 8% Lead · Tienda: 0%).
+            Solo Dirección y Administración. Cálculo SIEMPRE sobre Precio Promo
+            USD (incluso en ventas Cashea / Regular, excluyendo anuladas y
+            devueltas). Asesor: 1% Pasillo / 8% Lead · Encargado de Tienda: 5%
+            Pasillo / 8% Lead · Tienda: 0%.
           </p>
         </div>
 
@@ -232,14 +233,21 @@ export default function PaginaComisionesYCierre() {
                     </td>
                     <td className="px-4 py-3 text-xs">
                       <span
-                        className={`px-2 py-0.5 rounded-md font-bold text-[11px] ${
-                          c.rol === "ENCARGADO_TIENDA"
+                        title={
+                          c.rol === "ENCARGADO_TIENDA" || c.rol === "LIDER"
+                            ? "Encargado de Tienda (5% Pasillo / 8% Lead)"
+                            : "Asesor (1% Pasillo / 8% Lead)"
+                        }
+                        className={`inline-block px-2 py-0.5 rounded-md font-bold text-[11px] ${
+                          c.rol === "ENCARGADO_TIENDA" || c.rol === "LIDER"
                             ? "bg-[#EDF3FA] text-[#003566]"
                             : "bg-slate-100 text-slate-700"
                         }`}
                       >
-                        {c.rol === "ENCARGADO_TIENDA"
-                          ? "ENCARGADO TIENDA"
+                        {c.rol === "ENCARGADO_TIENDA" || c.rol === "LIDER"
+                          ? "Encargado de Tienda (5% / 8%)"
+                          : c.rol === "ASESORA"
+                          ? "Asesor (1% / 8%)"
                           : c.rol}
                       </span>
                     </td>

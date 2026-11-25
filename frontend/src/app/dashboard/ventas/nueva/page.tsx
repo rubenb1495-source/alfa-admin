@@ -434,6 +434,47 @@ export default function PaginaNuevaVentaPOS() {
     [carrito]
   );
 
+  const basePromoComisionable = useMemo(
+    () =>
+      redondear2(
+        carrito.reduce((acc, item) => {
+          if (item.tipo === "SERVICIO") return acc;
+          const promoUnit =
+            item.precio_pactado_usd !== undefined
+              ? item.precio_pactado_usd
+              : item.precio_promo_usd;
+          return acc + promoUnit * item.cantidad;
+        }, 0)
+      ),
+    [carrito]
+  );
+
+  const vistaPreviaComision = useMemo(() => {
+    const asesorSel = asesoresDisponibles.find(
+      (u) => String(u.id) === asesorId
+    );
+    if (!asesorSel) {
+      return {
+        etiquetaRol: "Tienda (0%)",
+        porcentaje: 0,
+        montoUsd: 0,
+      };
+    }
+    const esEncargado =
+      Boolean(asesorSel.es_encargado) ||
+      asesorSel.rol === "ENCARGADO_TIENDA" ||
+      asesorSel.rol === "LIDER";
+    const porcentaje =
+      origenVenta === "LEAD" ? 8 : esEncargado ? 5 : 1;
+    return {
+      etiquetaRol: esEncargado
+        ? "Encargado de Tienda (5% Pasillo / 8% Lead)"
+        : "Asesor (1% Pasillo / 8% Lead)",
+      porcentaje,
+      montoUsd: redondear2((basePromoComisionable * porcentaje) / 100),
+    };
+  }, [asesoresDisponibles, asesorId, origenVenta, basePromoComisionable]);
+
   const mapaInstrumentos = useMemo(() => {
     const mapa = new Map<string, InstrumentoFinanciero>();
     for (const inst of instrumentos) {
@@ -1333,15 +1374,17 @@ export default function PaginaNuevaVentaPOS() {
                 onChange={(e) => setAsesorId(e.target.value)}
                 className="w-full min-w-0 px-3 py-2 rounded-xl border border-slate-300 text-sm bg-white"
               >
-                <option value="">Tienda (Sin comisión)</option>
+                <option value="">Tienda (Sin comisión · 0%)</option>
                 {asesoresDisponibles.map((u) => (
                   <option key={u.id} value={u.id}>
                     {u.nombre} (
-                    {u.es_encargado || u.rol === "ENCARGADO_TIENDA"
-                      ? "ENCARGADO DE TIENDA"
-                      : u.es_lider || u.rol === "LIDER"
-                      ? "LÍDER · Multi-tienda"
-                      : u.rol}
+                    {u.es_encargado ||
+                    u.rol === "ENCARGADO_TIENDA" ||
+                    u.rol === "LIDER"
+                      ? "Encargado de Tienda · 5% Pasillo / 8% Lead"
+                      : u.rol === "ASESORA"
+                      ? "Asesor · 1% Pasillo / 8% Lead"
+                      : `${u.rol} · 1% Pasillo / 8% Lead`}
                     )
                   </option>
                 ))}
@@ -1384,6 +1427,28 @@ export default function PaginaNuevaVentaPOS() {
                 ))}
               </select>
             </div>
+          </div>
+
+          {/* Vista previa de comisión en vivo (siempre sobre Precio Promo USD) */}
+          <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs">
+            <div className="space-y-0.5">
+              <p className="font-bold text-[#000814]">
+                Comisión estimada:{" "}
+                <span className="text-[#003566]">
+                  {vistaPreviaComision.porcentaje}% sobre Promo (
+                  {formatearUsd(basePromoComisionable)})
+                </span>
+              </p>
+              <p className="text-[11px] text-slate-500">
+                {vistaPreviaComision.etiquetaRol} · Origen:{" "}
+                {origenVenta === "LEAD"
+                  ? "Lead (Redes / WhatsApp)"
+                  : "Pasillo (Tienda)"}
+              </p>
+            </div>
+            <span className="px-2.5 py-1 rounded-lg bg-[#EDF3FA] text-[#003566] font-black text-sm cifra-tabular">
+              {formatearUsd(vistaPreviaComision.montoUsd)}
+            </span>
           </div>
 
           {/* Agregar equipo LISTO por serial (desplegable con búsqueda y z-50) */}
