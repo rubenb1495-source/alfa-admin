@@ -234,6 +234,17 @@ export default function DisenoDashboard({
       titulo: "Taller",
       enlaces: [
         {
+          href: "/dashboard/taller/recepcion",
+          etiqueta: "Recepción GT / ST",
+          icono: <Shield className="w-4 h-4 shrink-0" />,
+          visible:
+            esAdmin ||
+            esDirector ||
+            usuario.rol === "ENCARGADO_TIENDA" ||
+            usuario.rol === "LIDER" ||
+            usuario.rol === "TECNICO",
+        },
+        {
           href: "/dashboard/taller/preparaciones",
           etiqueta: "Preparaciones",
           icono: <Wrench className="w-4 h-4 shrink-0" />,

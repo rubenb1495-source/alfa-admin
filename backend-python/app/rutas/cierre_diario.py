@@ -32,7 +32,12 @@ from app.modelos_logistica import (
     TrasladoDetalle,
 )
 from app.modelos_operaciones import DevolucionGarantia
-from app.modelos_taller import CasoPostventa, EstadoCasoPostventa
+from app.modelos_taller import (
+    CasoPostventa,
+    EstadoCasoPostventa,
+    EstadoOrdenRecepcion,
+    OrdenRecepcionTecnica,
+)
 from app.rutas.tasas import obtener_fecha_hoy
 from app.rutas.ventas import redondear_usd
 from app.seguridad import es_administrador, requerir_roles
@@ -437,6 +442,52 @@ def calcular_snapshot_cierre_diario(
                     "serial": c.serial_o_codigo,
                     "estado": c.estado,
                     "fecha_ingreso": f_ing.isoformat() if f_ing else "",
+                }
+            )
+
+    # También incluir Órdenes de Recepción Técnica (GAR-XXXX / ST-XXXX)
+    q_ord = bd.query(OrdenRecepcionTecnica)
+    if sucursal_id is not None:
+        q_ord = q_ord.filter(OrdenRecepcionTecnica.sucursal_id == sucursal_id)
+    estados_ord_cerrados = {
+        EstadoOrdenRecepcion.RESUELTO_ENTREGADO.value,
+        EstadoOrdenRecepcion.NO_REPARADO_ENTREGADO.value,
+    }
+    for o in q_ord.order_by(OrdenRecepcionTecnica.id.desc()).all():
+        f_rec_o = _fecha_caracas(o.fecha_recepcion)
+        f_res_o = _fecha_caracas(o.fecha_resolucion)
+        eq_desc = f"{o.marca} {o.modelo}".strip() or o.modelo
+        if f_rec_o == fecha_obj:
+            recibidas_hoy.append(
+                {
+                    "numero_caso": o.codigo,
+                    "tipo": o.tipo_orden,
+                    "cliente": o.cliente_nombre or "Cliente general",
+                    "equipo": eq_desc,
+                    "serial": o.serial,
+                    "motivo": o.falla_declarada_cliente,
+                }
+            )
+        if f_res_o == fecha_obj or (o.estado in estados_ord_cerrados and f_rec_o == fecha_obj):
+            resueltas_hoy.append(
+                {
+                    "numero": o.codigo,
+                    "tipo": o.tipo_orden,
+                    "cliente": o.cliente_nombre or "Cliente general",
+                    "equipo": eq_desc,
+                    "resolucion": o.solucion_aplicada or o.estado,
+                }
+            )
+        if o.estado not in estados_ord_cerrados:
+            pendientes_casos.append(
+                {
+                    "numero_caso": o.codigo,
+                    "tipo": o.tipo_orden,
+                    "cliente": o.cliente_nombre or "Cliente general",
+                    "equipo": eq_desc,
+                    "serial": o.serial,
+                    "estado": o.estado,
+                    "fecha_ingreso": f_rec_o.isoformat() if f_rec_o else "",
                 }
             )
 

@@ -195,3 +195,81 @@ class CasoRepuestoUsado(Base):
 
     caso = relationship("CasoPostventa", back_populates="repuestos_usados")
     articulo = relationship("CatalogoArticulo")
+
+
+class TipoOrdenRecepcion(str, Enum):
+    GARANTIA = "GARANTIA"
+    SERVICIO_TECNICO = "SERVICIO_TECNICO"
+
+
+class EstadoOrdenRecepcion(str, Enum):
+    RECIBIDO_EN_TIENDA = "RECIBIDO_EN_TIENDA"
+    ENVIADO_A_TECNICO = "ENVIADO_A_TECNICO"
+    EN_REVISION = "EN_REVISION"
+    PRESUPUESTADO = "PRESUPUESTADO"
+    EN_REPARACION = "EN_REPARACION"
+    LISTO_PARA_ENTREGA = "LISTO_PARA_ENTREGA"
+    RESUELTO_ENTREGADO = "RESUELTO_ENTREGADO"
+    NO_REPARADO_ENTREGADO = "NO_REPARADO_ENTREGADO"
+
+
+class OrdenRecepcionTecnica(Base):
+    __tablename__ = "ordenes_recepcion_tecnica"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    codigo: Mapped[str] = mapped_column(String(30), unique=True, index=True, nullable=False)
+    tipo_orden: Mapped[str] = mapped_column(String(25), nullable=False, index=True)
+
+    sucursal_id: Mapped[int] = mapped_column(ForeignKey("sucursales.id"), index=True, nullable=False)
+    recibido_por_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), nullable=False)
+    tecnico_asignado_id: Mapped[int | None] = mapped_column(ForeignKey("usuarios.id"), index=True, nullable=True)
+
+    # Datos del Cliente
+    cliente_id: Mapped[int | None] = mapped_column(ForeignKey("terceros.id"), index=True, nullable=True)
+    cliente_nombre: Mapped[str] = mapped_column(String(160), nullable=False)
+    cliente_documento: Mapped[str] = mapped_column(String(50), default="", nullable=False)
+    cliente_telefono: Mapped[str] = mapped_column(String(40), default="", nullable=False)
+
+    # Nota de Venta (SOLO GARANTIA; NULL para SERVICIO_TECNICO)
+    venta_id: Mapped[int | None] = mapped_column(ForeignKey("ventas.id"), index=True, nullable=True)
+    numero_nota_venta: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    fecha_venta: Mapped[date | None] = mapped_column(Date, nullable=True)
+    dias_transcurridos_garantia: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    # Detalles del Equipo
+    equipo_id: Mapped[int | None] = mapped_column(ForeignKey("equipos.id"), nullable=True)
+    marca: Mapped[str] = mapped_column(String(100), default="", nullable=False)
+    modelo: Mapped[str] = mapped_column(String(160), nullable=False)
+    serial: Mapped[str] = mapped_column(String(120), default="", nullable=False, index=True)
+    especificaciones: Mapped[str] = mapped_column(String(255), default="", nullable=False)
+    clave_acceso: Mapped[str] = mapped_column(String(100), default="", nullable=False)
+
+    # Diagnóstico de Recepción
+    falla_declarada_cliente: Mapped[str] = mapped_column(Text, nullable=False)
+    accesorios_entregados_json: Mapped[str] = mapped_column(Text, default="[]", nullable=False)
+    accesorios_otros: Mapped[str] = mapped_column(String(255), default="", nullable=False)
+    detalles_esteticos: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    detalles_sistema_recepcion: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    equipo_llega_apagado: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    condiciones_aceptadas: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+    # Costos de Revisión (SOLO SERVICIO_TECNICO)
+    costo_revision_usd: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=Decimal("0"), nullable=False)
+    reparacion_aprobada: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    repuestos_usados_json: Mapped[str] = mapped_column(Text, default="[]", nullable=False)
+
+    # Flujo de Estados y Trazabilidad
+    estado: Mapped[str] = mapped_column(
+        String(30), default=EstadoOrdenRecepcion.RECIBIDO_EN_TIENDA.value, nullable=False, index=True
+    )
+    fecha_recepcion: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    fecha_envio_tecnico: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    fecha_resolucion: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    diagnostico_tecnico: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    solucion_aplicada: Mapped[str] = mapped_column(Text, default="", nullable=False)
+
+    sucursal = relationship("Sucursal")
+    recibido_por = relationship("Usuario", foreign_keys=[recibido_por_id])
+    tecnico_asignado = relationship("Usuario", foreign_keys=[tecnico_asignado_id])
+    cliente = relationship("Tercero")
+    equipo = relationship("Equipo")
