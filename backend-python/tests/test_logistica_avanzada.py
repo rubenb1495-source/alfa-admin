@@ -384,3 +384,40 @@ def test_5_plantillas_excel_y_carga_masiva_validaciones(entorno):
     assert prev_trs.status_code == 200, prev_trs.text
     assert prev_trs.json()["errores_count"] == 1
     assert "stock insuficiente" in prev_trs.json()["filas_con_error"][0]["errores"][0].lower()
+
+
+def test_6_ingreso_tolera_strings_vacios_y_comas_sin_422(entorno):
+    client, Sesion = entorno
+    headers = _login_admin(client)
+    bd = Sesion()
+    suc = bd.query(Sucursal).first()
+    bd.close()
+
+    resp = client.post(
+        "/api/logistica/ingresos",
+        headers=headers,
+        json={
+            "tipo_ingreso": "COMPRA_NACIONAL",
+            "proveedor_nombre": "Proveedor Flexible",
+            "almacen_destino_id": suc.id,
+            "referencia_factura": None,
+            "observaciones": None,
+            "costo_flete_usd": "",
+            "costo_aduana_otros_usd": None,
+            "tracking_guia": None,
+            "items": [
+                {
+                    "sku": "CO-CARG-TEST",
+                    "serial": "",
+                    "cantidad": 4,
+                    "costo_unitario_usd": "12,50",
+                    "precio_venta_usd": "",
+                    "estado_inicial": "",
+                    "nota": None,
+                }
+            ],
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["productos_creados"] == 4
+    assert resp.json()["total_compra_usd"] == 50.0

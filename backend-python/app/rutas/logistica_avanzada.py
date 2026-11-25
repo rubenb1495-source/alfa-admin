@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Upload
 from fastapi.responses import StreamingResponse
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment, Font, PatternFill
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
@@ -239,22 +239,66 @@ class ItemIngresoEntrada(BaseModel):
     sku: str = Field(min_length=2, max_length=60)
     serial: str | None = Field(default=None, max_length=120)
     cantidad: int = Field(default=1, ge=1)
-    costo_unitario_usd: Decimal = Field(ge=Decimal("0"))
+    costo_unitario_usd: Decimal = Field(default=Decimal("0"), ge=Decimal("0"))
     precio_venta_usd: Decimal | None = Field(default=None, ge=Decimal("0"))
     estado_inicial: str | None = Field(default="PENDIENTE_REVISION")
     nota: str = Field(default="", max_length=300)
+
+    @field_validator("serial", "estado_inicial", mode="before")
+    @classmethod
+    def _vacio_a_none(cls, v: Any) -> Any:
+        if isinstance(v, str) and not v.strip():
+            return None
+        return v
+
+    @field_validator("nota", mode="before")
+    @classmethod
+    def _none_a_vacio_nota(cls, v: Any) -> str:
+        return "" if v is None else str(v)
+
+    @field_validator("costo_unitario_usd", mode="before")
+    @classmethod
+    def _coercer_costo(cls, v: Any) -> Any:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return Decimal("0")
+        if isinstance(v, str):
+            return v.strip().replace(",", ".")
+        return v
+
+    @field_validator("precio_venta_usd", mode="before")
+    @classmethod
+    def _coercer_precio_opcional(cls, v: Any) -> Any:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return None
+        if isinstance(v, str):
+            return v.strip().replace(",", ".")
+        return v
 
 
 class IngresoInventarioCrearEntrada(BaseModel):
     tipo_ingreso: str = Field(pattern="^(COMPRA_NACIONAL|COMPRA_INTERNACIONAL|CONSIGNACION)$")
     proveedor_nombre: str = Field(min_length=2, max_length=160)
-    almacen_destino_id: int
+    almacen_destino_id: int = Field(gt=0)
     referencia_factura: str = Field(default="", max_length=120)
     observaciones: str = Field(default="", max_length=500)
     costo_flete_usd: Decimal = Field(default=Decimal("0"), ge=Decimal("0"))
     costo_aduana_otros_usd: Decimal = Field(default=Decimal("0"), ge=Decimal("0"))
     tracking_guia: str = Field(default="", max_length=120)
     items: list[ItemIngresoEntrada] = Field(min_length=1)
+
+    @field_validator("referencia_factura", "observaciones", "tracking_guia", mode="before")
+    @classmethod
+    def _none_a_vacio_str(cls, v: Any) -> str:
+        return "" if v is None else str(v)
+
+    @field_validator("costo_flete_usd", "costo_aduana_otros_usd", mode="before")
+    @classmethod
+    def _coercer_gastos(cls, v: Any) -> Any:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return Decimal("0")
+        if isinstance(v, str):
+            return v.strip().replace(",", ".")
+        return v
 
 
 class ComponentePreparacionEntrada(BaseModel):
@@ -1179,11 +1223,13 @@ def _validar_lote_importacion(
 async def preview_carga_masiva(
     tipo: str,
     archivo: UploadFile = File(...),
-    almacen_origen_id: int | None = Form(default=None),
-    almacen_destino_id: int | None = Form(default=None),
+    almacen_origen_id: str | None = Form(default=None),
+    almacen_destino_id: str | None = Form(default=None),
     usuario_actual: Usuario = Depends(obtener_usuario_actual),
     bd: Session = Depends(obtener_bd),
 ) -> dict[str, Any]:
+    origen_id_int = int(almacen_origen_id) if (almacen_origen_id and almacen_origen_id.strip().isdigit()) else None
+    destino_id_int = int(almacen_destino_id) if (almacen_destino_id and almacen_destino_id.strip().isdigit()) else None
     tipo_norm = tipo.strip().upper()
     if tipo_norm not in TIPOS_PLANTILLA_VALIDOS:
         raise HTTPException(
@@ -1207,8 +1253,8 @@ async def preview_carga_masiva(
         bd=bd,
         tipo=tipo_norm,
         filas_crudas=filas_crudas,
-        almacen_origen_id=almacen_origen_id,
-        almacen_destino_id=almacen_destino_id,
+        almacen_origen_id=origen_id_int,
+        almacen_destino_id=destino_id_int,
     )
     resultado["nombre_archivo"] = archivo.filename or "carga.xlsx"
     return resultado
@@ -1218,17 +1264,26 @@ async def preview_carga_masiva(
 async def confirmar_carga_masiva(
     tipo: str,
     archivo: UploadFile = File(...),
-    almacen_origen_id: int | None = Form(default=None),
-    almacen_destino_id: int | None = Form(default=None),
+    almacen_origen_id: str | None = Form(default=None),
+    almacen_destino_id: str | None = Form(default=None),
     proveedor_nombre: str = Form(default=""),
     referencia_factura: str = Form(default=""),
-    costo_flete_usd: Decimal = Form(default=Decimal("0")),
-    costo_aduana_otros_usd: Decimal = Form(default=Decimal("0")),
+    costo_flete_usd: str = Form(default="0"),
+    costo_aduana_otros_usd: str = Form(default="0"),
     tracking_guia: str = Form(default=""),
     observaciones: str = Form(default=""),
     usuario_actual: Usuario = Depends(obtener_usuario_actual),
     bd: Session = Depends(obtener_bd),
 ) -> dict[str, Any]:
+    origen_id_int = int(almacen_origen_id) if (almacen_origen_id and almacen_origen_id.strip().isdigit()) else None
+    destino_id_int = int(almacen_destino_id) if (almacen_destino_id and almacen_destino_id.strip().isdigit()) else None
+    try:
+        flete_dec = parsear_decimal_seguro(costo_flete_usd, Decimal("0"))
+        aduana_dec = parsear_decimal_seguro(costo_aduana_otros_usd, Decimal("0"))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    almacen_origen_id_val = origen_id_int
+    almacen_destino_id_val = destino_id_int
     tipo_norm = tipo.strip().upper()
     if tipo_norm not in TIPOS_PLANTILLA_VALIDOS:
         raise HTTPException(
@@ -1249,8 +1304,8 @@ async def confirmar_carga_masiva(
         bd=bd,
         tipo=tipo_norm,
         filas_crudas=filas_crudas,
-        almacen_origen_id=almacen_origen_id,
-        almacen_destino_id=almacen_destino_id,
+        almacen_origen_id=almacen_origen_id_val,
+        almacen_destino_id=almacen_destino_id_val,
     )
     if validacion["errores_count"] > 0:
         raise HTTPException(
@@ -1267,7 +1322,7 @@ async def confirmar_carga_masiva(
         )
 
     if tipo_norm in {"COMPRA_NACIONAL", "COMPRA_INTERNACIONAL", "CONSIGNACION"}:
-        if not almacen_destino_id:
+        if not almacen_destino_id_val:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Debes seleccionar el almacén de destino.",
@@ -1277,7 +1332,7 @@ async def confirmar_carga_masiva(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Debes indicar el nombre del proveedor o consignante.",
             )
-        almacen = bd.query(Sucursal).filter(Sucursal.id == almacen_destino_id).first()
+        almacen = bd.query(Sucursal).filter(Sucursal.id == almacen_destino_id_val).first()
         if almacen is None or almacen.estado != EstadoSucursal.ACTIVA.value:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -1307,8 +1362,8 @@ async def confirmar_carga_masiva(
             almacen_destino=almacen,
             referencia_factura=referencia_factura,
             observaciones=observaciones,
-            costo_flete_usd=costo_flete_usd,
-            costo_aduana_otros_usd=costo_aduana_otros_usd,
+            costo_flete_usd=flete_dec,
+            costo_aduana_otros_usd=aduana_dec,
             tracking_guia=tracking_guia,
             items_normalizados=items_norm,
         )
@@ -1316,8 +1371,8 @@ async def confirmar_carga_masiva(
         return res
 
     if tipo_norm == "TRASLADO":
-        origen = bd.query(Sucursal).filter(Sucursal.id == almacen_origen_id).first()
-        destino = bd.query(Sucursal).filter(Sucursal.id == almacen_destino_id).first()
+        origen = bd.query(Sucursal).filter(Sucursal.id == almacen_origen_id_val).first()
+        destino = bd.query(Sucursal).filter(Sucursal.id == almacen_destino_id_val).first()
         if origen is None or destino is None or destino.estado != EstadoSucursal.ACTIVA.value:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,

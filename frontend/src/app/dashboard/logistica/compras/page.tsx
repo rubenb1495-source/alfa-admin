@@ -209,24 +209,41 @@ export default function PaginaComprasIngresos() {
     setError(null);
     setExito(null);
 
-    if (!proveedorNombre.trim() || !almacenDestinoId) {
-      setError("Completa el proveedor/consignante y el almacén de destino.");
+    const almacenIdNum = Number(almacenDestinoId);
+    if (!proveedorNombre.trim() || proveedorNombre.trim().length < 2) {
+      setError("Ingresa el nombre del proveedor o consignante (mínimo 2 caracteres).");
+      return;
+    }
+    if (!Number.isInteger(almacenIdNum) || almacenIdNum <= 0) {
+      setError("Selecciona un almacén de destino válido.");
       return;
     }
 
+    const parseNumero = (val: string): number => {
+      const n = parseFloat((val || "").trim().replace(",", "."));
+      return Number.isFinite(n) && n >= 0 ? n : 0;
+    };
+
     const itemsLimpios = items
       .filter((it) => it.sku.trim())
-      .map((it) => ({
-        sku: it.sku.trim().toUpperCase(),
-        serial: it.serial.trim() || null,
-        cantidad: it.serial.trim() ? 1 : Math.max(1, parseInt(it.cantidad || "1", 10) || 1),
-        costo_unitario_usd: parseFloat(it.costo_unitario_usd || "0") || 0,
-        precio_venta_usd: it.precio_venta_usd.trim()
-          ? parseFloat(it.precio_venta_usd)
-          : null,
-        estado_inicial: it.estado_inicial || "PENDIENTE_REVISION",
-        nota: it.nota.trim(),
-      }));
+      .map((it) => {
+        const precioRaw = (it.precio_venta_usd || "").trim().replace(",", ".");
+        const precioNum = precioRaw ? parseFloat(precioRaw) : null;
+        return {
+          sku: it.sku.trim().toUpperCase(),
+          serial: it.serial.trim() || null,
+          cantidad: it.serial.trim()
+            ? 1
+            : Math.max(1, parseInt(it.cantidad || "1", 10) || 1),
+          costo_unitario_usd: parseNumero(it.costo_unitario_usd),
+          precio_venta_usd:
+            precioNum !== null && Number.isFinite(precioNum) && precioNum >= 0
+              ? precioNum
+              : null,
+          estado_inicial: it.estado_inicial || "PENDIENTE_REVISION",
+          nota: it.nota.trim(),
+        };
+      });
 
     if (itemsLimpios.length === 0) {
       setError("Agrega al menos un artículo con SKU.");
@@ -242,13 +259,13 @@ export default function PaginaComprasIngresos() {
           body: JSON.stringify({
             tipo_ingreso: tab,
             proveedor_nombre: proveedorNombre.trim(),
-            almacen_destino_id: Number(almacenDestinoId),
+            almacen_destino_id: almacenIdNum,
             referencia_factura: referenciaFactura.trim(),
             observaciones: observaciones.trim(),
             costo_flete_usd:
-              tab === "COMPRA_INTERNACIONAL" ? parseFloat(costoFleteUsd || "0") || 0 : 0,
+              tab === "COMPRA_INTERNACIONAL" ? parseNumero(costoFleteUsd) : 0,
             costo_aduana_otros_usd:
-              tab === "COMPRA_INTERNACIONAL" ? parseFloat(costoAduanaUsd || "0") || 0 : 0,
+              tab === "COMPRA_INTERNACIONAL" ? parseNumero(costoAduanaUsd) : 0,
             tracking_guia: tab === "COMPRA_INTERNACIONAL" ? trackingGuia.trim() : "",
             items: itemsLimpios,
           }),

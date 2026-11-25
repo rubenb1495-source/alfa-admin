@@ -73,6 +73,39 @@ export function normalizarSkuCliente(valor: string): string {
   return valor.trim().replace(/\s+/g, "-").toUpperCase();
 }
 
+function extraerMensajeErrorFastApi(cuerpo: unknown, estado: number): string {
+  if (cuerpo && typeof cuerpo === "object" && "detail" in cuerpo) {
+    const det = (cuerpo as { detail: unknown }).detail;
+    if (typeof det === "string" && det.trim()) {
+      return det;
+    }
+    if (Array.isArray(det) && det.length > 0) {
+      const mensajes = det.map((item) => {
+        if (typeof item === "string") return item;
+        if (item && typeof item === "object") {
+          const obj = item as { loc?: unknown[]; msg?: string };
+          const ruta = Array.isArray(obj.loc)
+            ? obj.loc.filter((p) => p !== "body" && p !== "query").join(".")
+            : "";
+          let msg = obj.msg || "valor inválido";
+          if (msg.toLowerCase().includes("field required")) msg = "campo requerido";
+          else if (msg.toLowerCase().includes("valid number") || msg.toLowerCase().includes("valid decimal")) msg = "debe ser un número válido";
+          else if (msg.toLowerCase().includes("valid integer")) msg = "debe ser un número entero válido";
+          else if (msg.toLowerCase().includes("at least")) msg = msg.replace(/String should have at least (\d+) characters?/i, "debe tener al menos $1 caracteres");
+          return ruta ? `Error en ${ruta}: ${msg}` : msg;
+        }
+        return "Error de validación";
+      });
+      return mensajes.join(" · ");
+    }
+    if (det && typeof det === "object" && "mensaje" in det) {
+      const m = (det as { mensaje?: unknown }).mensaje;
+      if (typeof m === "string" && m.trim()) return m;
+    }
+  }
+  return `Error del servidor (HTTP ${estado}).`;
+}
+
 export async function solicitarApi<T>(
   ruta: string,
   opciones: RequestInit = {}
@@ -106,10 +139,7 @@ export async function solicitarApi<T>(
     if (respuesta.status === 401) {
       guardarToken(null);
     }
-    const detalle =
-      cuerpo && typeof cuerpo.detail === "string"
-        ? cuerpo.detail
-        : `Error del servidor (HTTP ${respuesta.status}).`;
+    const detalle = extraerMensajeErrorFastApi(cuerpo, respuesta.status);
     throw new ErrorApi(detalle, respuesta.status);
   }
 
@@ -143,10 +173,7 @@ export async function subirArchivoApi<T>(
 
   const cuerpo = await respuesta.json().catch(() => null);
   if (!respuesta.ok) {
-    const detalle =
-      cuerpo && typeof cuerpo.detail === "string"
-        ? cuerpo.detail
-        : `Error del servidor (HTTP ${respuesta.status}).`;
+    const detalle = extraerMensajeErrorFastApi(cuerpo, respuesta.status);
     throw new ErrorApi(detalle, respuesta.status);
   }
   return cuerpo as T;
