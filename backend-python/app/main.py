@@ -82,6 +82,28 @@ def asegurar_columnas_compatibles() -> None:
                         "ADD COLUMN fuente_tasa VARCHAR(30) NOT NULL DEFAULT 'MANUAL'"
                     )
                 )
+    if inspector.has_table("usuarios"):
+        columnas_usr = {col["name"] for col in inspector.get_columns("usuarios")}
+        nuevas_usuarios = [
+            ("modalidad", "VARCHAR(20) NOT NULL DEFAULT 'PRESENCIAL'"),
+            ("telefono", "VARCHAR(40) NOT NULL DEFAULT ''"),
+            ("cedula", "VARCHAR(40) NOT NULL DEFAULT ''"),
+            ("tiene_acceso", "BOOLEAN NOT NULL DEFAULT TRUE"),
+        ]
+        for nombre_col, ddl_col in nuevas_usuarios:
+            if nombre_col not in columnas_usr:
+                with motor.begin() as conexion:
+                    conexion.execute(
+                        text(f"ALTER TABLE usuarios ADD COLUMN {nombre_col} {ddl_col}")
+                    )
+        if motor.dialect.name == "postgresql":
+            with motor.begin() as conexion:
+                conexion.execute(
+                    text("ALTER TABLE usuarios ALTER COLUMN correo DROP NOT NULL")
+                )
+                conexion.execute(
+                    text("ALTER TABLE usuarios ALTER COLUMN clave_hash DROP NOT NULL")
+                )
 
 
 @asynccontextmanager

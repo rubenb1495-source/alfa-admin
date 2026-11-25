@@ -74,6 +74,7 @@ const ROLES_VENDEDORES = new Set([
   "TECNICO",
   "ADMINISTRACION",
   "DIRECCION",
+  "OTRO",
 ]);
 
 function redondear2(valor: number): number {
@@ -1377,7 +1378,8 @@ export default function PaginaNuevaVentaPOS() {
                 <option value="">Tienda (Sin comisión · 0%)</option>
                 {asesoresDisponibles.map((u) => (
                   <option key={u.id} value={u.id}>
-                    {u.nombre} (
+                    {u.nombre}
+                    {u.modalidad === "ONLINE" ? " [Online]" : ""} (
                     {u.es_encargado ||
                     u.rol === "ENCARGADO_TIENDA" ||
                     u.rol === "LIDER"

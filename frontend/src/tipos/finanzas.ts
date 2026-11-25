@@ -31,6 +31,9 @@ export interface UsuarioOperativo {
   id: number;
   nombre: string;
   rol: string;
+  modalidad?: string;
+  telefono?: string;
+  tiene_acceso?: boolean;
   es_lider?: boolean;
   es_encargado?: boolean;
   sucursal_id: number | null;

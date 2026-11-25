@@ -4,9 +4,9 @@ import re
 from datetime import date, datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
-from app.modelos import EstadoSucursal, OrigenTasa, RolUsuario, TipoArticulo
+from app.modelos import EstadoSucursal, ModalidadPersonal, OrigenTasa, RolUsuario, TipoArticulo
 
 
 def normalizar_sku(valor: str) -> str:
@@ -41,8 +41,12 @@ class UsuarioSalida(BaseModel):
 
     id: int
     nombre: str
-    correo: str
+    correo: str | None = None
     rol: RolUsuario
+    modalidad: str = ModalidadPersonal.PRESENCIAL.value
+    telefono: str = ""
+    cedula: str = ""
+    tiene_acceso: bool = True
     activo: bool
     motivo_estado: str | None = None
     creado_en: datetime
@@ -56,10 +60,21 @@ class LoginSalida(BaseModel):
 
 class UsuarioCrearEntrada(BaseModel):
     nombre: str = Field(min_length=2, max_length=150)
-    correo: EmailStr
-    clave: str = Field(min_length=6, max_length=128)
     rol: RolUsuario
+    modalidad: ModalidadPersonal = ModalidadPersonal.PRESENCIAL
+    telefono: str = Field(default="", max_length=40)
+    cedula: str = Field(default="", max_length=40)
+    tiene_acceso: bool | None = None
+    correo: EmailStr | None = None
+    clave: str | None = Field(default=None, max_length=128)
     sucursal_id: int | None = None
+
+    @field_validator("correo", "clave", mode="before")
+    @classmethod
+    def vacio_a_none(cls, valor: object) -> object:
+        if isinstance(valor, str) and not valor.strip():
+            return None
+        return valor
 
     @field_validator("nombre")
     @classmethod
@@ -68,6 +83,60 @@ class UsuarioCrearEntrada(BaseModel):
         if len(limpio) < 2:
             raise ValueError("El nombre debe tener al menos 2 caracteres.")
         return limpio
+
+    @model_validator(mode="after")
+    def validar_acceso_sistema(self) -> "UsuarioCrearEntrada":
+        # Compatibilidad: si no se envía tiene_acceso, se infiere True si viene correo/clave, False en caso contrario
+        acceso = self.tiene_acceso if self.tiene_acceso is not None else bool(self.correo or self.clave)
+        self.tiene_acceso = acceso
+        if acceso:
+            if not self.correo:
+                raise ValueError("El correo electrónico es obligatorio cuando el colaborador tiene acceso al sistema.")
+            if not self.clave or len(self.clave) < 6:
+                raise ValueError("La contraseña (mínimo 6 caracteres) es obligatoria al dar acceso al sistema.")
+        else:
+            self.correo = None
+            self.clave = None
+        return self
+
+
+class UsuarioActualizarEntrada(BaseModel):
+    nombre: str = Field(min_length=2, max_length=150)
+    rol: RolUsuario
+    modalidad: ModalidadPersonal = ModalidadPersonal.PRESENCIAL
+    telefono: str = Field(default="", max_length=40)
+    cedula: str = Field(default="", max_length=40)
+    tiene_acceso: bool = False
+    correo: EmailStr | None = None
+    clave: str | None = Field(default=None, max_length=128)
+    sucursal_id: int | None = None
+
+    @field_validator("correo", "clave", mode="before")
+    @classmethod
+    def vacio_a_none(cls, valor: object) -> object:
+        if isinstance(valor, str) and not valor.strip():
+            return None
+        return valor
+
+    @field_validator("nombre")
+    @classmethod
+    def limpiar_nombre(cls, valor: str) -> str:
+        limpio = valor.strip()
+        if len(limpio) < 2:
+            raise ValueError("El nombre debe tener al menos 2 caracteres.")
+        return limpio
+
+    @model_validator(mode="after")
+    def validar_acceso_edicion(self) -> "UsuarioActualizarEntrada":
+        if self.tiene_acceso:
+            if not self.correo:
+                raise ValueError("El correo electrónico es obligatorio cuando el colaborador tiene acceso al sistema.")
+            if self.clave is not None and len(self.clave) < 6:
+                raise ValueError("La contraseña debe tener al menos 6 caracteres.")
+        else:
+            self.correo = None
+            self.clave = None
+        return self
 
 
 class UsuarioEstadoEntrada(BaseModel):

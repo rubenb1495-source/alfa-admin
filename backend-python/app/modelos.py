@@ -33,6 +33,12 @@ class RolUsuario(str, Enum):
     ENCARGADO_TIENDA = "ENCARGADO_TIENDA"
     ASESORA = "ASESORA"
     TECNICO = "TECNICO"
+    OTRO = "OTRO"
+
+
+class ModalidadPersonal(str, Enum):
+    PRESENCIAL = "PRESENCIAL"
+    ONLINE = "ONLINE"
 
 
 class OrigenTasa(str, Enum):
@@ -64,9 +70,13 @@ class Usuario(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     nombre: Mapped[str] = mapped_column(String(150), nullable=False)
-    correo: Mapped[str] = mapped_column(String(180), unique=True, index=True, nullable=False)
-    clave_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    correo: Mapped[str | None] = mapped_column(String(180), unique=True, index=True, nullable=True)
+    clave_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
     rol: Mapped[str] = mapped_column(String(30), nullable=False)
+    modalidad: Mapped[str] = mapped_column(String(20), default=ModalidadPersonal.PRESENCIAL.value, nullable=False)
+    telefono: Mapped[str] = mapped_column(String(40), default="", nullable=False)
+    cedula: Mapped[str] = mapped_column(String(40), default="", nullable=False)
+    tiene_acceso: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     sucursal_id: Mapped[int | None] = mapped_column(ForeignKey("sucursales.id"), nullable=True)
     activo: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     motivo_estado: Mapped[str | None] = mapped_column(String(255), nullable=True)

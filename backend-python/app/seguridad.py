@@ -112,10 +112,10 @@ def obtener_usuario_actual(
         .filter(Usuario.id == usuario_id)
         .first()
     )
-    if usuario is None or not usuario.activo:
+    if usuario is None or not usuario.activo or not getattr(usuario, "tiene_acceso", True):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Usuario inactivo o inexistente.",
+            detail="Usuario inactivo, sin acceso o inexistente.",
         )
     return usuario
 
