@@ -22,6 +22,7 @@ import ModalCargaMasiva, {
   descargarPlantillaLogistica,
   type TipoCargaMasiva,
 } from "@/components/ModalCargaMasiva";
+import TarjetaRespaldoBD from "@/components/TarjetaRespaldoBD";
 import { usarSesion } from "@/contexto/SesionContexto";
 import {
   ErrorApi,
@@ -357,6 +358,9 @@ export default function PaginaAdministracionFinanzas() {
           </p>
         </div>
       </div>
+
+      {/* Respaldo de Base de Datos (solo visible para ADMIN) */}
+      {esAdmin && <TarjetaRespaldoBD />}
 
       {/* Pestañas */}
       <div className="flex flex-wrap gap-1.5 border-b border-slate-200 pb-3">
