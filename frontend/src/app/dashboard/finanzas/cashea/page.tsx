@@ -263,7 +263,9 @@ export default function PaginaFinanzasCashea() {
                 <th className="px-4 py-3">Nota</th>
                 <th className="px-4 py-3">Fecha</th>
                 <th className="px-4 py-3">Sucursal</th>
-                <th className="px-4 py-3 text-right">Pendiente USD</th>
+                <th className="px-4 py-3 text-right">Financiado Bruto</th>
+                <th className="px-4 py-3 text-right">Cargos Cashea</th>
+                <th className="px-4 py-3 text-right">Neto Real por Cobrar</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -287,8 +289,14 @@ export default function PaginaFinanzasCashea() {
                   </td>
                   <td className="px-4 py-3">{c.fecha_venta}</td>
                   <td className="px-4 py-3">{c.sucursal}</td>
-                  <td className="px-4 py-3 text-right font-black text-[#001D3D]">
-                    {formatearUsd(c.saldo_pendiente_usd)}
+                  <td className="px-4 py-3 text-right text-slate-600 font-semibold">
+                    {formatearUsd(c.monto_original_usd)}
+                  </td>
+                  <td className="px-4 py-3 text-right text-rose-600 font-semibold">
+                    -{formatearUsd(c.cashea_total_cargos_usd ?? 0)}
+                  </td>
+                  <td className="px-4 py-3 text-right font-black text-emerald-700">
+                    {formatearUsd(c.cashea_neto_por_cobrar_usd ?? c.saldo_pendiente_usd)}
                   </td>
                 </tr>
               ))}

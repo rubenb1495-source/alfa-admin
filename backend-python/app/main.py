@@ -83,6 +83,25 @@ def asegurar_columnas_compatibles() -> None:
                         "ADD COLUMN liquidacion_id INTEGER NULL"
                     )
                 )
+        nuevas_cashea_vta = [
+            ("es_cashea", "BOOLEAN NOT NULL DEFAULT FALSE"),
+            ("cashea_inicial_usd", "NUMERIC(14, 2) NOT NULL DEFAULT 0"),
+            ("cashea_financiado_usd", "NUMERIC(14, 2) NOT NULL DEFAULT 0"),
+            ("cashea_comision_venta_usd", "NUMERIC(14, 2) NOT NULL DEFAULT 0"),
+            ("cashea_comision_financiado_usd", "NUMERIC(14, 2) NOT NULL DEFAULT 0"),
+            ("cashea_iva_usd", "NUMERIC(14, 2) NOT NULL DEFAULT 0"),
+            ("cashea_islr_usd", "NUMERIC(14, 2) NOT NULL DEFAULT 0"),
+            ("cashea_total_cargos_usd", "NUMERIC(14, 2) NOT NULL DEFAULT 0"),
+            ("cashea_neto_por_cobrar_usd", "NUMERIC(14, 2) NOT NULL DEFAULT 0"),
+            ("tasa_bcv_aplicada", "NUMERIC(14, 4) NOT NULL DEFAULT 0"),
+            ("tasa_usdt_aplicada", "NUMERIC(14, 4) NOT NULL DEFAULT 0"),
+        ]
+        for nombre_col, ddl_col in nuevas_cashea_vta:
+            if nombre_col not in columnas_vta:
+                with motor.begin() as conexion:
+                    conexion.execute(
+                        text(f"ALTER TABLE ventas ADD COLUMN {nombre_col} {ddl_col}")
+                    )
     if inspector.has_table("tasas_diarias"):
         columnas_tasas = {col["name"] for col in inspector.get_columns("tasas_diarias")}
         if "recargo_confirmado" not in columnas_tasas:

@@ -9,6 +9,24 @@ export interface InstrumentoFinanciero {
   activo?: boolean;
 }
 
+export interface DesgloseCashea {
+  total_precio_regular_usd: number;
+  total_precio_regular_bs: number;
+  total_precio_regular_usdt: number;
+  inicial_cobrada_usd: number;
+  monto_financiado_usd: number;
+  cashea_comision_venta_usd: number;
+  cashea_comision_financiado_usd: number;
+  cashea_iva_usd: number;
+  cashea_islr_usd: number;
+  cashea_total_cargos_usd: number;
+  cashea_neto_por_cobrar_usd: number;
+  cashea_neto_bs: number;
+  cashea_neto_usdt: number;
+  tasa_bcv_aplicada: number;
+  tasa_usdt_aplicada: number;
+}
+
 export interface SimulacionVenta {
   total_promo_usd: number;
   total_regular_usd: number;
@@ -21,7 +39,9 @@ export interface SimulacionVenta {
   cashea_financiado_sugerido_usd?: number;
   cashea_financiado_sugerido_bs?: number | null;
   usa_cashea: boolean;
+  desglose_cashea?: DesgloseCashea | null;
   tasa_bcv: number;
+  tasa_usdt?: number;
   recargo_porcentaje: number;
   estado: "CUADRADA" | "CON_SALDO";
 }
@@ -144,6 +164,12 @@ export interface CuentaPorCobrarResumen {
   cliente: string;
   monto_original_usd: number;
   saldo_pendiente_usd: number;
+  cashea_comision_venta_usd?: number;
+  cashea_comision_financiado_usd?: number;
+  cashea_iva_usd?: number;
+  cashea_islr_usd?: number;
+  cashea_total_cargos_usd?: number;
+  cashea_neto_por_cobrar_usd?: number;
   estado: "PENDIENTE" | "PAGADA" | "ANULADA";
 }
 

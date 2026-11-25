@@ -517,8 +517,24 @@ def serializar_venta(venta: Venta, incluir_costos: bool) -> dict[str, Any]:
     if incluir_costos:
         total_costo = sum((d.costo_total_snapshot_usd for d in venta.detalles), Decimal("0"))
         total_real = sum((p.usd_real for p in venta.pagos if not p.anulado), Decimal("0"))
+        cargos_c = Decimal(getattr(venta, "cashea_total_cargos_usd", 0) or 0)
         datos["costo_total_usd"] = redondear_usd(total_costo)
-        datos["utilidad_real_usd"] = redondear_usd(total_real - total_costo)
+        datos["utilidad_real_usd"] = redondear_usd(total_real - total_costo - cargos_c)
+        if getattr(venta, "es_cashea", False):
+            datos["es_cashea"] = True
+            datos["desglose_cashea"] = {
+                "total_precio_regular_usd": redondear_usd(venta.total_regular_usd),
+                "inicial_cobrada_usd": redondear_usd(venta.cashea_inicial_usd),
+                "monto_financiado_usd": redondear_usd(venta.cashea_financiado_usd),
+                "cashea_comision_venta_usd": redondear_usd(venta.cashea_comision_venta_usd),
+                "cashea_comision_financiado_usd": redondear_usd(venta.cashea_comision_financiado_usd),
+                "cashea_iva_usd": redondear_usd(venta.cashea_iva_usd),
+                "cashea_islr_usd": redondear_usd(venta.cashea_islr_usd),
+                "cashea_total_cargos_usd": redondear_usd(venta.cashea_total_cargos_usd),
+                "cashea_neto_por_cobrar_usd": redondear_usd(venta.cashea_neto_por_cobrar_usd),
+                "tasa_bcv_aplicada": float(venta.tasa_bcv_aplicada or 0),
+                "tasa_usdt_aplicada": float(venta.tasa_usdt_aplicada or 0),
+            }
     return datos
 
 
@@ -627,6 +643,23 @@ def simular_venta(
         vuelto_usd=datos.vuelto_usd,
         validar_disponibilidad=False,
     )
+    desglose_cashea = None
+    if calc["usa_cashea"]:
+        from app.servicios.cashea import calcular_desglose_cashea, serializar_desglose_cashea
+
+        inicial_sim = max(
+            Decimal("0"),
+            Decimal(calc["total_regular_usd"] or 0) - Decimal(calc["total_cashea_usd"] or 0),
+        )
+        desglose_cashea = serializar_desglose_cashea(
+            calcular_desglose_cashea(
+                total_precio_regular_usd=calc["total_regular_usd"],
+                inicial_cobrada_usd=inicial_sim,
+                tasa_bcv=calc["tasa_bcv"],
+                tasa_usdt=calc["tasa_usdt"],
+            )
+        )
+
     return {
         "total_promo_usd": redondear_usd(calc["total_promo_usd"]),
         "total_regular_usd": redondear_usd(calc["total_regular_usd"]),
@@ -643,7 +676,9 @@ def simular_venta(
             else None
         ),
         "usa_cashea": calc["usa_cashea"],
+        "desglose_cashea": desglose_cashea,
         "tasa_bcv": float(calc["tasa_bcv"]),
+        "tasa_usdt": float(calc["tasa_usdt"]),
         "recargo_porcentaje": float(calc["recargo_pct"]),
         "estado": calc["estado"],
     }
@@ -728,6 +763,21 @@ def crear_venta(
             detail=mensaje_faltante,
         )
 
+    cashea_calc: dict[str, Any] | None = None
+    if calc["usa_cashea"] and calc["total_cashea_usd"] > 0:
+        from app.servicios.cashea import calcular_desglose_cashea
+
+        inicial_cobrada = max(
+            Decimal("0"),
+            Decimal(calc["total_regular_usd"] or 0) - Decimal(calc["total_cashea_usd"] or 0),
+        )
+        cashea_calc = calcular_desglose_cashea(
+            total_precio_regular_usd=calc["total_regular_usd"],
+            inicial_cobrada_usd=inicial_cobrada,
+            tasa_bcv=calc["tasa_bcv"],
+            tasa_usdt=calc["tasa_usdt"],
+        )
+
     numero_venta = generar_correlativo_corto(bd, Venta, Venta.numero_venta, "N")
     venta = Venta(
         numero_venta=numero_venta,
@@ -751,6 +801,17 @@ def crear_venta(
         recargo_especial_porcentaje=datos.recargo_especial,
         total_promo_usd=calc["total_promo_usd"],
         total_regular_usd=calc["total_regular_usd"],
+        es_cashea=bool(cashea_calc is not None),
+        cashea_inicial_usd=cashea_calc["inicial_cobrada_usd"] if cashea_calc else Decimal("0"),
+        cashea_financiado_usd=cashea_calc["monto_financiado_usd"] if cashea_calc else Decimal("0"),
+        cashea_comision_venta_usd=cashea_calc["cashea_comision_venta_usd"] if cashea_calc else Decimal("0"),
+        cashea_comision_financiado_usd=cashea_calc["cashea_comision_financiado_usd"] if cashea_calc else Decimal("0"),
+        cashea_iva_usd=cashea_calc["cashea_iva_usd"] if cashea_calc else Decimal("0"),
+        cashea_islr_usd=cashea_calc["cashea_islr_usd"] if cashea_calc else Decimal("0"),
+        cashea_total_cargos_usd=cashea_calc["cashea_total_cargos_usd"] if cashea_calc else Decimal("0"),
+        cashea_neto_por_cobrar_usd=cashea_calc["cashea_neto_por_cobrar_usd"] if cashea_calc else Decimal("0"),
+        tasa_bcv_aplicada=calc["tasa_bcv"],
+        tasa_usdt_aplicada=calc["tasa_usdt"],
         vuelto_caja_chica_usd=datos.vuelto_usd,
         es_factura=datos.es_factura,
         numero_control=datos.numero_control.strip(),
@@ -893,13 +954,18 @@ def crear_venta(
         )
 
     if calc["total_cashea_usd"] > 0:
+        saldo_neto_cashea = (
+            cashea_calc["cashea_neto_por_cobrar_usd"]
+            if cashea_calc is not None
+            else calc["total_cashea_usd"]
+        )
         bd.add(
             CuentaPorCobrar(
                 venta_id=venta.id,
                 tipo=TipoCuentaPorCobrar.CASHEA.value,
                 cliente_id=datos.cliente_id,
                 monto_original_usd=calc["total_cashea_usd"],
-                saldo_pendiente_usd=calc["total_cashea_usd"],
+                saldo_pendiente_usd=saldo_neto_cashea,
                 estado=EstadoCuentaPorCobrar.PENDIENTE.value,
             )
         )
@@ -962,6 +1028,37 @@ def crear_venta(
             if com_usd > 0:
                 lineas_vta.append({"cuenta_codigo": "6.1.01", "debe_usd": com_usd, "haber_usd": Decimal("0"), "nota": f"Comisión {asesor_v.nombre}"})
                 lineas_vta.append({"cuenta_codigo": "2.1.02", "debe_usd": Decimal("0"), "haber_usd": com_usd, "nota": f"Comisión por pagar {numero_venta}"})
+
+    # Comisiones e Impuestos de Cashea (8.1.01 Comisiones + 9.1.01 Impuestos vs 1.1.02 CxC Cashea)
+    if cashea_calc is not None and cashea_calc["cashea_total_cargos_usd"] > 0:
+        com_cashea = cashea_calc["cashea_comision_venta_usd"] + cashea_calc["cashea_comision_financiado_usd"]
+        imp_cashea = cashea_calc["cashea_iva_usd"] + cashea_calc["cashea_islr_usd"]
+        if com_cashea > 0:
+            lineas_vta.append(
+                {
+                    "cuenta_codigo": "8.1.01",
+                    "debe_usd": com_cashea,
+                    "haber_usd": Decimal("0"),
+                    "nota": f"Comisiones Cashea (4%+4%) {numero_venta}",
+                }
+            )
+        if imp_cashea > 0:
+            lineas_vta.append(
+                {
+                    "cuenta_codigo": "9.1.01",
+                    "debe_usd": imp_cashea,
+                    "haber_usd": Decimal("0"),
+                    "nota": f"IVA 16% + ISLR 2% Cashea {numero_venta}",
+                }
+            )
+        lineas_vta.append(
+            {
+                "cuenta_codigo": "1.1.02",
+                "debe_usd": Decimal("0"),
+                "haber_usd": cashea_calc["cashea_total_cargos_usd"],
+                "nota": f"Descuento cargos Cashea sobre CxC {numero_venta}",
+            }
+        )
 
     if len(lineas_vta) >= 2:
         crear_asiento_contable(

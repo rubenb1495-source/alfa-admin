@@ -2189,8 +2189,24 @@ export default function PaginaNuevaVentaPOS() {
                     <span>Total Regular ({simulacion.recargo_porcentaje}%):</span>
                     <span>{formatearUsd(simulacion.total_regular_usd)}</span>
                   </div>
+                  {simulacion.desglose_cashea && (
+                    <div className="grid grid-cols-2 gap-1.5 py-1 px-2 rounded-lg bg-white/70 border border-current/15 text-[11px]">
+                      <div>
+                        <span className="opacity-70">Equiv. Bs (BCV): </span>
+                        <strong className="cifra-tabular">
+                          {formatearBs(simulacion.desglose_cashea.total_precio_regular_bs)}
+                        </strong>
+                      </div>
+                      <div className="text-right">
+                        <span className="opacity-70">Equiv. USDT: </span>
+                        <strong className="cifra-tabular">
+                          {simulacion.desglose_cashea.total_precio_regular_usdt.toFixed(2)} USDT
+                        </strong>
+                      </div>
+                    </div>
+                  )}
                   <div className="flex justify-between text-[11px] opacity-80">
-                    <span>Referencia Precio Promo (no aplica con Cashea):</span>
+                    <span>Referencia Precio Promo (base comisión asesor):</span>
                     <span>{formatearUsd(simulacion.total_promo_usd)}</span>
                   </div>
                   <div className="flex justify-between">
@@ -2200,7 +2216,7 @@ export default function PaginaNuevaVentaPOS() {
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Financiado Cashea:</span>
+                    <span>Monto Financiado Cashea:</span>
                     <span className="font-bold">
                       {formatearUsd(casheaFinanciadoAutoUsd)}
                       {casheaFinanciadoAutoBs !== null
@@ -2208,6 +2224,47 @@ export default function PaginaNuevaVentaPOS() {
                         : ""}
                     </span>
                   </div>
+
+                  {/* Bloque interno de Desglose Cashea (solo ADMIN y DIRECTOR; oculto para cliente en PDF/WA) */}
+                  {simulacion.desglose_cashea &&
+                    (usuario?.rol === "DIRECCION" ||
+                      usuario?.rol === "ADMINISTRACION" ||
+                      usuario?.rol === "DIRECTOR") && (
+                      <div className="mt-2 p-2.5 rounded-lg bg-slate-900 text-slate-100 space-y-1 text-[11px]">
+                        <div className="font-bold text-amber-300 uppercase tracking-wide text-[10px]">
+                          Desglose Interno Cashea (Solo Admin / Dirección)
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-300">4% sobre Total Venta (Regular):</span>
+                          <span>{formatearUsd(simulacion.desglose_cashea.cashea_comision_venta_usd)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-300">4% sobre Monto Financiado:</span>
+                          <span>{formatearUsd(simulacion.desglose_cashea.cashea_comision_financiado_usd)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-300">16% IVA (sobre el 4% venta):</span>
+                          <span>{formatearUsd(simulacion.desglose_cashea.cashea_iva_usd)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-300">2% ISLR (sobre el 4% venta):</span>
+                          <span>{formatearUsd(simulacion.desglose_cashea.cashea_islr_usd)}</span>
+                        </div>
+                        <div className="flex justify-between pt-1 border-t border-slate-700 font-bold text-rose-300">
+                          <span>Total Cargos Cashea:</span>
+                          <span>-{formatearUsd(simulacion.desglose_cashea.cashea_total_cargos_usd)}</span>
+                        </div>
+                        <div className="flex justify-between font-black text-emerald-300 text-xs">
+                          <span>Neto Real por Cobrar Cashea:</span>
+                          <span>{formatearUsd(simulacion.desglose_cashea.cashea_neto_por_cobrar_usd)}</span>
+                        </div>
+                        <div className="text-[10px] text-slate-400 text-right">
+                          {formatearBs(simulacion.desglose_cashea.cashea_neto_bs)} ·{" "}
+                          {simulacion.desglose_cashea.cashea_neto_usdt.toFixed(2)} USDT
+                        </div>
+                      </div>
+                    )}
+
                   <div className="pt-2 border-t border-current/20 font-black text-sm">
                     {simulacion.estado === "CUADRADA"
                       ? "✅ Venta CUADRADA (Precio Regular)"

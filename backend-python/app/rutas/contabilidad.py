@@ -783,6 +783,7 @@ def obtener_rentabilidad_real_ventas(
     tot_ventas = Decimal("0")
     tot_costos = Decimal("0")
     tot_comisiones = Decimal("0")
+    tot_cargos_cashea = Decimal("0")
     tot_utilidad = Decimal("0")
 
     for v in ventas:
@@ -808,12 +809,14 @@ def obtener_rentabilidad_real_ventas(
             elif v.asesor.rol == RolUsuario.ASESORA.value:
                 pct_com = Decimal("0.01")
         com_usd = _q2(precio_v * pct_com)
-        utilidad = precio_v - costo_total - com_usd
+        cargos_cashea = Decimal(getattr(v, "cashea_total_cargos_usd", 0) or 0)
+        utilidad = precio_v - costo_total - com_usd - cargos_cashea
         margen = _q2((utilidad / precio_v) * Decimal("100")) if precio_v > 0 else Decimal("0")
 
         tot_ventas += precio_v
         tot_costos += costo_total
         tot_comisiones += com_usd
+        tot_cargos_cashea += cargos_cashea
         tot_utilidad += utilidad
 
         filas.append(
@@ -824,12 +827,14 @@ def obtener_rentabilidad_real_ventas(
                 "sucursal": v.sucursal.nombre if v.sucursal else "",
                 "asesor": v.asesor.nombre if v.asesor else "Tienda",
                 "origen_venta": v.origen_venta,
+                "es_cashea": bool(getattr(v, "es_cashea", False)),
                 "precio_venta_usd": _r2(precio_v),
                 "costo_base_usd": _r2(costo_base),
                 "costo_flete_usd": _r2(costo_flete),
                 "costo_preparacion_usd": _r2(costo_prep),
                 "costo_total_real_usd": _r2(costo_total),
                 "comision_usd": _r2(com_usd),
+                "cashea_total_cargos_usd": _r2(cargos_cashea),
                 "utilidad_neta_usd": _r2(utilidad),
                 "margen_neto_pct": float(margen),
             }
@@ -841,6 +846,7 @@ def obtener_rentabilidad_real_ventas(
             "total_ventas_usd": _r2(tot_ventas),
             "total_costos_reales_usd": _r2(tot_costos),
             "total_comisiones_usd": _r2(tot_comisiones),
+            "total_cargos_cashea_usd": _r2(tot_cargos_cashea),
             "utilidad_neta_total_usd": _r2(tot_utilidad),
             "margen_neto_promedio_pct": float(
                 _q2((tot_utilidad / tot_ventas) * Decimal("100")) if tot_ventas > 0 else Decimal("0")

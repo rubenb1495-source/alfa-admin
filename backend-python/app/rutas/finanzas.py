@@ -238,6 +238,16 @@ def listar_cuentas_por_cobrar(
             "cliente": c.cliente.nombre if c.cliente else "Cliente general",
             "monto_original_usd": redondear_usd(c.monto_original_usd),
             "saldo_pendiente_usd": redondear_usd(c.saldo_pendiente_usd),
+            "cashea_comision_venta_usd": redondear_usd(c.venta.cashea_comision_venta_usd) if c.venta else 0.0,
+            "cashea_comision_financiado_usd": redondear_usd(c.venta.cashea_comision_financiado_usd) if c.venta else 0.0,
+            "cashea_iva_usd": redondear_usd(c.venta.cashea_iva_usd) if c.venta else 0.0,
+            "cashea_islr_usd": redondear_usd(c.venta.cashea_islr_usd) if c.venta else 0.0,
+            "cashea_total_cargos_usd": redondear_usd(c.venta.cashea_total_cargos_usd) if c.venta else 0.0,
+            "cashea_neto_por_cobrar_usd": (
+                redondear_usd(c.venta.cashea_neto_por_cobrar_usd)
+                if (c.venta and c.tipo == TipoCuentaPorCobrar.CASHEA.value and c.venta.cashea_neto_por_cobrar_usd > 0)
+                else redondear_usd(c.saldo_pendiente_usd)
+            ),
             "estado": c.estado,
         }
         for c in filas
