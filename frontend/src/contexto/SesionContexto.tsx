@@ -58,10 +58,10 @@ export function ProveedorSesion({ children }: { children: React.ReactNode }) {
   }, [recargarTasaHoy]);
 
   const iniciarSesion = useCallback(
-    async (correo: string, clave: string) => {
+    async (usuarioNombre: string, clave: string) => {
       const respuesta = await solicitarApi<RespuestaLogin>("/api/auth/login", {
         method: "POST",
-        body: JSON.stringify({ correo, clave }),
+        body: JSON.stringify({ usuario: usuarioNombre, clave }),
       });
       guardarToken(respuesta.token);
       setUsuario(respuesta.usuario);

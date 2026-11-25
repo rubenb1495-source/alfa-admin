@@ -15,6 +15,7 @@ import {
   Cpu,
   CreditCard,
   FileSpreadsheet,
+  KeyRound,
   LogOut,
   Menu,
   Package,
@@ -40,6 +41,7 @@ import BotonInstalarPWA from "@/components/BotonInstalarPWA";
 import CampanaAlertas from "@/components/CampanaAlertas";
 import LogoAlfa from "@/components/LogoAlfa";
 import ModalAperturaDiaria from "@/components/ModalAperturaDiaria";
+import ModalCambiarClave from "@/components/ModalCambiarClave";
 import { usarSesion } from "@/contexto/SesionContexto";
 import {
   esRolAdministrativo,
@@ -79,6 +81,8 @@ export default function DisenoDashboard({
   const [menuMovilAbierto, setMenuMovilAbierto] = useState(false);
   const [sidebarColapsado, setSidebarColapsado] = useState(false);
   const [modalTasasAbierto, setModalTasasAbierto] = useState(false);
+  const [modalClaveAbierto, setModalClaveAbierto] = useState(false);
+  const [menuPerfilAbierto, setMenuPerfilAbierto] = useState(false);
   const [avisoPermiso, setAvisoPermiso] = useState<string | null>(null);
 
   useEffect(() => {
@@ -599,18 +603,62 @@ export default function DisenoDashboard({
                   {usuario.sucursal.nombre}
                 </span>
               )}
-              <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-white/80 border border-gray-200/80">
-                <span className="font-bold text-[#000814] max-w-[140px] truncate">
-                  {usuario.nombre}
-                </span>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#EDF3FA] text-[#003566] font-bold text-[10px] tracking-wide">
-                  <Shield className="w-2.5 h-2.5" />
-                  {usuario.rol}
-                </span>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setMenuPerfilAbierto((v) => !v)}
+                  className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-white/80 hover:bg-white border border-gray-200/80 cursor-pointer"
+                >
+                  <span className="font-bold text-[#000814] max-w-[140px] truncate">
+                    {usuario.nombre}
+                  </span>
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#EDF3FA] text-[#003566] font-bold text-[10px] tracking-wide">
+                    <Shield className="w-2.5 h-2.5" />
+                    {usuario.rol}
+                  </span>
+                </button>
+                {menuPerfilAbierto && (
+                  <div className="absolute right-0 mt-1.5 w-52 rounded-xl bg-white border border-slate-200 shadow-xl py-1.5 z-50">
+                    <div className="px-3 py-1.5 border-b border-slate-100">
+                      <p className="text-xs font-bold text-slate-900 truncate">{usuario.nombre}</p>
+                      <p className="text-[11px] text-slate-500 truncate">
+                        Usuario: {usuario.usuario || usuario.nombre}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMenuPerfilAbierto(false);
+                        setModalClaveAbierto(true);
+                      }}
+                      className="w-full px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
+                    >
+                      <KeyRound className="w-3.5 h-3.5 text-[#003566]" />
+                      Cambiar mi clave
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMenuPerfilAbierto(false);
+                        cerrarSesion();
+                        router.replace("/login");
+                      }}
+                      className="w-full px-3 py-2 text-left text-xs font-semibold text-red-600 hover:bg-red-50 flex items-center gap-2 cursor-pointer"
+                    >
+                      <LogOut className="w-3.5 h-3.5" />
+                      Cerrar sesión
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
         </header>
+
+        <ModalCambiarClave
+          abierto={modalClaveAbierto}
+          alCerrar={() => setModalClaveAbierto(false)}
+        />
 
         <main className="relative z-10 flex-1 p-4 lg:p-6 max-w-7xl w-full mx-auto min-w-0">
           {avisoPermiso && (

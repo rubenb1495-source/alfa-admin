@@ -109,6 +109,10 @@ def asegurar_columnas_compatibles() -> None:
             ("cedula", "VARCHAR(40) NOT NULL DEFAULT ''"),
             ("tiene_acceso", "BOOLEAN NOT NULL DEFAULT TRUE"),
             ("debe_cambiar_clave", "BOOLEAN NOT NULL DEFAULT FALSE"),
+            ("usuario", "VARCHAR(120) NULL"),
+            ("intentos_fallidos", "INTEGER NOT NULL DEFAULT 0"),
+            ("cuenta_bloqueada", "BOOLEAN NOT NULL DEFAULT FALSE"),
+            ("fecha_bloqueo", "TIMESTAMP NULL"),
             ("fecha_ingreso", "DATE NULL"),
             ("cargo", "VARCHAR(120) NOT NULL DEFAULT ''"),
             ("salario_base_usd", "NUMERIC(12, 2) NOT NULL DEFAULT 0"),
@@ -217,6 +221,31 @@ async def ciclo_vida(_app: FastAPI) -> AsyncIterator[None]:
         ejecutar_semilla(bd)
         ejecutar_semilla_finanzas(bd)
         ejecutar_semilla_contabilidad(bd)
+        # Migración segura: asignar usuario = nombre a usuarios existentes con acceso sin usuario
+        from app.modelos import Usuario
+
+        usrs_sin_usuario = (
+            bd.query(Usuario)
+            .filter(
+                Usuario.tiene_acceso.is_(True),
+                (Usuario.usuario.is_(None)) | (Usuario.usuario == ""),
+            )
+            .all()
+        )
+        if usrs_sin_usuario:
+            existentes_lower = {
+                (u.usuario or "").strip().lower()
+                for u in bd.query(Usuario.usuario).filter(Usuario.usuario.isnot(None)).all()
+                if u.usuario
+            }
+            for u in usrs_sin_usuario:
+                base_u = " ".join((u.nombre or f"usuario_{u.id}").split())
+                candidato = base_u
+                if candidato.lower() in existentes_lower:
+                    candidato = f"{base_u} {u.id}"
+                u.usuario = candidato
+                existentes_lower.add(candidato.lower())
+            bd.commit()
     finally:
         bd.close()
     yield

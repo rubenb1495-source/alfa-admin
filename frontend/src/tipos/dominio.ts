@@ -28,6 +28,7 @@ export interface Sucursal {
 export interface Usuario {
   id: number;
   nombre: string;
+  usuario?: string | null;
   correo: string | null;
   rol: RolUsuario;
   modalidad?: ModalidadPersonal;
@@ -35,6 +36,9 @@ export interface Usuario {
   cedula?: string;
   tiene_acceso?: boolean;
   debe_cambiar_clave?: boolean;
+  intentos_fallidos?: number;
+  cuenta_bloqueada?: boolean;
+  fecha_bloqueo?: string | null;
   activo: boolean;
   motivo_estado: string | null;
   creado_en: string;

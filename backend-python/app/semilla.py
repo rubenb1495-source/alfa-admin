@@ -44,6 +44,7 @@ def ejecutar_semilla(bd: Session) -> None:
         bd.add(
             Usuario(
                 nombre="Dirección General Alfa",
+                usuario="Dirección General Alfa",
                 correo=correo_admin,
                 clave_hash=generar_hash_clave("Alfa2026!"),
                 rol=RolUsuario.DIRECCION.value,
@@ -51,5 +52,7 @@ def ejecutar_semilla(bd: Session) -> None:
                 activo=True,
             )
         )
+    elif not getattr(admin_existente, "usuario", None):
+        admin_existente.usuario = admin_existente.nombre.strip()
 
     bd.commit()

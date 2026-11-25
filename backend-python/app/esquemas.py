@@ -32,8 +32,23 @@ class SucursalSalida(BaseModel):
 # ---------------- Autenticación y Usuarios ----------------
 
 class LoginEntrada(BaseModel):
-    correo: EmailStr
-    clave: str = Field(min_length=1)
+    usuario: str | None = Field(default=None, max_length=180)
+    correo: str | None = Field(default=None, max_length=180)
+    email: str | None = Field(default=None, max_length=180)
+    clave: str | None = Field(default=None, max_length=128)
+    password: str | None = Field(default=None, max_length=128)
+
+    @model_validator(mode="after")
+    def validar_credenciales(self) -> "LoginEntrada":
+        ident = (self.usuario or self.correo or self.email or "").strip()
+        pwd = self.clave if self.clave is not None else (self.password or "")
+        if not ident:
+            raise ValueError("Ingresa tu nombre de usuario.")
+        if not pwd:
+            raise ValueError("Ingresa tu clave de acceso.")
+        self.usuario = ident
+        self.clave = pwd
+        return self
 
 
 class UsuarioSalida(BaseModel):
@@ -41,6 +56,7 @@ class UsuarioSalida(BaseModel):
 
     id: int
     nombre: str
+    usuario: str | None = None
     correo: str | None = None
     rol: RolUsuario
     modalidad: str = ModalidadPersonal.PRESENCIAL.value
@@ -48,6 +64,9 @@ class UsuarioSalida(BaseModel):
     cedula: str = ""
     tiene_acceso: bool = True
     debe_cambiar_clave: bool = False
+    intentos_fallidos: int = 0
+    cuenta_bloqueada: bool = False
+    fecha_bloqueo: datetime | None = None
     cargo: str = ""
     salario_base_usd: Decimal = Decimal("0")
     bono_alimentacion_usd: Decimal = Decimal("0")
@@ -66,6 +85,7 @@ class LoginSalida(BaseModel):
 
 class UsuarioCrearEntrada(BaseModel):
     nombre: str = Field(min_length=2, max_length=150)
+    usuario: str | None = Field(default=None, max_length=120)
     rol: RolUsuario
     modalidad: ModalidadPersonal = ModalidadPersonal.PRESENCIAL
     telefono: str = Field(default="", max_length=40)
@@ -79,7 +99,7 @@ class UsuarioCrearEntrada(BaseModel):
     bono_alimentacion_usd: Decimal = Field(default=Decimal("0"), ge=Decimal("0"))
     bonos_fijos_usd: Decimal = Field(default=Decimal("0"), ge=Decimal("0"))
 
-    @field_validator("correo", "clave", mode="before")
+    @field_validator("usuario", "correo", "clave", mode="before")
     @classmethod
     def vacio_a_none(cls, valor: object) -> object:
         if isinstance(valor, str) and not valor.strip():
@@ -89,22 +109,21 @@ class UsuarioCrearEntrada(BaseModel):
     @field_validator("nombre")
     @classmethod
     def limpiar_nombre(cls, valor: str) -> str:
-        limpio = valor.strip()
+        limpio = " ".join(valor.split())
         if len(limpio) < 2:
             raise ValueError("El nombre debe tener al menos 2 caracteres.")
         return limpio
 
     @model_validator(mode="after")
     def validar_acceso_sistema(self) -> "UsuarioCrearEntrada":
-        # Compatibilidad: si no se envía tiene_acceso, se infiere True si viene correo/clave, False en caso contrario
-        acceso = self.tiene_acceso if self.tiene_acceso is not None else bool(self.correo or self.clave)
+        acceso = self.tiene_acceso if self.tiene_acceso is not None else bool(self.usuario or self.correo or self.clave)
         self.tiene_acceso = acceso
         if acceso:
-            if not self.correo:
-                raise ValueError("El correo electrónico es obligatorio cuando el colaborador tiene acceso al sistema.")
+            self.usuario = " ".join((self.usuario or self.nombre).split())
             if not self.clave or len(self.clave) < 6:
                 raise ValueError("La contraseña (mínimo 6 caracteres) es obligatoria al dar acceso al sistema.")
         else:
+            self.usuario = None
             self.correo = None
             self.clave = None
         return self
@@ -112,6 +131,7 @@ class UsuarioCrearEntrada(BaseModel):
 
 class UsuarioActualizarEntrada(BaseModel):
     nombre: str = Field(min_length=2, max_length=150)
+    usuario: str | None = Field(default=None, max_length=120)
     rol: RolUsuario
     modalidad: ModalidadPersonal = ModalidadPersonal.PRESENCIAL
     telefono: str = Field(default="", max_length=40)
@@ -125,7 +145,7 @@ class UsuarioActualizarEntrada(BaseModel):
     bono_alimentacion_usd: Decimal = Field(default=Decimal("0"), ge=Decimal("0"))
     bonos_fijos_usd: Decimal = Field(default=Decimal("0"), ge=Decimal("0"))
 
-    @field_validator("correo", "clave", mode="before")
+    @field_validator("usuario", "correo", "clave", mode="before")
     @classmethod
     def vacio_a_none(cls, valor: object) -> object:
         if isinstance(valor, str) and not valor.strip():
@@ -135,7 +155,7 @@ class UsuarioActualizarEntrada(BaseModel):
     @field_validator("nombre")
     @classmethod
     def limpiar_nombre(cls, valor: str) -> str:
-        limpio = valor.strip()
+        limpio = " ".join(valor.split())
         if len(limpio) < 2:
             raise ValueError("El nombre debe tener al menos 2 caracteres.")
         return limpio
@@ -143,11 +163,11 @@ class UsuarioActualizarEntrada(BaseModel):
     @model_validator(mode="after")
     def validar_acceso_edicion(self) -> "UsuarioActualizarEntrada":
         if self.tiene_acceso:
-            if not self.correo:
-                raise ValueError("El correo electrónico es obligatorio cuando el colaborador tiene acceso al sistema.")
+            self.usuario = " ".join((self.usuario or self.nombre).split())
             if self.clave is not None and len(self.clave) < 6:
                 raise ValueError("La contraseña debe tener al menos 6 caracteres.")
         else:
+            self.usuario = None
             self.correo = None
             self.clave = None
         return self

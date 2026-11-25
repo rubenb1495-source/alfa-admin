@@ -71,6 +71,7 @@ class Usuario(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     nombre: Mapped[str] = mapped_column(String(150), nullable=False)
+    usuario: Mapped[str | None] = mapped_column(String(120), unique=True, index=True, nullable=True)
     correo: Mapped[str | None] = mapped_column(String(180), unique=True, index=True, nullable=True)
     clave_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
     rol: Mapped[str] = mapped_column(String(30), nullable=False)
@@ -79,6 +80,9 @@ class Usuario(Base):
     cedula: Mapped[str] = mapped_column(String(40), default="", nullable=False)
     tiene_acceso: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     debe_cambiar_clave: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    intentos_fallidos: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    cuenta_bloqueada: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    fecha_bloqueo: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     fecha_ingreso: Mapped[date | None] = mapped_column(Date, nullable=True)
     cargo: Mapped[str] = mapped_column(String(120), default="", nullable=False)
     salario_base_usd: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0"), nullable=False)

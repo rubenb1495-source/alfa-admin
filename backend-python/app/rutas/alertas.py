@@ -288,6 +288,26 @@ def obtener_resumen_alertas(
     preventivas_cxp = sum(1 for c in alertas_cxp if c["urgencia"] == "PROXIMA")
     monto_total_cxp = sum((Decimal(str(c["monto_pendiente_usd"])) for c in alertas_cxp), Decimal("0"))
 
+    # 3. Alertas de Seguridad (Cuentas bloqueadas tras 5 intentos fallidos)
+    bloqueados = (
+        bd.query(Usuario)
+        .filter(Usuario.cuenta_bloqueada.is_(True), Usuario.activo.is_(True))
+        .order_by(Usuario.fecha_bloqueo.desc())
+        .all()
+    )
+    alertas_seguridad = [
+        {
+            "usuario_id": u.id,
+            "nombre": u.nombre,
+            "usuario": u.usuario or u.nombre,
+            "rol": u.rol,
+            "intentos_fallidos": int(u.intentos_fallidos or 5),
+            "fecha_bloqueo": u.fecha_bloqueo.isoformat() if u.fecha_bloqueo else None,
+            "mensaje": f"Acceso bloqueado para {u.nombre} tras 5 intentos fallidos.",
+        }
+        for u in bloqueados
+    ]
+
     return {
         "fecha_evaluacion": hoy.isoformat(),
         "configuracion": {
@@ -296,17 +316,19 @@ def obtener_resumen_alertas(
             "actualizado_por": cfg.actualizado_por,
         },
         "contadores": {
-            "total_criticas": criticas_inv + criticas_cxp,
+            "total_criticas": criticas_inv + criticas_cxp + len(alertas_seguridad),
             "total_preventivas": preventivas_inv + preventivas_cxp,
-            "total_alertas": len(alertas_inventario) + len(alertas_cxp),
+            "total_alertas": len(alertas_inventario) + len(alertas_cxp) + len(alertas_seguridad),
             "agotados": criticas_inv,
             "stock_bajo": preventivas_inv,
             "cxp_criticas": criticas_cxp,
             "cxp_proximas": preventivas_cxp,
+            "seguridad_bloqueos": len(alertas_seguridad),
             "monto_total_cxp_alerta_usd": _r2(monto_total_cxp),
         },
         "inventario": alertas_inventario,
         "cuentas_por_pagar": alertas_cxp,
+        "seguridad": alertas_seguridad,
     }
 
 

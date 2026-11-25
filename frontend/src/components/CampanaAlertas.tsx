@@ -2,8 +2,19 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, Bell, Boxes, CalendarClock, ExternalLink } from "lucide-react";
-import { formatearUsd, solicitarApi } from "@/servicios/api";
+import { AlertTriangle, Bell, Boxes, CalendarClock, ExternalLink, ShieldAlert } from "lucide-react";
+import { usarSesion } from "@/contexto/SesionContexto";
+import { esRolAdministrativo, formatearUsd, solicitarApi } from "@/servicios/api";
+
+export interface AlertaSeguridadItem {
+  usuario_id: number;
+  nombre: string;
+  usuario: string;
+  rol: string;
+  intentos_fallidos: number;
+  fecha_bloqueo: string | null;
+  mensaje: string;
+}
 
 export interface AlertaInventarioItem {
   articulo_id: number;
@@ -45,14 +56,19 @@ export interface ResumenAlertas {
     stock_bajo: number;
     cxp_criticas: number;
     cxp_proximas: number;
+    seguridad_bloqueos?: number;
     monto_total_cxp_alerta_usd: number;
   };
   inventario: AlertaInventarioItem[];
   cuentas_por_pagar: AlertaCxpItem[];
+  seguridad?: AlertaSeguridadItem[];
 }
 
 export default function CampanaAlertas() {
+  const { usuario } = usarSesion();
+  const esAdmin = usuario ? esRolAdministrativo(usuario.rol) : false;
   const [resumen, setResumen] = useState<ResumenAlertas | null>(null);
+  const [desbloqueandoId, setDesbloqueandoId] = useState<number | null>(null);
   const [abierto, setAbierto] = useState(false);
   const contenedorRef = useRef<HTMLDivElement>(null);
 
@@ -137,6 +153,46 @@ export default function CampanaAlertas() {
               </p>
             ) : (
               <>
+                {(resumen.seguridad || []).map((seg) => (
+                  <div
+                    key={`seg-${seg.usuario_id}`}
+                    className="p-3 bg-red-50/80 flex items-start justify-between gap-2"
+                  >
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-red-700">
+                        <ShieldAlert className="h-3.5 w-3.5 shrink-0" />
+                        <span>Acceso Bloqueado · {seg.nombre}</span>
+                      </div>
+                      <p className="text-[11px] text-red-600">
+                        {seg.intentos_fallidos} intentos fallidos
+                        {seg.fecha_bloqueo
+                          ? ` · ${new Date(seg.fecha_bloqueo).toLocaleString("es-VE")}`
+                          : ""}
+                      </p>
+                    </div>
+                    {esAdmin && (
+                      <button
+                        type="button"
+                        disabled={desbloqueandoId === seg.usuario_id}
+                        onClick={async () => {
+                          setDesbloqueandoId(seg.usuario_id);
+                          try {
+                            await solicitarApi(
+                              `/api/personal/${seg.usuario_id}/desbloquear`,
+                              { method: "POST", body: JSON.stringify({}) }
+                            );
+                            await cargar();
+                          } finally {
+                            setDesbloqueandoId(null);
+                          }
+                        }}
+                        className="px-2 py-1 rounded-md bg-red-600 hover:bg-red-700 text-white text-[10px] font-bold shrink-0 cursor-pointer disabled:opacity-50"
+                      >
+                        {desbloqueandoId === seg.usuario_id ? "..." : "Desbloquear"}
+                      </button>
+                    )}
+                  </div>
+                ))}
                 {resumen.cuentas_por_pagar.slice(0, 3).map((cxp) => (
                   <div
                     key={`cxp-${cxp.fuente}-${cxp.id}`}

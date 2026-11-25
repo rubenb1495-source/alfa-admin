@@ -147,9 +147,11 @@ export default function PaginaPersonalYUsuarios() {
   const [cedula, setCedula] = useState("");
   const [sucursalId, setSucursalId] = useState<string>("");
   const [tieneAcceso, setTieneAcceso] = useState(false);
+  const [usuarioAcceso, setUsuarioAcceso] = useState("");
   const [correo, setCorreo] = useState("");
   const [clave, setClave] = useState("");
   const [guardando, setGuardando] = useState(false);
+  const [desbloqueandoId, setDesbloqueandoId] = useState<number | null>(null);
   const [errorModal, setErrorModal] = useState<string | null>(null);
 
   // Modal cambio de estado (borrado lógico)
@@ -215,6 +217,7 @@ export default function PaginaPersonalYUsuarios() {
   const abrirModalCrear = () => {
     setEditandoUsuario(null);
     setNombre("");
+    setUsuarioAcceso("");
     setRolForm("ASESORA");
     setModalidad("PRESENCIAL");
     setTelefono("");
@@ -230,6 +233,7 @@ export default function PaginaPersonalYUsuarios() {
   const abrirModalEditar = (u: Usuario) => {
     setEditandoUsuario(u);
     setNombre(u.nombre);
+    setUsuarioAcceso(u.usuario || u.nombre);
     setRolForm(u.rol);
     setModalidad(u.modalidad === "ONLINE" ? "ONLINE" : "PRESENCIAL");
     setTelefono(u.telefono || "");
@@ -242,6 +246,26 @@ export default function PaginaPersonalYUsuarios() {
     setModalAbierto(true);
   };
 
+  const manejarDesbloquearAcceso = async (u: Usuario) => {
+    setDesbloqueandoId(u.id);
+    setError(null);
+    try {
+      await solicitarApi(`/api/personal/${u.id}/desbloquear`, {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+      await cargarDatos();
+    } catch (err) {
+      setError(
+        err instanceof ErrorApi
+          ? err.message
+          : "No se pudo desbloquear el acceso del usuario."
+      );
+    } finally {
+      setDesbloqueandoId(null);
+    }
+  };
+
   const manejarGuardarPersonal = async (
     e: React.FormEvent<HTMLFormElement>
   ) => {
@@ -249,9 +273,10 @@ export default function PaginaPersonalYUsuarios() {
     setErrorModal(null);
 
     if (tieneAcceso) {
-      if (!correo.trim()) {
+      const usrFinal = (usuarioAcceso || nombre).trim();
+      if (!usrFinal) {
         setErrorModal(
-          "El correo electrónico es obligatorio al dar acceso al sistema."
+          "El usuario de acceso (nombre) es obligatorio al dar acceso al sistema."
         );
         return;
       }
@@ -273,13 +298,14 @@ export default function PaginaPersonalYUsuarios() {
     try {
       const payload = {
         nombre: nombre.trim(),
+        usuario: tieneAcceso ? (usuarioAcceso.trim() || nombre.trim()) : null,
         rol: rolForm,
         modalidad,
         telefono: telefono.trim(),
         cedula: cedula.trim(),
         sucursal_id: sucursalId ? Number(sucursalId) : null,
         tiene_acceso: tieneAcceso,
-        correo: tieneAcceso ? correo.trim() : null,
+        correo: tieneAcceso && correo.trim() ? correo.trim() : null,
         clave: tieneAcceso && clave ? clave : null,
       };
 
@@ -520,7 +546,7 @@ export default function PaginaPersonalYUsuarios() {
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-xs">
+                      <td className="px-4 py-3 text-xs space-x-1">
                         <span
                           className={`px-2 py-0.5 rounded-full font-bold ${
                             u.activo
@@ -530,9 +556,26 @@ export default function PaginaPersonalYUsuarios() {
                         >
                           {u.activo ? "Activo" : "Inactivo"}
                         </span>
+                        {u.cuenta_bloqueada && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-600 text-white font-bold">
+                            <ShieldAlert className="w-3 h-3" />
+                            Bloqueado
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-right space-x-1.5 whitespace-nowrap">
-                        {conAcceso && u.correo && (
+                        {u.cuenta_bloqueada && (
+                          <button
+                            type="button"
+                            disabled={desbloqueandoId === u.id}
+                            onClick={() => void manejarDesbloquearAcceso(u)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-bold cursor-pointer disabled:opacity-50"
+                          >
+                            <KeyRound className="w-3.5 h-3.5" />
+                            {desbloqueandoId === u.id ? "..." : "Desbloquear acceso"}
+                          </button>
+                        )}
+                        {conAcceso && (
                           <button
                             type="button"
                             disabled={restableciendoId === u.id}
@@ -748,7 +791,15 @@ export default function PaginaPersonalYUsuarios() {
                     role="switch"
                     aria-checked={tieneAcceso}
                     disabled={editandoUsuario?.id === usuario?.id}
-                    onClick={() => setTieneAcceso((prev) => !prev)}
+                    onClick={() => {
+                      setTieneAcceso((prev) => {
+                        const next = !prev;
+                        if (next && !usuarioAcceso.trim() && nombre.trim()) {
+                          setUsuarioAcceso(nombre.trim());
+                        }
+                        return next;
+                      });
+                    }}
                     className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors cursor-pointer disabled:opacity-50 ${
                       tieneAcceso ? "bg-[#003566]" : "bg-slate-300"
                     }`}
@@ -763,16 +814,28 @@ export default function PaginaPersonalYUsuarios() {
 
                 {tieneAcceso && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-[#003566]/15">
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Usuario de acceso (Nombre para iniciar sesión) *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={usuarioAcceso}
+                        onChange={(e) => setUsuarioAcceso(e.target.value)}
+                        placeholder={nombre.trim() || "Ej. Carlos Mendoza"}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm bg-white"
+                      />
+                    </div>
                     <div>
                       <label className="block text-xs font-bold text-slate-700 mb-1">
-                        Correo electrónico *
+                        Correo electrónico (opcional)
                       </label>
                       <input
                         type="email"
-                        required
                         value={correo}
                         onChange={(e) => setCorreo(e.target.value)}
-                        placeholder="usuario@alfaimportaciones.com"
+                        placeholder="opcional@alfadigitalstore.com"
                         className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm bg-white"
                       />
                     </div>

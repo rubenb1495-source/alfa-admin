@@ -86,22 +86,37 @@ def crear_usuario(
     bd: Session = Depends(obtener_bd),
 ) -> UsuarioSalida:
     tiene_acceso = bool(datos.tiene_acceso)
+    usuario_acceso: str | None = None
     correo_normalizado: str | None = None
     clave_hash: str | None = None
 
     if tiene_acceso:
-        if not datos.correo or not datos.clave:
+        if not datos.clave:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Correo y contraseña son obligatorios al dar acceso al sistema.",
+                detail="La contraseña es obligatoria al dar acceso al sistema.",
             )
-        correo_normalizado = str(datos.correo).strip().lower()
-        existente = bd.query(Usuario).filter(Usuario.correo == correo_normalizado).first()
-        if existente is not None:
+        usuario_acceso = " ".join((datos.usuario or datos.nombre).split())
+        from sqlalchemy import func as sqla_func
+
+        dup_usr = (
+            bd.query(Usuario)
+            .filter(sqla_func.lower(Usuario.usuario) == usuario_acceso.lower())
+            .first()
+        )
+        if dup_usr is not None:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=f"Ya existe un usuario registrado con el correo '{correo_normalizado}'.",
+                detail=f"Ya existe un usuario de acceso con el nombre '{usuario_acceso}'. Elige uno distinto.",
             )
+        if datos.correo:
+            correo_normalizado = str(datos.correo).strip().lower()
+            existente = bd.query(Usuario).filter(Usuario.correo == correo_normalizado).first()
+            if existente is not None:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"Ya existe un usuario registrado con el correo '{correo_normalizado}'.",
+                )
         clave_hash = generar_hash_clave(datos.clave)
 
     if datos.sucursal_id is not None:
@@ -114,6 +129,7 @@ def crear_usuario(
 
     nuevo = Usuario(
         nombre=datos.nombre,
+        usuario=usuario_acceso,
         correo=correo_normalizado,
         clave_hash=clave_hash,
         rol=datos.rol.value,
@@ -183,23 +199,37 @@ def actualizar_usuario(
     usuario.tiene_acceso = datos.tiene_acceso
 
     if datos.tiene_acceso:
-        if not datos.correo:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="El correo electrónico es obligatorio cuando el colaborador tiene acceso al sistema.",
-            )
-        correo_norm = str(datos.correo).strip().lower()
-        duplicado = (
+        from sqlalchemy import func as sqla_func
+
+        usuario_acceso = " ".join((datos.usuario or datos.nombre).split())
+        dup_usr = (
             bd.query(Usuario)
-            .filter(Usuario.correo == correo_norm, Usuario.id != usuario.id)
+            .filter(sqla_func.lower(Usuario.usuario) == usuario_acceso.lower(), Usuario.id != usuario.id)
             .first()
         )
-        if duplicado is not None:
+        if dup_usr is not None:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=f"Ya existe otro usuario con el correo '{correo_norm}'.",
+                detail=f"Ya existe otro usuario de acceso con el nombre '{usuario_acceso}'.",
             )
-        usuario.correo = correo_norm
+        usuario.usuario = usuario_acceso
+
+        if datos.correo:
+            correo_norm = str(datos.correo).strip().lower()
+            duplicado = (
+                bd.query(Usuario)
+                .filter(Usuario.correo == correo_norm, Usuario.id != usuario.id)
+                .first()
+            )
+            if duplicado is not None:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"Ya existe otro usuario con el correo '{correo_norm}'.",
+                )
+            usuario.correo = correo_norm
+        else:
+            usuario.correo = None
+
         if datos.clave:
             usuario.clave_hash = generar_hash_clave(datos.clave)
         elif not usuario.clave_hash:
@@ -208,6 +238,7 @@ def actualizar_usuario(
                 detail="Debes asignar una contraseña inicial (mín. 6 caracteres) al habilitar el acceso por primera vez.",
             )
     else:
+        usuario.usuario = None
         usuario.correo = None
         usuario.clave_hash = None
 
@@ -292,15 +323,79 @@ def restablecer_clave_usuario(
 
     usuario.clave_hash = generar_hash_clave(clave_temporal)
     usuario.debe_cambiar_clave = True
+    usuario.cuenta_bloqueada = False
+    usuario.intentos_fallidos = 0
+    usuario.fecha_bloqueo = None
     bd.commit()
 
     return {
         "usuario_id": usuario.id,
         "nombre": usuario.nombre,
+        "usuario": usuario.usuario or usuario.nombre,
         "correo": usuario.correo,
         "rol": usuario.rol,
         "telefono": usuario.telefono or "",
         "clave_temporal": clave_temporal,
         "debe_cambiar_clave": True,
         "url_app": "https://alfa-admin-web.vercel.app",
+    }
+
+
+@enrutador.post("/personal/{usuario_id}/desbloquear")
+@enrutador.post("/usuarios/{usuario_id}/desbloquear")
+def desbloquear_acceso_usuario(
+    usuario_id: int,
+    payload: dict | None = None,
+    usuario_actual: Usuario = Depends(requerir_roles(*ROLES_ADMINISTRATIVOS)),
+    bd: Session = Depends(obtener_bd),
+) -> dict:
+    """Desbloquea una cuenta bloqueada tras 5 intentos fallidos y opcionalmente asigna clave temporal. Solo ADMIN."""
+    import json
+    from app.modelos_admin import AuditLog
+
+    usuario = bd.query(Usuario).filter(Usuario.id == usuario_id).first()
+    if usuario is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado.")
+
+    usuario.cuenta_bloqueada = False
+    usuario.intentos_fallidos = 0
+    usuario.fecha_bloqueo = None
+
+    clave_asignada: str | None = None
+    nueva_clave = (payload or {}).get("nueva_clave_temporal") if isinstance(payload, dict) else None
+    if not nueva_clave and isinstance(payload, dict):
+        nueva_clave = payload.get("nueva_clave")
+    if isinstance(nueva_clave, str) and len(nueva_clave.strip()) >= 6:
+        clave_asignada = nueva_clave.strip()
+        usuario.clave_hash = generar_hash_clave(clave_asignada)
+        usuario.debe_cambiar_clave = True
+
+    bd.add(
+        AuditLog(
+            usuario_id=usuario_actual.id,
+            usuario_nombre=usuario_actual.nombre,
+            modulo="SEGURIDAD",
+            accion="DESBLOQUEO_ACCESO",
+            entidad_id=str(usuario.id),
+            datos_anteriores_json=json.dumps({"cuenta_bloqueada": True}, ensure_ascii=False),
+            datos_nuevos_json=json.dumps(
+                {
+                    "cuenta_bloqueada": False,
+                    "usuario_desbloqueado": usuario.usuario or usuario.nombre,
+                    "clave_temporal_asignada": bool(clave_asignada),
+                },
+                ensure_ascii=False,
+            ),
+        )
+    )
+    bd.commit()
+
+    return {
+        "usuario_id": usuario.id,
+        "nombre": usuario.nombre,
+        "usuario": usuario.usuario or usuario.nombre,
+        "cuenta_bloqueada": False,
+        "intentos_fallidos": 0,
+        "clave_temporal": clave_asignada,
+        "mensaje": f"Acceso desbloqueado correctamente para {usuario.nombre}.",
     }
