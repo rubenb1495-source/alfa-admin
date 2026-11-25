@@ -305,3 +305,25 @@ class LiquidacionComision(Base):
     instrumento_pago = relationship("InstrumentoFinanciero", foreign_keys=[instrumento_pago_id])
     movimiento_financiero = relationship("Pago", foreign_keys=[movimiento_financiero_id])
     ventas = relationship("Venta", foreign_keys="Venta.liquidacion_id")
+
+
+class CierreDiario(Base):
+    __tablename__ = "cierres_diarios"
+    __table_args__ = (UniqueConstraint("fecha", "sucursal_id", name="uq_cierre_diario_fecha_sucursal"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    fecha: Mapped[date] = mapped_column(Date, index=True, nullable=False)
+    sucursal_id: Mapped[int | None] = mapped_column(ForeignKey("sucursales.id"), index=True, nullable=True)
+    encargado_tienda_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), nullable=False)
+    encargado_tienda_nombre: Mapped[str] = mapped_column(String(150), nullable=False)
+    tasa_bcv: Mapped[Decimal] = mapped_column(Numeric(14, 4), default=Decimal("0"), nullable=False)
+    tasa_usdt: Mapped[Decimal] = mapped_column(Numeric(14, 4), default=Decimal("0"), nullable=False)
+    porcentaje_recargo: Mapped[Decimal] = mapped_column(Numeric(6, 2), default=Decimal("0"), nullable=False)
+    resumen_json: Mapped[str] = mapped_column(Text, default="{}", nullable=False)
+    observaciones: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    cerrado_por_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    sucursal = relationship("Sucursal")
+    encargado_tienda = relationship("Usuario", foreign_keys=[encargado_tienda_id])
+    cerrado_por = relationship("Usuario", foreign_keys=[cerrado_por_id])

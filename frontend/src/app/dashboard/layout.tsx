@@ -134,6 +134,15 @@ export default function DisenoDashboard({
           visible: true,
         },
         {
+          href: "/dashboard/cierre-diario",
+          etiqueta: "Cierre Diario",
+          icono: <CheckSquare className="w-4 h-4 shrink-0" />,
+          visible:
+            esAdmin ||
+            usuario.rol === "ENCARGADO_TIENDA" ||
+            usuario.rol === "LIDER",
+        },
+        {
           href: "/dashboard/catalogo",
           etiqueta: "Catálogo y Precios",
           icono: <Package className="w-4 h-4 shrink-0" />,

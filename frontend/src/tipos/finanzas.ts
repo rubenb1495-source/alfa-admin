@@ -298,6 +298,135 @@ export interface LiquidacionComisionResumen {
   ventas?: LiquidacionVentaItem[];
 }
 
+export interface CierreDiarioSnapshot {
+  jornada: {
+    fecha: string;
+    sucursal_id: number | null;
+    sucursal_nombre: string;
+    encargado_sugerido_id: number | null;
+    encargado_sugerido_nombre: string;
+    encargados_disponibles: { id: number; nombre: string; rol: string }[];
+    tasa_bcv: number;
+    tasa_usdt: number;
+    porcentaje_recargo: number;
+    ya_cerrado: boolean;
+    cierre_existente_id: number | null;
+    observaciones_guardadas: string;
+  };
+  ventas_dia: {
+    cantidad_total: number;
+    total_promo_usd: number;
+    total_regular_usd: number;
+    pasillo_cantidad: number;
+    pasillo_usd: number;
+    lead_cantidad: number;
+    lead_usd: number;
+    cashea_cantidad: number;
+    cashea_inicial_usd: number;
+    cashea_financiado_usd: number;
+  };
+  recibido_por_instrumento: {
+    total_usd: number;
+    items: {
+      instrumento_id: number;
+      instrumento: string;
+      moneda: string;
+      cantidad_pagos: number;
+      total_moneda_origen: number;
+      total_usd: number;
+    }[];
+  };
+  recepciones_almacen: {
+    total_unidades: number;
+    items: {
+      origen: string;
+      documento: string;
+      tipo: string;
+      descripcion: string;
+      serial: string | null;
+      cantidad: number;
+    }[];
+  };
+  inventario: {
+    salidas_hoy: {
+      total_unidades: number;
+      items: {
+        motivo: string;
+        documento: string;
+        descripcion: string;
+        serial: string | null;
+        cantidad: number;
+      }[];
+    };
+    disponible_cierre: {
+      total_equipos: number;
+      total_componentes: number;
+      total_unidades: number;
+      equipos_por_modelo: { modelo: string; categoria: string; cantidad: number }[];
+      componentes_stock: { sku: string; descripcion: string; cantidad: number }[];
+    };
+  };
+  garantias_casos: {
+    recibidas_hoy: {
+      numero_caso: string;
+      tipo: string;
+      cliente: string;
+      equipo: string;
+      serial: string;
+      motivo: string;
+    }[];
+    resueltas_hoy: {
+      numero: string;
+      tipo: string;
+      cliente: string;
+      equipo: string;
+      resolucion: string;
+    }[];
+    pendientes: {
+      total: number;
+      items: {
+        numero_caso: string;
+        tipo: string;
+        cliente: string;
+        equipo: string;
+        serial: string;
+        estado: string;
+        fecha_ingreso: string;
+      }[];
+    };
+  };
+  ventas_por_asesor: {
+    personal_id: number;
+    nombre: string;
+    rol: string;
+    modalidad: string;
+    cantidad_pasillo: number;
+    cantidad_lead: number;
+    total_ventas: number;
+    total_usd: number;
+  }[];
+  ventas_tienda_sin_asesor: {
+    cantidad: number;
+    total_usd: number;
+  };
+}
+
+export interface CierreDiarioHistorialItem {
+  id: number;
+  fecha: string;
+  sucursal_id: number | null;
+  sucursal_nombre: string;
+  encargado_tienda_id: number;
+  encargado_tienda_nombre: string;
+  tasa_bcv: number;
+  tasa_usdt: number;
+  porcentaje_recargo: number;
+  observaciones: string;
+  cerrado_por: string | null;
+  created_at: string | null;
+  resumen: CierreDiarioSnapshot;
+}
+
 export interface TableroFinanciero {
   desde: string;
   hasta: string;

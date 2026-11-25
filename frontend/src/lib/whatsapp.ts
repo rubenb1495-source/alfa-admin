@@ -1,5 +1,6 @@
 import { formatearBs, formatearUsd } from "@/servicios/api";
 import type {
+  CierreDiarioSnapshot,
   ComisionPorPersonaReporte,
   DetalleVentaComision,
   LiquidacionComisionResumen,
@@ -592,5 +593,118 @@ export function formatearWhatsAppLiquidacion(
   }
 
   lineas.push("", "🏢 _ALFA IMPORTACIONES, C.A. · RIF J-50793794-1_");
+  return lineas.join("\n");
+}
+
+/**
+ * 9. Reporte oficial de Cierre Diario de Tienda para WhatsApp (sin comisiones ni liquidaciones).
+ */
+export function formatearWhatsAppCierreDiario(
+  cierre: CierreDiarioSnapshot,
+  encargadoNombre: string,
+  observaciones?: string
+): string {
+  const j = cierre.jornada;
+  const v = cierre.ventas_dia;
+  const r = cierre.recibido_por_instrumento;
+  const rec = cierre.recepciones_almacen;
+  const inv = cierre.inventario;
+  const g = cierre.garantias_casos;
+
+  const lineas: string[] = [
+    `*CIERRE DIARIO DE TIENDA — ALFA*`,
+    `📅 Fecha: *${j.fecha}* · 🏪 ${j.sucursal_nombre}`,
+    `👤 Encargado de Tienda: *${encargadoNombre || j.encargado_sugerido_nombre || "Sin asignar"}*`,
+    `💱 Tasas: BCV *${formatearBs(j.tasa_bcv)}* | USDT *${formatearBs(j.tasa_usdt)}* | Recargo *${j.porcentaje_recargo}%*`,
+    "",
+    `*VENTAS DEL DÍA:*`,
+    `• Total: *${v.cantidad_total} venta(s)* · *${formatearUsd(v.total_promo_usd)}*`,
+    `• Pasillo: ${v.pasillo_cantidad} (${formatearUsd(v.pasillo_usd)}) | Lead: ${v.lead_cantidad} (${formatearUsd(v.lead_usd)})`,
+  ];
+
+  if (v.cashea_cantidad > 0) {
+    lineas.push(
+      `• Cashea: ${v.cashea_cantidad} venta(s) · Inicial ${formatearUsd(v.cashea_inicial_usd)} | Financiado ${formatearUsd(v.cashea_financiado_usd)}`
+    );
+  }
+
+  lineas.push("", `*RECIBIDO POR INSTRUMENTO DE PAGO:*`);
+  if (r.items.length === 0) {
+    lineas.push("• Sin cobros registrados hoy.");
+  } else {
+    for (const item of r.items) {
+      const montoStr =
+        item.moneda === "BS"
+          ? `${formatearBs(item.total_moneda_origen)} (≈ ${formatearUsd(item.total_usd)})`
+          : `${formatearUsd(item.total_moneda_origen)} ${item.moneda}`;
+      lineas.push(`• ${item.instrumento}: *${montoStr}*`);
+    }
+    lineas.push(`💵 *Total recibido equiv. USD:* *${formatearUsd(r.total_usd)}*`);
+  }
+
+  lineas.push("", `*RECEPCIONES DE ALMACÉN:*`);
+  if (rec.items.length === 0) {
+    lineas.push("• Sin recepciones de almacén hoy.");
+  } else {
+    lineas.push(`• Total ingresado: *${rec.total_unidades} unidad(es)*`);
+    for (const item of rec.items.slice(0, 12)) {
+      const ser = item.serial ? ` [${item.serial}]` : "";
+      lineas.push(`  - ${item.cantidad}x ${item.descripcion}${ser} (${item.origen})`);
+    }
+    if (rec.items.length > 12) {
+      lineas.push(`  - ... y ${rec.items.length - 12} ítem(s) más.`);
+    }
+  }
+
+  lineas.push(
+    "",
+    `*INVENTARIO (SALIDAS / DISPONIBLE):*`,
+    `• Salieron hoy: *${inv.salidas_hoy.total_unidades} unidad(es)*`
+  );
+  for (const s of inv.salidas_hoy.items.slice(0, 10)) {
+    const ser = s.serial ? ` [${s.serial}]` : "";
+    lineas.push(`  - ${s.cantidad}x ${s.descripcion}${ser} (${s.motivo} ${s.documento})`);
+  }
+  if (inv.salidas_hoy.items.length > 10) {
+    lineas.push(`  - ... y ${inv.salidas_hoy.items.length - 10} salida(s) más.`);
+  }
+  lineas.push(
+    `• Disponible al cierre: *${inv.disponible_cierre.total_equipos} equipo(s)* y *${inv.disponible_cierre.total_componentes} componente(s)* (Total: *${inv.disponible_cierre.total_unidades}*)`
+  );
+
+  lineas.push(
+    "",
+    `*GARANTÍAS Y CASOS:*`,
+    `• Recibidas hoy: *${g.recibidas_hoy.length}* | Resueltas hoy: *${g.resueltas_hoy.length}* | Pendientes abiertas: *${g.pendientes.total}*`
+  );
+  for (const rItem of g.recibidas_hoy.slice(0, 5)) {
+    lineas.push(`  - Recibida: ${rItem.numero_caso} · ${rItem.equipo} (${rItem.cliente})`);
+  }
+  for (const resItem of g.resueltas_hoy.slice(0, 5)) {
+    lineas.push(`  - Resuelta: ${resItem.numero} · ${resItem.equipo} (${resItem.resolucion})`);
+  }
+
+  const obsTxt = (observaciones ?? j.observaciones_guardadas ?? "").trim();
+  if (obsTxt) {
+    lineas.push("", `*OBSERVACIONES:*`, obsTxt);
+  }
+
+  lineas.push("", "---", `*RESUMEN DE VENTAS POR ASESOR:*`);
+  if (cierre.ventas_por_asesor.length === 0 && cierre.ventas_tienda_sin_asesor.cantidad === 0) {
+    lineas.push("• Sin ventas registradas hoy.");
+  } else {
+    for (const a of cierre.ventas_por_asesor) {
+      const mod = a.modalidad === "ONLINE" ? " [Online]" : "";
+      lineas.push(
+        `• *${a.nombre}*${mod}: ${a.total_ventas} venta(s) (P:${a.cantidad_pasillo} / L:${a.cantidad_lead}) — *${formatearUsd(a.total_usd)}*`
+      );
+    }
+    if (cierre.ventas_tienda_sin_asesor.cantidad > 0) {
+      lineas.push(
+        `• *Tienda (sin asesor)*: ${cierre.ventas_tienda_sin_asesor.cantidad} venta(s) — *${formatearUsd(cierre.ventas_tienda_sin_asesor.total_usd)}*`
+      );
+    }
+  }
+
   return lineas.join("\n");
 }
