@@ -110,7 +110,10 @@ export default function DisenoDashboard({
 
   const esAdmin = esRolAdministrativo(usuario.rol);
   const esLogistica = puedeGestionarCatalogo(usuario.rol);
-  const esTallerOAdmin = esLogistica || usuario.rol === "TECNICO";
+  const esTallerOAdmin =
+    esLogistica ||
+    usuario.rol === "TECNICO" ||
+    usuario.rol === "ENCARGADO_TIENDA";
 
   const grupos: GrupoNav[] = [
     {
@@ -168,9 +171,9 @@ export default function DisenoDashboard({
       enlaces: [
         {
           href: "/dashboard/logistica/compras",
-          etiqueta: "Compras e Importación",
+          etiqueta: "Ingresos y Compras",
           icono: <ShoppingBag className="w-4 h-4 shrink-0" />,
-          visible: esLogistica,
+          visible: esAdmin,
         },
         {
           href: "/dashboard/logistica/guias",

@@ -31,6 +31,7 @@ class TipoTercero(str, Enum):
 class OrigenCompra(str, Enum):
     IMPORTACION = "IMPORTACION"
     NACIONAL = "NACIONAL"
+    CONSIGNACION = "CONSIGNACION"
     INVENTARIO_EXISTENTE = "INVENTARIO_EXISTENTE"
     PARTE_DE_PAGO = "PARTE_DE_PAGO"
 
@@ -53,8 +54,13 @@ class EstadoGuia(str, Enum):
 
 class EstadoEquipo(str, Enum):
     EN_TRANSITO = "EN_TRANSITO"
+    PENDIENTE_REVISION = "PENDIENTE_REVISION"
     POR_PREPARAR = "POR_PREPARAR"
+    EN_PREPARACION = "EN_PREPARACION"
     LISTO = "LISTO"
+    DEFECTUOSO = "DEFECTUOSO"
+    RESERVADO = "RESERVADO"
+    EN_GARANTIA = "EN_GARANTIA"
     HOSPITAL = "HOSPITAL"
     CEMENTERIO = "CEMENTERIO"
     VENDIDO = "VENDIDO"
@@ -135,6 +141,8 @@ class Compra(Base):
     proveedor_id: Mapped[int | None] = mapped_column(ForeignKey("terceros.id"), nullable=True)
     fecha: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     factura_orden: Mapped[str] = mapped_column(String(100), default="", nullable=False)
+    proveedor_nombre: Mapped[str] = mapped_column(String(160), default="", nullable=False)
+    tracking_guia: Mapped[str] = mapped_column(String(120), default="", nullable=False)
     monto_mercancia_usd: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"), nullable=False)
     envio_usd: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"), nullable=False)
     otros_gastos_usd: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"), nullable=False)
@@ -203,6 +211,9 @@ class Equipo(Base):
     costo_flete_usd: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0"), nullable=False)
     costo_taller_usd: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0"), nullable=False)
     precio_promo_usd: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0"), nullable=False)
+    es_consignacion: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
+    consignante_nombre: Mapped[str] = mapped_column(String(160), default="", nullable=False)
+    costo_acordado_usd: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     recibido_por_id: Mapped[int | None] = mapped_column(ForeignKey("usuarios.id"), nullable=True)
     verificado_por_id: Mapped[int | None] = mapped_column(ForeignKey("usuarios.id"), nullable=True)
     fecha_recepcion: Mapped[date | None] = mapped_column(Date, nullable=True)
@@ -298,3 +309,18 @@ class AjusteInventario(Base):
     articulo = relationship("CatalogoArticulo")
     solicitado_por = relationship("Usuario", foreign_keys=[solicitado_por_id])
     revisado_por = relationship("Usuario", foreign_keys=[revisado_por_id])
+
+
+class HistorialEstadoEquipo(Base):
+    __tablename__ = "historial_estados_equipo"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    equipo_id: Mapped[int] = mapped_column(ForeignKey("equipos.id"), index=True, nullable=False)
+    usuario_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), nullable=False)
+    estado_anterior: Mapped[str] = mapped_column(String(30), nullable=False)
+    estado_nuevo: Mapped[str] = mapped_column(String(30), nullable=False)
+    nota_tecnica: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    fecha: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    equipo = relationship("Equipo")
+    usuario = relationship("Usuario")

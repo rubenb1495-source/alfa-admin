@@ -61,6 +61,14 @@ ROLES_LOGISTICA: tuple[str, ...] = (
     RolUsuario.LIDER.value,
 )
 
+ROLES_TRASLADOS: tuple[str, ...] = (
+    RolUsuario.DIRECCION.value,
+    RolUsuario.ADMINISTRACION.value,
+    RolUsuario.LOGISTICA.value,
+    RolUsuario.LIDER.value,
+    RolUsuario.ENCARGADO_TIENDA.value,
+)
+
 ROLES_SOLICITAR_AJUSTE: tuple[str, ...] = (
     RolUsuario.DIRECCION.value,
     RolUsuario.ADMINISTRACION.value,
@@ -133,6 +141,8 @@ def serializar_equipo(equipo: Equipo, incluir_costos: bool) -> dict[str, Any]:
         "verificado_por": equipo.verificado_por.nombre if equipo.verificado_por else None,
         "fecha_recepcion": equipo.fecha_recepcion.isoformat() if equipo.fecha_recepcion else None,
         "nota": equipo.nota,
+        "es_consignacion": bool(getattr(equipo, "es_consignacion", False)),
+        "consignante_nombre": getattr(equipo, "consignante_nombre", "") or "",
     }
     if incluir_costos:
         costo_total = equipo.costo_compra_usd + equipo.costo_flete_usd + equipo.costo_taller_usd
@@ -140,6 +150,11 @@ def serializar_equipo(equipo: Equipo, incluir_costos: bool) -> dict[str, Any]:
         datos["costo_flete_usd"] = redondear_usd(equipo.costo_flete_usd)
         datos["costo_taller_usd"] = redondear_usd(equipo.costo_taller_usd)
         datos["costo_total_usd"] = redondear_usd(costo_total)
+        datos["costo_acordado_usd"] = (
+            redondear_usd(equipo.costo_acordado_usd)
+            if getattr(equipo, "costo_acordado_usd", None) is not None
+            else None
+        )
     return datos
 
 
@@ -922,7 +937,7 @@ def listar_traslados(
 @enrutador.post("/traslados", status_code=status.HTTP_201_CREATED)
 def crear_traslado(
     datos: TrasladoCrearEntrada,
-    usuario_actual: Usuario = Depends(requerir_roles(*ROLES_LOGISTICA)),
+    usuario_actual: Usuario = Depends(requerir_roles(*ROLES_TRASLADOS)),
     bd: Session = Depends(obtener_bd),
 ) -> dict[str, Any]:
     if datos.origen_id == datos.destino_id:

@@ -1,71 +1,93 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
-  BellRing,
   CheckCircle2,
-  Plus,
-  Trash2,
+  Download,
+  FileSpreadsheet,
+  History,
+  Loader2,
+  Search,
   Wrench,
+  X,
 } from "lucide-react";
+import ModalCargaMasiva, {
+  descargarPlantillaLogistica,
+} from "@/components/ModalCargaMasiva";
 import { ErrorApi, solicitarApi } from "@/servicios/api";
-import type { ArticuloCatalogo, CatalogoPaginado } from "@/tipos/dominio";
-import type {
-  EquipoColaTaller,
-  ResultadoPreparacion,
-  TipoPreparacion,
-} from "@/tipos/taller";
+import type { Sucursal } from "@/tipos/dominio";
+import type { EquipoInventario } from "@/tipos/logistica";
 
-interface ComponenteFila {
-  articulo_id: string;
-  cantidad: string;
+interface HistorialEstadoItem {
+  id: number;
+  equipo_id: number;
+  estado_anterior: string;
+  estado_nuevo: string;
+  estado_nuevo_etiqueta: string;
+  usuario_nombre: string;
+  observacion: string;
+  creado_en: string | null;
 }
 
-interface RepuestoFaltanteFila {
-  descripcion: string;
-  cantidad: string;
+const OPCIONES_ESTADO: { valor: string; etiqueta: string; color: string }[] = [
+  { valor: "PENDIENTE_REVISION", etiqueta: "Pendiente Revisión", color: "bg-amber-100 text-amber-800" },
+  { valor: "POR_PREPARAR", etiqueta: "Por Preparar", color: "bg-orange-100 text-orange-800" },
+  { valor: "EN_PREPARACION", etiqueta: "En Preparación", color: "bg-sky-100 text-sky-800" },
+  { valor: "DISPONIBLE", etiqueta: "Disponible (POS)", color: "bg-emerald-100 text-emerald-800" },
+  { valor: "DEFECTUOSO", etiqueta: "Defectuoso", color: "bg-red-100 text-red-700" },
+  { valor: "RESERVADO", etiqueta: "Reservado", color: "bg-violet-100 text-violet-800" },
+  { valor: "EN_GARANTIA", etiqueta: "En Garantía", color: "bg-indigo-100 text-indigo-800" },
+];
+
+function etiquetaDeEstado(estado: string): { texto: string; color: string } {
+  if (estado === "LISTO" || estado === "DISPONIBLE") {
+    return { texto: "Disponible (POS)", color: "bg-emerald-100 text-emerald-800" };
+  }
+  const found = OPCIONES_ESTADO.find((o) => o.valor === estado);
+  if (found) return { texto: found.etiqueta, color: found.color };
+  return { texto: estado, color: "bg-slate-100 text-slate-700" };
 }
 
 export default function PaginaPreparaciones() {
-  const [cola, setCola] = useState<EquipoColaTaller[]>([]);
-  const [componentesCatalogo, setComponentesCatalogo] = useState<
-    ArticuloCatalogo[]
-  >([]);
+  const [equipos, setEquipos] = useState<EquipoInventario[]>([]);
+  const [sucursales, setSucursales] = useState<Sucursal[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [exito, setExito] = useState<string | null>(null);
 
-  // Formulario de preparación
-  const [equipoId, setEquipoId] = useState("");
-  const [busquedaSerial, setBusquedaSerial] = useState("");
-  const [tipo, setTipo] = useState<TipoPreparacion>("ESTANDAR");
-  const [pagoEspecial, setPagoEspecial] = useState("");
-  const [resultado, setResultado] = useState<ResultadoPreparacion>("LISTO");
-  const [nota, setNota] = useState("");
-  const [componentesUsados, setComponentesUsados] = useState<ComponenteFila[]>(
-    []
-  );
-  const [repuestosFaltantes, setRepuestosFaltantes] = useState<
-    RepuestoFaltanteFila[]
-  >([{ descripcion: "", cantidad: "1" }]);
-  const [guardando, setGuardando] = useState(false);
+  // Filtros
+  const [busqueda, setBusqueda] = useState("");
+  const [filtroSucursal, setFiltroSucursal] = useState("");
+  const [filtroEstado, setFiltroEstado] = useState("");
+
+  // Selección masiva
+  const [seleccionados, setSeleccionados] = useState<number[]>([]);
+  const [estadoMasivo, setEstadoMasivo] = useState("DISPONIBLE");
+  const [observacionMasiva, setObservacionMasiva] = useState("");
+  const [procesando, setProcesando] = useState(false);
+
+  // Modal carga masiva e historial
+  const [modalMasivo, setModalMasivo] = useState(false);
+  const [historialEquipo, setHistorialEquipo] = useState<EquipoInventario | null>(null);
+  const [historialItems, setHistorialItems] = useState<HistorialEstadoItem[]>([]);
+  const [cargandoHistorial, setCargandoHistorial] = useState(false);
 
   const cargarDatos = useCallback(async () => {
     setCargando(true);
     setError(null);
     try {
-      const [respCola, respCat] = await Promise.all([
-        solicitarApi<EquipoColaTaller[]>("/api/taller/cola"),
-        solicitarApi<CatalogoPaginado>("/api/catalogo?tipo=COMPONENTE&por_pagina=100"),
+      const [respEq, respSuc] = await Promise.all([
+        solicitarApi<EquipoInventario[]>("/api/logistica/inventario/equipos"),
+        solicitarApi<Sucursal[]>("/api/sucursales"),
       ]);
-      setCola(respCola);
-      setComponentesCatalogo(respCat.elementos);
+      setEquipos(
+        respEq.filter((e) => e.estado !== "VENDIDO" && e.estado !== "CEMENTERIO")
+      );
+      setSucursales(respSuc);
     } catch (err) {
       setError(
-        err instanceof ErrorApi
-          ? err.message
-          : "No se pudo cargar la cola de taller."
+        err instanceof ErrorApi ? err.message : "No se pudieron cargar los equipos."
       );
     } finally {
       setCargando(false);
@@ -76,429 +98,401 @@ export default function PaginaPreparaciones() {
     void cargarDatos();
   }, [cargarDatos]);
 
-  const porPreparar = cola.filter((e) => e.estado === "POR_PREPARAR");
-  const enHospital = cola.filter((e) => e.estado === "HOSPITAL");
-  const repuestosLlegaron = cola.filter((e) => e.repuesto_disponible);
+  const equiposFiltrados = useMemo(() => {
+    return equipos.filter((eq) => {
+      if (filtroSucursal && String(eq.ubicacion_id) !== filtroSucursal) return false;
+      if (filtroEstado) {
+        const estadoTarget = filtroEstado === "DISPONIBLE" ? "LISTO" : filtroEstado;
+        if (eq.estado !== estadoTarget) return false;
+      }
+      if (busqueda.trim()) {
+        const q = busqueda.trim().toLowerCase();
+        const texto = `${eq.serial} ${eq.modelo} ${eq.sku || ""} ${eq.ubicacion || ""}`.toLowerCase();
+        if (!texto.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [equipos, filtroSucursal, filtroEstado, busqueda]);
 
-  const colaFiltrada = busquedaSerial.trim()
-    ? cola.filter(
-        (e) =>
-          e.serial.includes(busquedaSerial.trim().toUpperCase()) ||
-          e.modelo.toLowerCase().includes(busquedaSerial.trim().toLowerCase())
-      )
-    : cola;
+  const toggleSeleccion = (id: number) => {
+    setSeleccionados((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
 
-  const manejarRegistrar = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const toggleSeleccionTodos = () => {
+    const editables = equiposFiltrados
+      .filter((e) => e.estado !== "EN_TRANSITO")
+      .map((e) => e.id);
+    if (seleccionados.length === editables.length && editables.length > 0) {
+      setSeleccionados([]);
+    } else {
+      setSeleccionados(editables);
+    }
+  };
+
+  const aplicarCambioEstado = async (
+    ids: number[],
+    nuevoEstado: string,
+    observacion: string
+  ) => {
+    if (ids.length === 0) return;
+    setProcesando(true);
     setError(null);
     setExito(null);
-
-    if (!equipoId) {
-      setError("Selecciona un equipo de la cola.");
-      return;
-    }
-
-    const compsValidos = componentesUsados
-      .filter((c) => c.articulo_id !== "")
-      .map((c) => ({
-        articulo_id: Number(c.articulo_id),
-        cantidad: Number(c.cantidad || 1),
-      }));
-
-    const faltantesValidos =
-      resultado === "HOSPITAL"
-        ? repuestosFaltantes
-            .filter((r) => r.descripcion.trim() !== "")
-            .map((r) => ({
-              descripcion: r.descripcion.trim(),
-              cantidad: Number(r.cantidad || 1),
-            }))
-        : [];
-
-    setGuardando(true);
     try {
-      await solicitarApi("/api/taller/preparaciones", {
-        method: "POST",
-        body: JSON.stringify({
-          equipo_id: Number(equipoId),
-          tipo,
-          pago_tecnico_usd:
-            tipo === "ESPECIAL" && pagoEspecial !== ""
-              ? Number(pagoEspecial)
-              : null,
-          componentes_usados: compsValidos,
-          resultado,
-          repuestos_faltantes: faltantesValidos,
-          nota: nota.trim(),
-        }),
-      });
-      setExito("Preparación registrada correctamente.");
-      setEquipoId("");
-      setNota("");
-      setComponentesUsados([]);
-      setRepuestosFaltantes([{ descripcion: "", cantidad: "1" }]);
+      const resp = await solicitarApi<{ actualizados: number; estado_etiqueta: string }>(
+        "/api/preparaciones/estado-masivo",
+        {
+          method: "PATCH",
+          body: JSON.stringify({
+            equipo_ids: ids,
+            nuevo_estado: nuevoEstado,
+            observacion: observacion.trim(),
+          }),
+        }
+      );
+      setExito(
+        `${resp.actualizados} equipo(s) actualizados a "${resp.estado_etiqueta}".`
+      );
+      setSeleccionados([]);
+      setObservacionMasiva("");
       await cargarDatos();
     } catch (err) {
       setError(
-        err instanceof ErrorApi
-          ? err.message
-          : "Error al registrar la preparación."
+        err instanceof ErrorApi ? err.message : "No se pudo actualizar el estado."
       );
     } finally {
-      setGuardando(false);
+      setProcesando(false);
+    }
+  };
+
+  const abrirHistorial = async (eq: EquipoInventario) => {
+    setHistorialEquipo(eq);
+    setHistorialItems([]);
+    setCargandoHistorial(true);
+    try {
+      const data = await solicitarApi<HistorialEstadoItem[]>(
+        `/api/preparaciones/equipos/${eq.id}/historial`
+      );
+      setHistorialItems(data);
+    } catch {
+      setHistorialItems([]);
+    } finally {
+      setCargandoHistorial(false);
     }
   };
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-black text-slate-900">
-          Taller · Preparaciones por Serial
-        </h2>
-        <p className="text-sm text-slate-500">
-          Atiende equipos por preparar, descuenta componentes de Bodega y
-          reporta repuestos faltantes a Logística.
-        </p>
-      </div>
-
-      {/* Tarjetas superiores */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white p-5 rounded-2xl border border-slate-200">
-          <p className="text-xs font-bold uppercase text-slate-500">
-            Por preparar
-          </p>
-          <p className="text-3xl font-black text-slate-900 mt-1">
-            {porPreparar.length}
+      {/* Encabezado */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight text-[#001D3D]">
+            <Wrench className="h-6 w-6 text-[#003566]" />
+            Preparaciones y Alistamiento
+          </h1>
+          <p className="text-sm text-slate-600">
+            Cambia estados individualmente o en lote. Los equipos marcados como{" "}
+            <strong>Disponible (POS)</strong> aparecen de inmediato para la venta.
           </p>
         </div>
-        <div className="bg-white p-5 rounded-2xl border border-amber-200">
-          <p className="text-xs font-bold uppercase text-amber-700">
-            En Hospital
-          </p>
-          <p className="text-3xl font-black text-amber-700 mt-1">
-            {enHospital.length}
-          </p>
-        </div>
-        <div className="bg-emerald-50 p-5 rounded-2xl border-2 border-emerald-300">
-          <p className="text-xs font-bold uppercase text-emerald-800 flex items-center gap-1.5">
-            <BellRing className="w-4 h-4" />
-            Repuestos que llegaron
-          </p>
-          <p className="text-3xl font-black text-emerald-800 mt-1">
-            {repuestosLlegaron.length}
-          </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void descargarPlantillaLogistica("PREPARACION_ESTADOS")}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            <Download className="h-4 w-4 text-[#003566]" />
+            Descargar Plantilla (.xlsx)
+          </button>
+          <button
+            type="button"
+            onClick={() => setModalMasivo(true)}
+            className="inline-flex items-center gap-2 rounded-xl border border-[#003566]/30 bg-sky-50 px-3.5 py-2 text-xs font-semibold text-[#003566] hover:bg-sky-100"
+          >
+            <FileSpreadsheet className="h-4 w-4" />
+            Carga Masiva
+          </button>
         </div>
       </div>
 
       {error && (
-        <div className="flex items-center gap-2.5 p-4 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700">
-          <AlertCircle className="w-4 h-4 shrink-0" />
+        <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <AlertCircle className="h-4 w-4 shrink-0" />
           <span>{error}</span>
         </div>
       )}
       {exito && (
-        <div className="flex items-center gap-2.5 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-sm text-emerald-700">
-          <CheckCircle2 className="w-4 h-4 shrink-0" />
+        <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
+          <CheckCircle2 className="h-4 w-4 shrink-0" />
           <span>{exito}</span>
         </div>
       )}
 
-      {/* Formulario de preparación */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-4">
-        <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-          <Wrench className="w-4 h-4 text-[#003566]" />
-          Registrar preparación de equipo
-        </h3>
-
-        <form onSubmit={manejarRegistrar} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Filtrar serial en cola
-              </label>
-              <input
-                type="text"
-                value={busquedaSerial}
-                onChange={(e) => setBusquedaSerial(e.target.value)}
-                placeholder="Buscar serial..."
-                className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm font-mono"
-              />
-            </div>
-
-            <div className="md:col-span-2">
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Equipo en cola ({colaFiltrada.length})
-              </label>
-              <select
-                required
-                value={equipoId}
-                onChange={(e) => setEquipoId(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm bg-white"
-              >
-                <option value="">Seleccionar equipo...</option>
-                {colaFiltrada.map((eq) => (
-                  <option key={eq.id} value={eq.id}>
-                    {eq.repuesto_disponible ? "🟢 [REPUESTO LLEGÓ] " : ""}
-                    {eq.serial} — {eq.modelo || "Equipo"} ({eq.estado} ·{" "}
-                    {eq.dias_en_taller}d)
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Tipo de preparación
-              </label>
-              <select
-                value={tipo}
-                onChange={(e) => setTipo(e.target.value as TipoPreparacion)}
-                className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm bg-white"
-              >
-                <option value="ESTANDAR">ESTANDAR ($1.00)</option>
-                <option value="ESPECIAL">ESPECIAL (monto personalizado)</option>
-              </select>
-            </div>
-
-            {tipo === "ESPECIAL" && (
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Pago especial técnico (USD)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  required
-                  value={pagoEspecial}
-                  onChange={(e) => setPagoEspecial(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm"
-                />
-              </div>
-            )}
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Resultado
-              </label>
-              <select
-                value={resultado}
-                onChange={(e) =>
-                  setResultado(e.target.value as ResultadoPreparacion)
-                }
-                className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm bg-white"
-              >
-                <option value="LISTO">LISTO (vendible)</option>
-                <option value="HOSPITAL">HOSPITAL (esperando repuesto)</option>
-                <option value="CEMENTERIO">CEMENTERIO (baja)</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Componentes usados */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-bold uppercase text-slate-600">
-                Componentes instalados (descuento automático en Bodega)
-              </p>
-              <button
-                type="button"
-                onClick={() =>
-                  setComponentesUsados((prev) => [
-                    ...prev,
-                    { articulo_id: "", cantidad: "1" },
-                  ])
-                }
-                className="inline-flex items-center gap-1 text-xs font-bold text-[#003566] cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                Agregar componente
-              </button>
-            </div>
-            {componentesUsados.map((comp, idx) => (
-              <div key={idx} className="flex gap-2 items-center">
-                <select
-                  value={comp.articulo_id}
-                  onChange={(e) => {
-                    const copia = [...componentesUsados];
-                    copia[idx] = { ...copia[idx], articulo_id: e.target.value };
-                    setComponentesUsados(copia);
-                  }}
-                  className="flex-1 px-3 py-2 rounded-xl border border-slate-300 text-xs bg-white"
-                >
-                  <option value="">Seleccionar componente...</option>
-                  {componentesCatalogo.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.sku} — {c.descripcion}
-                    </option>
-                  ))}
-                </select>
-                <input
-                  type="number"
-                  min="1"
-                  value={comp.cantidad}
-                  onChange={(e) => {
-                    const copia = [...componentesUsados];
-                    copia[idx] = { ...copia[idx], cantidad: e.target.value };
-                    setComponentesUsados(copia);
-                  }}
-                  className="w-20 px-3 py-2 rounded-xl border border-slate-300 text-xs"
-                />
-                <button
-                  type="button"
-                  onClick={() =>
-                    setComponentesUsados((prev) =>
-                      prev.filter((_, i) => i !== idx)
-                    )
-                  }
-                  className="p-2 text-red-600 hover:bg-red-50 rounded-lg cursor-pointer"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            ))}
-          </div>
-
-          {/* Repuestos faltantes si HOSPITAL */}
-          {resultado === "HOSPITAL" && (
-            <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 space-y-2">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-bold uppercase text-amber-800">
-                  Repuestos que faltan (se enviará alerta automática a Logística)
-                </p>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setRepuestosFaltantes((prev) => [
-                      ...prev,
-                      { descripcion: "", cantidad: "1" },
-                    ])
-                  }
-                  className="text-xs font-bold text-amber-900 cursor-pointer"
-                >
-                  + Otro repuesto
-                </button>
-              </div>
-              {repuestosFaltantes.map((rep, idx) => (
-                <div key={idx} className="flex gap-2">
-                  <input
-                    type="text"
-                    placeholder="Ej: Pantalla 14 FHD 30 pines"
-                    value={rep.descripcion}
-                    onChange={(e) => {
-                      const copia = [...repuestosFaltantes];
-                      copia[idx] = { ...copia[idx], descripcion: e.target.value };
-                      setRepuestosFaltantes(copia);
-                    }}
-                    className="flex-1 px-3 py-2 rounded-xl border border-amber-300 bg-white text-xs"
-                  />
-                  <input
-                    type="number"
-                    min="1"
-                    value={rep.cantidad}
-                    onChange={(e) => {
-                      const copia = [...repuestosFaltantes];
-                      copia[idx] = { ...copia[idx], cantidad: e.target.value };
-                      setRepuestosFaltantes(copia);
-                    }}
-                    className="w-20 px-3 py-2 rounded-xl border border-amber-300 bg-white text-xs"
-                  />
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">
-              Nota técnica
-            </label>
-            <input
-              type="text"
-              value={nota}
-              onChange={(e) => setNota(e.target.value)}
-              placeholder="Ej: Cambio de pasta térmica, pruebas de batería OK"
-              className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm"
-            />
-          </div>
-
-          <div className="flex justify-end">
-            <button
-              type="submit"
-              disabled={guardando}
-              className="px-5 py-2.5 rounded-xl bg-[#003566] hover:bg-[#C9461A] text-white text-sm font-bold disabled:opacity-60 cursor-pointer"
-            >
-              {guardando ? "Guardando..." : "Registrar preparación"}
-            </button>
-          </div>
-        </form>
+      {/* Filtros */}
+      <div className="grid grid-cols-1 gap-3 rounded-2xl border border-slate-200 bg-white p-4 md:grid-cols-4">
+        <div className="relative md:col-span-2">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            placeholder="Buscar por serial, modelo o SKU..."
+            className="w-full rounded-xl border border-slate-300 py-2 pl-9 pr-3 text-sm"
+          />
+        </div>
+        <select
+          value={filtroSucursal}
+          onChange={(e) => setFiltroSucursal(e.target.value)}
+          className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
+        >
+          <option value="">Todos los almacenes</option>
+          {sucursales.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.nombre}
+            </option>
+          ))}
+        </select>
+        <select
+          value={filtroEstado}
+          onChange={(e) => setFiltroEstado(e.target.value)}
+          className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
+        >
+          <option value="">Todos los estados</option>
+          {OPCIONES_ESTADO.map((o) => (
+            <option key={o.valor} value={o.valor}>
+              {o.etiqueta}
+            </option>
+          ))}
+        </select>
       </div>
 
-      {/* Cola actual */}
-      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-        {cargando ? (
-          <div className="p-6 space-y-3">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-12 rounded-xl bg-slate-100 animate-pulse" />
-            ))}
+      {/* Barra de acción masiva */}
+      {seleccionados.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#003566]/30 bg-[#EDF3FA] px-5 py-3.5 shadow-xs">
+          <div className="text-sm font-bold text-[#001D3D]">
+            {seleccionados.length} equipo(s) seleccionado(s)
           </div>
-        ) : cola.length === 0 ? (
-          <div className="p-10 text-center text-sm text-slate-500">
-            No hay equipos pendientes en la cola de taller.
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={estadoMasivo}
+              onChange={(e) => setEstadoMasivo(e.target.value)}
+              className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-800"
+            >
+              {OPCIONES_ESTADO.map((o) => (
+                <option key={o.valor} value={o.valor}>
+                  Cambiar a: {o.etiqueta}
+                </option>
+              ))}
+            </select>
+            <input
+              type="text"
+              value={observacionMasiva}
+              onChange={(e) => setObservacionMasiva(e.target.value)}
+              placeholder="Observación opcional..."
+              className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs"
+            />
+            <button
+              type="button"
+              disabled={procesando}
+              onClick={() =>
+                void aplicarCambioEstado(seleccionados, estadoMasivo, observacionMasiva)
+              }
+              className="inline-flex items-center gap-1.5 rounded-xl bg-[#003566] px-4 py-2 text-xs font-bold text-white hover:bg-[#001D3D] disabled:opacity-50"
+            >
+              {procesando ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <CheckCircle2 className="h-3.5 w-3.5" />
+              )}
+              Aplicar Cambio Masivo
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Tabla de equipos */}
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
+        {cargando ? (
+          <div className="flex items-center justify-center gap-2 py-12 text-sm text-slate-500">
+            <Loader2 className="h-4 w-4 animate-spin" /> Cargando equipos...
+          </div>
+        ) : equiposFiltrados.length === 0 ? (
+          <div className="py-12 text-center text-sm text-slate-500">
+            No se encontraron equipos con los filtros seleccionados.
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
-              <thead className="bg-slate-50 border-b border-slate-200 text-xs uppercase text-slate-500">
+            <table className="min-w-full divide-y divide-slate-200 text-sm">
+              <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
                 <tr>
+                  <th className="px-4 py-3 w-10">
+                    <input
+                      type="checkbox"
+                      checked={
+                        seleccionados.length > 0 &&
+                        seleccionados.length ===
+                          equiposFiltrados.filter((e) => e.estado !== "EN_TRANSITO").length
+                      }
+                      onChange={toggleSeleccionTodos}
+                    />
+                  </th>
                   <th className="px-4 py-3">Serial</th>
-                  <th className="px-4 py-3">Modelo</th>
-                  <th className="px-4 py-3">Estado</th>
-                  <th className="px-4 py-3">Días en taller</th>
-                  <th className="px-4 py-3">Alertas</th>
+                  <th className="px-4 py-3">Modelo / SKU</th>
+                  <th className="px-4 py-3">Almacén</th>
+                  <th className="px-4 py-3">Estado Actual</th>
+                  <th className="px-4 py-3">Cambio Rápido</th>
+                  <th className="px-4 py-3 text-right">Historial</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {cola.map((eq) => (
-                  <tr
-                    key={eq.id}
-                    className={
-                      eq.repuesto_disponible ? "bg-emerald-50/70" : "hover:bg-slate-50"
-                    }
-                  >
-                    <td className="px-4 py-3 font-mono font-bold">
-                      {eq.serial}
-                    </td>
-                    <td className="px-4 py-3">{eq.modelo || "—"}</td>
-                    <td className="px-4 py-3">
-                      <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-slate-100">
-                        {eq.estado}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 font-semibold">
-                      {eq.dias_en_taller} días
-                    </td>
-                    <td className="px-4 py-3 text-xs">
-                      {eq.repuesto_disponible ? (
-                        <span className="px-2.5 py-1 rounded-full bg-emerald-600 text-white font-bold">
-                          Repuesto llegó · Atención inmediata
+                {equiposFiltrados.map((eq) => {
+                  const badge = etiquetaDeEstado(eq.estado);
+                  const bloqueado = eq.estado === "EN_TRANSITO";
+                  const valorSelect = eq.estado === "LISTO" ? "DISPONIBLE" : eq.estado;
+                  return (
+                    <tr key={eq.id} className="hover:bg-slate-50/70">
+                      <td className="px-4 py-3">
+                        <input
+                          type="checkbox"
+                          disabled={bloqueado}
+                          checked={seleccionados.includes(eq.id)}
+                          onChange={() => toggleSeleccion(eq.id)}
+                        />
+                      </td>
+                      <td className="px-4 py-3 font-mono text-xs font-bold text-[#001D3D]">
+                        <div>{eq.serial}</div>
+                        {eq.es_consignacion && (
+                          <span className="mt-0.5 inline-block rounded-full bg-amber-100 px-2 py-0.5 font-sans text-[10px] font-bold text-amber-800">
+                            Consignación
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-slate-800">{eq.modelo}</div>
+                        <div className="text-xs text-slate-500">{eq.sku || "—"}</div>
+                      </td>
+                      <td className="px-4 py-3 text-xs text-slate-600">
+                        {eq.ubicacion || "—"}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-bold ${badge.color}`}
+                        >
+                          {badge.texto}
                         </span>
-                      ) : eq.repuestos_pendientes.length > 0 ? (
-                        <span className="text-amber-700 font-semibold">
-                          Esperando: {eq.repuestos_pendientes.join(", ")}
-                        </span>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="px-4 py-3">
+                        <select
+                          disabled={bloqueado || procesando}
+                          value={valorSelect}
+                          onChange={(e) =>
+                            void aplicarCambioEstado(
+                              [eq.id],
+                              e.target.value,
+                              "Cambio rápido desde Preparaciones"
+                            )
+                          }
+                          className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 disabled:bg-slate-100"
+                        >
+                          {OPCIONES_ESTADO.map((o) => (
+                            <option key={o.valor} value={o.valor}>
+                              {o.etiqueta}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() => void abrirHistorial(eq)}
+                          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-100"
+                        >
+                          <History className="h-3.5 w-3.5" />
+                          Ver
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         )}
       </div>
+
+      {/* Modal Historial de Estados */}
+      {historialEquipo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
+          <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between bg-[#003566] px-5 py-3.5 text-white">
+              <div>
+                <h3 className="text-sm font-bold">
+                  Historial de Estados — {historialEquipo.serial}
+                </h3>
+                <p className="text-xs text-sky-200">{historialEquipo.modelo}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setHistorialEquipo(null)}
+                className="rounded-lg p-1 hover:bg-white/10"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="max-h-96 overflow-y-auto p-5">
+              {cargandoHistorial ? (
+                <div className="flex items-center justify-center py-8 text-xs text-slate-500">
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Cargando historial...
+                </div>
+              ) : historialItems.length === 0 ? (
+                <p className="py-6 text-center text-xs text-slate-500">
+                  Sin transiciones registradas aún para este equipo.
+                </p>
+              ) : (
+                <ol className="space-y-3">
+                  {historialItems.map((h) => (
+                    <li
+                      key={h.id}
+                      className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 text-xs"
+                    >
+                      <div className="flex items-center justify-between font-semibold text-[#001D3D]">
+                        <span>
+                          {h.estado_anterior || "INGRESO"} → {h.estado_nuevo_etiqueta}
+                        </span>
+                        <span className="text-[11px] font-normal text-slate-500">
+                          {h.creado_en
+                            ? new Date(h.creado_en).toLocaleString("es-VE")
+                            : ""}
+                        </span>
+                      </div>
+                      <div className="mt-1 text-slate-600">
+                        Responsable: <strong>{h.usuario_nombre || "Sistema"}</strong>
+                      </div>
+                      {h.observacion && (
+                        <div className="mt-1 text-slate-500">{h.observacion}</div>
+                      )}
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Carga Masiva */}
+      <ModalCargaMasiva
+        abierto={modalMasivo}
+        alCerrar={() => setModalMasivo(false)}
+        tipo="PREPARACION_ESTADOS"
+        titulo="Carga Masiva — Cambio de Estado de Equipos"
+        sucursales={sucursales}
+        alCompletar={() => {
+          void cargarDatos();
+        }}
+      />
     </div>
   );
 }

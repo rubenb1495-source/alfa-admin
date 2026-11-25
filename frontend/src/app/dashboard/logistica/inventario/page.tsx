@@ -31,8 +31,13 @@ import type {
 
 const ESTADOS_EQUIPO: EstadoEquipo[] = [
   "EN_TRANSITO",
+  "PENDIENTE_REVISION",
   "POR_PREPARAR",
+  "EN_PREPARACION",
   "LISTO",
+  "DEFECTUOSO",
+  "RESERVADO",
+  "EN_GARANTIA",
   "HOSPITAL",
   "CEMENTERIO",
   "VENDIDO",
@@ -338,7 +343,12 @@ export default function PaginaInventario() {
                     {equipos.map((eq) => (
                       <tr key={eq.id} className="hover:bg-slate-50">
                         <td className="px-4 py-3 font-mono font-bold text-slate-900">
-                          {eq.serial}
+                          <div>{eq.serial}</div>
+                          {eq.es_consignacion && (
+                            <span className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 font-sans text-[10px] font-bold text-amber-800">
+                              Consignación{eq.consignante_nombre ? ` · ${eq.consignante_nombre}` : ""}
+                            </span>
+                          )}
                         </td>
                         <td className="px-4 py-3">
                           <p className="font-semibold">{eq.modelo || "—"}</p>

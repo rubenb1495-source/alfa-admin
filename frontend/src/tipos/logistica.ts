@@ -2,15 +2,23 @@ export type OrigenCompra =
   | "IMPORTACION"
   | "NACIONAL"
   | "INVENTARIO_EXISTENTE"
-  | "PARTE_DE_PAGO";
+  | "PARTE_DE_PAGO"
+  | "CONSIGNACION"
+  | "COMPRA_NACIONAL"
+  | "COMPRA_INTERNACIONAL";
 
-export type EstadoCompra = "PENDIENTE" | "RECIBIDA_PARCIAL" | "RECIBIDA";
+export type EstadoCompra = "PENDIENTE" | "RECIBIDA_PARCIAL" | "RECIBIDA" | "CONFIRMADA";
 export type ModalidadGuia = "AEREO" | "MARITIMO";
 export type EstadoGuia = "EN_TRANSITO" | "RECIBIDA";
 export type EstadoEquipo =
   | "EN_TRANSITO"
+  | "PENDIENTE_REVISION"
   | "POR_PREPARAR"
+  | "EN_PREPARACION"
   | "LISTO"
+  | "DEFECTUOSO"
+  | "RESERVADO"
+  | "EN_GARANTIA"
   | "HOSPITAL"
   | "CEMENTERIO"
   | "VENDIDO";
@@ -140,10 +148,13 @@ export interface EquipoInventario {
   verificado_por: string | null;
   fecha_recepcion: string | null;
   nota: string;
+  es_consignacion?: boolean;
+  consignante_nombre?: string;
   costo_compra_usd?: number;
   costo_flete_usd?: number;
   costo_taller_usd?: number;
   costo_total_usd?: number;
+  costo_acordado_usd?: number | null;
 }
 
 export interface TrazabilidadEquipo {

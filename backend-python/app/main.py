@@ -13,7 +13,7 @@ from app import modelos_finanzas as _modelos_finanzas  # noqa: F401
 from app import modelos_logistica as _modelos_logistica  # noqa: F401
 from app import modelos_operaciones as _modelos_operaciones  # noqa: F401
 from app import modelos_taller as _modelos_taller  # noqa: F401
-from app.rutas import autenticacion, catalogo, cierre_diario, finanzas, logistica, operaciones, taller, tasas, usuarios, ventas
+from app.rutas import autenticacion, catalogo, cierre_diario, finanzas, logistica, logistica_avanzada, operaciones, taller, tasas, usuarios, ventas
 from app.semilla import ejecutar_semilla
 from app.semilla_finanzas import ejecutar_semilla_finanzas
 
@@ -145,6 +145,31 @@ def asegurar_columnas_compatibles() -> None:
                     conexion.execute(
                         text(f"ALTER TABLE liquidaciones_comisiones ADD COLUMN {nombre_col} {ddl_col}")
                     )
+    if inspector.has_table("equipos"):
+        columnas_eq = {col["name"] for col in inspector.get_columns("equipos")}
+        nuevas_eq = [
+            ("es_consignacion", "BOOLEAN NOT NULL DEFAULT FALSE"),
+            ("consignante_nombre", "VARCHAR(160) NOT NULL DEFAULT ''"),
+            ("costo_acordado_usd", "NUMERIC(12, 2) NULL"),
+        ]
+        for nombre_col, ddl_col in nuevas_eq:
+            if nombre_col not in columnas_eq:
+                with motor.begin() as conexion:
+                    conexion.execute(
+                        text(f"ALTER TABLE equipos ADD COLUMN {nombre_col} {ddl_col}")
+                    )
+    if inspector.has_table("compras"):
+        columnas_cmp = {col["name"] for col in inspector.get_columns("compras")}
+        nuevas_cmp = [
+            ("proveedor_nombre", "VARCHAR(160) NOT NULL DEFAULT ''"),
+            ("tracking_guia", "VARCHAR(120) NOT NULL DEFAULT ''"),
+        ]
+        for nombre_col, ddl_col in nuevas_cmp:
+            if nombre_col not in columnas_cmp:
+                with motor.begin() as conexion:
+                    conexion.execute(
+                        text(f"ALTER TABLE compras ADD COLUMN {nombre_col} {ddl_col}")
+                    )
 
 
 @asynccontextmanager
@@ -185,6 +210,7 @@ app.include_router(usuarios.enrutador)
 app.include_router(tasas.enrutador)
 app.include_router(catalogo.enrutador)
 app.include_router(logistica.enrutador)
+app.include_router(logistica_avanzada.enrutador)
 app.include_router(taller.enrutador)
 app.include_router(ventas.enrutador)
 app.include_router(finanzas.enrutador)

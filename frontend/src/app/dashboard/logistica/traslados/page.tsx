@@ -6,10 +6,16 @@ import {
   Ban,
   CheckCircle2,
   Copy,
+  Download,
+  FileSpreadsheet,
   Plus,
+  Trash2,
   Truck,
 } from "lucide-react";
 import BuscadorTabla from "@/componentes/BuscadorTabla";
+import ModalCargaMasiva, {
+  descargarPlantillaLogistica,
+} from "@/components/ModalCargaMasiva";
 import { usarSesion } from "@/contexto/SesionContexto";
 import {
   copiarTextoPortapapeles,
@@ -20,12 +26,14 @@ import {
   puedeGestionarCatalogo,
   solicitarApi,
 } from "@/servicios/api";
-import type { Sucursal } from "@/tipos/dominio";
+import type { ArticuloCatalogo, CatalogoPaginado, Sucursal } from "@/tipos/dominio";
 import type { EquipoInventario, TrasladoResumen } from "@/tipos/logistica";
 
 export default function PaginaTraslados() {
   const { usuario } = usarSesion();
-  const puedeEnviar = usuario ? puedeGestionarCatalogo(usuario.rol) : false;
+  const puedeEnviar = usuario
+    ? puedeGestionarCatalogo(usuario.rol) || usuario.rol === "ENCARGADO_TIENDA"
+    : false;
 
   const [pestana, setPestana] = useState<"enviados" | "por_recibir">("enviados");
   const [traslados, setTraslados] = useState<TrasladoResumen[]>([]);
@@ -33,6 +41,11 @@ export default function PaginaTraslados() {
   const [copiadoId, setCopiadoId] = useState<number | null>(null);
   const [ultimoTrasladoWa, setUltimoTrasladoWa] = useState<string | null>(null);
   const [sucursales, setSucursales] = useState<Sucursal[]>([]);
+  const [productosCatalogo, setProductosCatalogo] = useState<ArticuloCatalogo[]>([]);
+  const [modalMasivo, setModalMasivo] = useState(false);
+  const [componentesTraslado, setComponentesTraslado] = useState<
+    { articulo_id: string; cantidad: string }[]
+  >([]);
   const [equiposDisponibles, setEquiposDisponibles] = useState<
     EquipoInventario[]
   >([]);
@@ -60,12 +73,16 @@ export default function PaginaTraslados() {
     setCargando(true);
     setError(null);
     try {
-      const [respTrs, respSuc] = await Promise.all([
+      const [respTrs, respSuc, respCat] = await Promise.all([
         solicitarApi<TrasladoResumen[]>("/api/logistica/traslados"),
         solicitarApi<Sucursal[]>("/api/sucursales"),
+        solicitarApi<CatalogoPaginado>("/api/catalogo?por_pagina=200"),
       ]);
       setTraslados(respTrs);
       setSucursales(respSuc);
+      setProductosCatalogo(
+        respCat.elementos.filter((a) => a.tipo !== "EQUIPO")
+      );
     } catch (err) {
       setError(
         err instanceof ErrorApi
@@ -110,8 +127,14 @@ export default function PaginaTraslados() {
     e.preventDefault();
     setError(null);
     setExito(null);
-    if (equiposSeleccionados.length === 0) {
-      setError("Selecciona al menos un equipo para trasladar.");
+    const compsValidos = componentesTraslado
+      .filter((c) => c.articulo_id && Number(c.cantidad) > 0)
+      .map((c) => ({
+        articulo_id: Number(c.articulo_id),
+        cantidad: Number(c.cantidad),
+      }));
+    if (equiposSeleccionados.length === 0 && compsValidos.length === 0) {
+      setError("Selecciona al menos un equipo o un producto/accesorio para trasladar.");
       return;
     }
 
@@ -125,6 +148,7 @@ export default function PaginaTraslados() {
             origen_id: Number(origenId),
             destino_id: Number(destinoId),
             equipos_ids: equiposSeleccionados,
+            componentes: compsValidos,
             nota: nota.trim(),
           }),
         }
@@ -132,6 +156,7 @@ export default function PaginaTraslados() {
       setUltimoTrasladoWa(formatearWhatsAppTraslado(creado));
       setModalCrear(false);
       setEquiposSeleccionados([]);
+      setComponentesTraslado([]);
       setNota("");
       setExito(
         `Traslado ${creado.numero_traslado} enviado en estado EN_TRANSITO.`
@@ -250,14 +275,32 @@ export default function PaginaTraslados() {
         </div>
 
         {puedeEnviar && (
-          <button
-            type="button"
-            onClick={() => setModalCrear(true)}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#003566] hover:bg-[#C9461A] text-white text-sm font-bold cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            Nuevo traslado
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void descargarPlantillaLogistica("TRASLADO")}
+              className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold cursor-pointer"
+            >
+              <Download className="w-4 h-4 text-[#003566]" />
+              Descargar Plantilla (.xlsx)
+            </button>
+            <button
+              type="button"
+              onClick={() => setModalMasivo(true)}
+              className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl border border-[#003566]/30 bg-sky-50 hover:bg-sky-100 text-[#003566] text-xs font-bold cursor-pointer"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              Carga Masiva
+            </button>
+            <button
+              type="button"
+              onClick={() => setModalCrear(true)}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#003566] hover:bg-[#001D3D] text-white text-sm font-bold cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              Nuevo traslado
+            </button>
+          </div>
         )}
       </div>
 
@@ -521,6 +564,77 @@ export default function PaginaTraslados() {
               </div>
 
               <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-slate-700">
+                    Productos / Accesorios / Repuestos por Cantidad (opcional)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setComponentesTraslado((prev) => [
+                        ...prev,
+                        { articulo_id: "", cantidad: "1" },
+                      ])
+                    }
+                    className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    <Plus className="w-3 h-3" /> Agregar producto
+                  </button>
+                </div>
+                {componentesTraslado.length > 0 && (
+                  <div className="space-y-2 rounded-xl border border-slate-200 p-2.5 bg-slate-50/70">
+                    {componentesTraslado.map((comp, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <select
+                          value={comp.articulo_id}
+                          onChange={(e) =>
+                            setComponentesTraslado((prev) =>
+                              prev.map((c, i) =>
+                                i === idx ? { ...c, articulo_id: e.target.value } : c
+                              )
+                            )
+                          }
+                          className="flex-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs"
+                        >
+                          <option value="">Selecciona SKU / producto...</option>
+                          {productosCatalogo.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.sku} — {p.descripcion}
+                            </option>
+                          ))}
+                        </select>
+                        <input
+                          type="number"
+                          min="1"
+                          value={comp.cantidad}
+                          onChange={(e) =>
+                            setComponentesTraslado((prev) =>
+                              prev.map((c, i) =>
+                                i === idx ? { ...c, cantidad: e.target.value } : c
+                              )
+                            )
+                          }
+                          className="w-20 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs"
+                          placeholder="Cant."
+                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setComponentesTraslado((prev) =>
+                              prev.filter((_, i) => i !== idx)
+                            )
+                          }
+                          className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
                   Nota de despacho
                 </label>
@@ -594,6 +708,17 @@ export default function PaginaTraslados() {
           </div>
         </div>
       )}
+
+      <ModalCargaMasiva
+        abierto={modalMasivo}
+        alCerrar={() => setModalMasivo(false)}
+        tipo="TRASLADO"
+        titulo="Carga Masiva — Traslado entre Almacenes"
+        sucursales={sucursales.filter((s) => s.estado === "ACTIVA")}
+        alCompletar={() => {
+          void cargarDatos();
+        }}
+      />
     </div>
   );
 }
