@@ -75,12 +75,25 @@ export default function DisenoDashboard({
   const [menuMovilAbierto, setMenuMovilAbierto] = useState(false);
   const [sidebarColapsado, setSidebarColapsado] = useState(false);
   const [modalTasasAbierto, setModalTasasAbierto] = useState(false);
+  const [avisoPermiso, setAvisoPermiso] = useState<string | null>(null);
 
   useEffect(() => {
     if (!cargandoSesion && !usuario) {
       router.replace("/login");
     }
   }, [usuario, cargandoSesion, router]);
+
+  useEffect(() => {
+    if (cargandoSesion || !usuario) return;
+    const esAdm = esRolAdministrativo(usuario.rol);
+    const rutaRestringidaAdmin =
+      rutaActual.startsWith("/dashboard/finanzas") ||
+      rutaActual.startsWith("/dashboard/usuarios");
+    if (rutaRestringidaAdmin && !esAdm) {
+      setAvisoPermiso("No tienes permisos para acceder a esta sección.");
+      router.replace("/dashboard/ventas/nueva");
+    }
+  }, [rutaActual, usuario, cargandoSesion, router]);
 
   if (cargandoSesion || !usuario) {
     return (
@@ -537,6 +550,21 @@ export default function DisenoDashboard({
         </header>
 
         <main className="relative z-10 flex-1 p-4 lg:p-6 max-w-7xl w-full mx-auto min-w-0">
+          {avisoPermiso && (
+            <div className="mb-4 flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-amber-50 border border-amber-200 text-xs font-bold text-amber-900">
+              <span className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                {avisoPermiso}
+              </span>
+              <button
+                type="button"
+                onClick={() => setAvisoPermiso(null)}
+                className="text-amber-700 hover:text-amber-950 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
           {children}
         </main>
       </div>

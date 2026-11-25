@@ -37,6 +37,7 @@ export interface Usuario {
   motivo_estado: string | null;
   creado_en: string;
   sucursal: Sucursal | null;
+  permisos?: string[];
 }
 
 export interface RespuestaLogin {

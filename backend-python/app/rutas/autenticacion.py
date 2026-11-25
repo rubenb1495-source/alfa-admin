@@ -6,10 +6,16 @@ from sqlalchemy.orm import Session, joinedload
 from app.base_datos import obtener_bd
 from app.esquemas import LoginEntrada, LoginSalida, UsuarioSalida
 from app.modelos import Usuario
-from app.seguridad import crear_token_acceso, obtener_usuario_actual, verificar_clave
+from app.seguridad import crear_token_acceso, obtener_permisos_rol, obtener_usuario_actual, verificar_clave
 
 
 enrutador = APIRouter(prefix="/api/auth", tags=["Autenticación"])
+
+
+def _serializar_usuario_con_permisos(usuario: Usuario) -> UsuarioSalida:
+    salida = UsuarioSalida.model_validate(usuario)
+    salida.permisos = obtener_permisos_rol(usuario.rol)
+    return salida
 
 
 @enrutador.post("/login", response_model=LoginSalida)
@@ -43,10 +49,11 @@ def iniciar_sesion(datos: LoginEntrada, bd: Session = Depends(obtener_bd)) -> Lo
     token = crear_token_acceso(usuario)
     return LoginSalida(
         token=token,
-        usuario=UsuarioSalida.model_validate(usuario),
+        usuario=_serializar_usuario_con_permisos(usuario),
     )
 
 
 @enrutador.get("/perfil", response_model=UsuarioSalida)
+@enrutador.get("/me", response_model=UsuarioSalida)
 def obtener_perfil(usuario_actual: Usuario = Depends(obtener_usuario_actual)) -> UsuarioSalida:
-    return UsuarioSalida.model_validate(usuario_actual)
+    return _serializar_usuario_con_permisos(usuario_actual)

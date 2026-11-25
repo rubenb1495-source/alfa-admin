@@ -50,7 +50,7 @@ from app.modelos_taller import (
 from app.rutas.logistica import _leer_filas_archivo
 from app.rutas.tasas import obtener_fecha_hoy
 from app.rutas.ventas import redondear_usd, verificar_mes_abierto
-from app.seguridad import ROLES_ADMINISTRATIVOS, obtener_usuario_actual, requerir_roles
+from app.seguridad import ROLES_ADMINISTRATIVOS, es_administrador, obtener_usuario_actual, requerir_admin, requerir_roles
 
 
 enrutador = APIRouter(prefix="/api/finanzas", tags=["Finanzas, Conciliación y Cierres"])
@@ -61,7 +61,7 @@ enrutador_comisiones = APIRouter(prefix="/api/comisiones", tags=["Reporte de Com
 
 @enrutador.get("/instrumentos")
 def listar_instrumentos(
-    _usuario: Usuario = Depends(obtener_usuario_actual),
+    usuario_actual: Usuario = Depends(obtener_usuario_actual),
     bd: Session = Depends(obtener_bd),
 ) -> list[dict[str, Any]]:
     filas = (
@@ -70,13 +70,15 @@ def listar_instrumentos(
         .order_by(InstrumentoFinanciero.id.asc())
         .all()
     )
-    pagos_activos = bd.query(Pago).filter(Pago.anulado.is_(False)).all()
+    incluir_saldos = es_administrador(usuario_actual.rol)
     neto_por_inst: dict[int, Decimal] = {}
-    for p in pagos_activos:
-        signo = Decimal("-1") if p.tipo_movimiento == TipoMovimientoPago.EGRESO.value else Decimal("1")
-        neto_por_inst[p.instrumento_id] = neto_por_inst.get(p.instrumento_id, Decimal("0")) + (
-            p.monto_moneda_origen * signo
-        )
+    if incluir_saldos:
+        pagos_activos = bd.query(Pago).filter(Pago.anulado.is_(False)).all()
+        for p in pagos_activos:
+            signo = Decimal("-1") if p.tipo_movimiento == TipoMovimientoPago.EGRESO.value else Decimal("1")
+            neto_por_inst[p.instrumento_id] = neto_por_inst.get(p.instrumento_id, Decimal("0")) + (
+                p.monto_moneda_origen * signo
+            )
 
     return [
         {
@@ -86,8 +88,14 @@ def listar_instrumentos(
             "tipo_precio": i.tipo_precio,
             "requiere_verificacion": i.requiere_verificacion,
             "liquida_en_bs": i.liquida_en_bs,
-            "saldo_actual": redondear_usd(
-                (i.saldo_inicial or Decimal("0")) + neto_por_inst.get(i.id, Decimal("0"))
+            **(
+                {
+                    "saldo_actual": redondear_usd(
+                        (i.saldo_inicial or Decimal("0")) + neto_por_inst.get(i.id, Decimal("0"))
+                    )
+                }
+                if incluir_saldos
+                else {}
             ),
         }
         for i in filas
@@ -98,7 +106,7 @@ def listar_instrumentos(
 def listar_pagos(
     estado_verificacion: EstadoVerificacionPago | None = Query(default=None),
     instrumento_id: int | None = Query(default=None),
-    _usuario: Usuario = Depends(obtener_usuario_actual),
+    _usuario: Usuario = Depends(requerir_admin),
     bd: Session = Depends(obtener_bd),
 ) -> list[dict[str, Any]]:
     consulta = (
@@ -206,7 +214,7 @@ def eliminar_movimiento_financiero(
 def listar_cuentas_por_cobrar(
     tipo: TipoCuentaPorCobrar | None = Query(default=None),
     estado: EstadoCuentaPorCobrar | None = Query(default=None),
-    _usuario: Usuario = Depends(obtener_usuario_actual),
+    _usuario: Usuario = Depends(requerir_admin),
     bd: Session = Depends(obtener_bd),
 ) -> list[dict[str, Any]]:
     consulta = bd.query(CuentaPorCobrar).options(
@@ -240,7 +248,7 @@ def listar_cuentas_por_cobrar(
 def registrar_abono_cxc(
     cxc_id: int,
     datos: AbonoCxcEntrada,
-    _usuario: Usuario = Depends(obtener_usuario_actual),
+    _usuario: Usuario = Depends(requerir_admin),
     bd: Session = Depends(obtener_bd),
 ) -> dict[str, Any]:
     fecha_op = datos.fecha or obtener_fecha_hoy()

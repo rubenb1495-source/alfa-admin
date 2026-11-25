@@ -59,7 +59,7 @@ from app.modelos_logistica import (
 )
 from app.rutas.logistica import calcular_stock_componente, generar_correlativo
 from app.rutas.tasas import obtener_fecha_hoy
-from app.seguridad import obtener_usuario_actual, puede_ver_costos
+from app.seguridad import obtener_usuario_actual, puede_ver_costos, requerir_admin
 from app.servicios.pdf_nota import generar_pdf_nota_entrega
 
 
@@ -978,7 +978,7 @@ def descargar_nota_entrega_pdf(
 def anular_venta(
     venta_id: int,
     datos: VentaAnularEntrada,
-    usuario_actual: Usuario = Depends(obtener_usuario_actual),
+    usuario_actual: Usuario = Depends(requerir_admin),
     bd: Session = Depends(obtener_bd),
 ) -> dict[str, Any]:
     venta = (

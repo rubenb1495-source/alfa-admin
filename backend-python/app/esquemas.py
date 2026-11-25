@@ -51,6 +51,7 @@ class UsuarioSalida(BaseModel):
     motivo_estado: str | None = None
     creado_en: datetime
     sucursal: SucursalSalida | None = None
+    permisos: list[str] = Field(default_factory=list)
 
 
 class LoginSalida(BaseModel):

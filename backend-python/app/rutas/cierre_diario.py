@@ -35,7 +35,7 @@ from app.modelos_operaciones import DevolucionGarantia
 from app.modelos_taller import CasoPostventa, EstadoCasoPostventa
 from app.rutas.tasas import obtener_fecha_hoy
 from app.rutas.ventas import redondear_usd
-from app.seguridad import requerir_roles
+from app.seguridad import es_administrador, requerir_roles
 
 
 enrutador = APIRouter(prefix="/api/cierre-diario", tags=["Cierre Diario de Tienda"])
@@ -583,7 +583,14 @@ def guardar_cierre_diario(
     usuario_actual: Usuario = Depends(requerir_roles(*ROLES_CIERRE_DIARIO)),
     bd: Session = Depends(obtener_bd),
 ) -> dict[str, Any]:
-    fecha_obj = datos.fecha or obtener_fecha_hoy()
+    hoy = obtener_fecha_hoy()
+    fecha_obj = datos.fecha or hoy
+    if fecha_obj < hoy and not es_administrador(usuario_actual.rol):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo Dirección o Administración pueden registrar o modificar cierres de fechas anteriores.",
+        )
+
     encargado = bd.query(Usuario).filter(Usuario.id == datos.encargado_tienda_id).first()
     if encargado is None:
         raise HTTPException(
@@ -599,6 +606,11 @@ def guardar_cierre_diario(
         )
         .first()
     )
+    if existente is not None and not es_administrador(usuario_actual.rol):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="El cierre diario de esta fecha ya fue registrado. Solo Dirección o Administración pueden reabrirlo o modificarlo.",
+        )
 
     snapshot = calcular_snapshot_cierre_diario(bd, fecha_obj, datos.sucursal_id)
     snapshot["jornada"]["encargado_sugerido_id"] = encargado.id

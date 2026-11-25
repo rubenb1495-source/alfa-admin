@@ -13,6 +13,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import BuscadorTabla from "@/componentes/BuscadorTabla";
+import { usarSesion } from "@/contexto/SesionContexto";
 import {
   copiarTextoPortapapeles,
   formatearWhatsAppVenta,
@@ -20,12 +21,15 @@ import {
 import {
   ErrorApi,
   descargarPdfApi,
+  esRolAdministrativo,
   formatearUsd,
   solicitarApi,
 } from "@/servicios/api";
 import type { VentaResumen } from "@/tipos/finanzas";
 
 export default function PaginaHistorialVentas() {
+  const { usuario } = usarSesion();
+  const esAdmin = usuario ? esRolAdministrativo(usuario.rol) : false;
   const [ventas, setVentas] = useState<VentaResumen[]>([]);
   const [busqueda, setBusqueda] = useState("");
   const [copiadoId, setCopiadoId] = useState<number | null>(null);
@@ -268,17 +272,19 @@ export default function PaginaHistorialVentas() {
                             <RotateCcw className="w-3.5 h-3.5" />
                             Garantía / Cambio
                           </Link>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setMotivo("");
-                              setVentaAnular(v);
-                            }}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-red-300 text-red-700 text-xs font-bold cursor-pointer"
-                          >
-                            <Ban className="w-3.5 h-3.5" />
-                            Anular
-                          </button>
+                          {esAdmin && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setMotivo("");
+                                setVentaAnular(v);
+                              }}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-red-300 text-red-700 text-xs font-bold cursor-pointer"
+                            >
+                              <Ban className="w-3.5 h-3.5" />
+                              Anular
+                            </button>
+                          )}
                         </>
                       )}
                     </td>

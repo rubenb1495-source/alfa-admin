@@ -21,12 +21,80 @@ esquema_bearer = HTTPBearer(auto_error=False)
 ROLES_SIN_COSTOS: frozenset[str] = frozenset({
     RolUsuario.ASESORA.value,
     RolUsuario.TECNICO.value,
+    RolUsuario.ENCARGADO_TIENDA.value,
+    RolUsuario.LIDER.value,
+    RolUsuario.OTRO.value,
 })
 
 ROLES_ADMINISTRATIVOS: tuple[str, ...] = (
     RolUsuario.DIRECCION.value,
     RolUsuario.ADMINISTRACION.value,
 )
+
+
+def es_administrador(rol: str) -> bool:
+    """Devuelve True solo para roles con acceso administrativo total (DIRECCION / ADMINISTRACION)."""
+    return rol in ROLES_ADMINISTRATIVOS
+
+
+def obtener_permisos_rol(rol: str) -> list[str]:
+    """Devuelve la lista explícita de permisos por rol para el frontend (/auth/me y /auth/perfil)."""
+    if rol in ROLES_ADMINISTRATIVOS:
+        return [
+            "admin:all",
+            "costos:read",
+            "finanzas:read",
+            "finanzas:write",
+            "comisiones:read",
+            "comisiones:write",
+            "usuarios:write",
+            "ventas:anular",
+            "apertura:write",
+            "pos:write",
+            "cotizaciones:write",
+            "clientes:write",
+            "inventario:read",
+            "traslados:receive",
+            "garantias:write",
+            "cierre:write",
+            "cierre:reopen",
+        ]
+    if rol in (RolUsuario.ENCARGADO_TIENDA.value, RolUsuario.LIDER.value):
+        return [
+            "apertura:write",
+            "pos:write",
+            "cotizaciones:write",
+            "clientes:write",
+            "inventario:read_no_cost",
+            "traslados:receive",
+            "garantias:write",
+            "cierre:write",
+        ]
+    if rol == RolUsuario.LOGISTICA.value:
+        return [
+            "apertura:write",
+            "costos:read",
+            "inventario:read",
+            "traslados:receive",
+            "pos:write",
+            "cotizaciones:write",
+            "clientes:write",
+        ]
+    if rol == RolUsuario.TECNICO.value:
+        return [
+            "apertura:write",
+            "inventario:read_no_cost",
+            "garantias:write",
+            "pos:write",
+        ]
+    return [
+        "apertura:write",
+        "pos:write",
+        "cotizaciones:write",
+        "clientes:write",
+        "inventario:read_no_cost",
+        "garantias:write",
+    ]
 
 
 def generar_hash_clave(clave_plana: str) -> str:
@@ -133,3 +201,9 @@ def requerir_roles(*roles_permitidos: str) -> Callable[[Usuario], Usuario]:
         return usuario_actual
 
     return validador
+
+
+# Alias explícito reutilizable para endpoints exclusivos de Administrador
+requerir_admin = requerir_roles(*ROLES_ADMINISTRATIVOS)
+require_roles = requerir_roles
+require_admin = requerir_admin
