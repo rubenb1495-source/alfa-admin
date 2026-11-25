@@ -12,6 +12,7 @@ interface ValorContextoSesion {
   iniciarSesion: (correo: string, clave: string) => Promise<void>;
   cerrarSesion: () => void;
   recargarTasaHoy: () => Promise<void>;
+  actualizarTasaHoyLocal: (tasa: TasaHoy) => void;
 }
 
 const ContextoSesion = createContext<ValorContextoSesion | undefined>(undefined);
@@ -75,6 +76,10 @@ export function ProveedorSesion({ children }: { children: React.ReactNode }) {
     setTasaHoy(null);
   }, []);
 
+  const actualizarTasaHoyLocal = useCallback((tasa: TasaHoy) => {
+    setTasaHoy(tasa);
+  }, []);
+
   return (
     <ContextoSesion.Provider
       value={{
@@ -85,6 +90,7 @@ export function ProveedorSesion({ children }: { children: React.ReactNode }) {
         iniciarSesion,
         cerrarSesion,
         recargarTasaHoy,
+        actualizarTasaHoyLocal,
       }}
     >
       {children}

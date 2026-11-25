@@ -100,14 +100,23 @@ class TasaActualizarHoyEntrada(BaseModel):
     nota: str | None = Field(default=None, max_length=500)
 
 
+class TasaConfirmarHoyEntrada(BaseModel):
+    porcentaje_recargo: Decimal = Field(ge=0, le=500)
+    tasa_bcv: Decimal | None = Field(default=None, gt=0)
+    tasa_usdt: Decimal | None = Field(default=None, gt=0)
+    nota: str | None = Field(default=None, max_length=500)
+
+
 class TasaSalida(BaseModel):
     id: int
     fecha: date
     tasa_bcv: float
     tasa_usdt: float
     recargo_porcentaje: float
+    recargo_confirmado: bool = True
     brecha_porcentaje: float
     origen: OrigenTasa
+    fuente_tasa: str = "MANUAL"
     nota: str
     publicado_por: str | None = None
     actualizado_en: datetime
@@ -120,9 +129,14 @@ class TasaHoySalida(BaseModel):
     tasa_bcv: float | None = None
     tasa_usdt: float | None = None
     recargo_porcentaje: float | None = None
+    porcentaje_recargo: float | None = None
+    recargo_confirmado: bool = False
+    fuente_tasa: str = "RESPALDO_MANUAL"
+    ultimo_recargo_usado: float | None = None
     brecha_porcentaje: float | None = None
     origen: OrigenTasa | None = None
     nota: str = ""
+    actualizado_por: str | None = None
     actualizado_en: datetime | None = None
 
 

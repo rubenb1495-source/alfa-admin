@@ -83,7 +83,9 @@ class TasaDiaria(Base):
     tasa_bcv: Mapped[Decimal] = mapped_column(Numeric(14, 4), nullable=False)
     tasa_usdt: Mapped[Decimal] = mapped_column(Numeric(14, 4), nullable=False)
     recargo_porcentaje: Mapped[Decimal] = mapped_column(Numeric(6, 2), nullable=False)
+    recargo_confirmado: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     origen: Mapped[str] = mapped_column(String(20), default=OrigenTasa.MANUAL.value, nullable=False)
+    fuente_tasa: Mapped[str] = mapped_column(String(30), default="MANUAL", nullable=False)
     publicado_por_id: Mapped[int | None] = mapped_column(ForeignKey("usuarios.id"), nullable=True)
     nota: Mapped[str] = mapped_column(Text, default="", nullable=False)
     actualizado_en: Mapped[datetime] = mapped_column(

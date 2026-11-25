@@ -64,6 +64,24 @@ def asegurar_columnas_compatibles() -> None:
                         "ADD COLUMN origen_venta VARCHAR(20) NOT NULL DEFAULT 'PASILLO'"
                     )
                 )
+    if inspector.has_table("tasas_diarias"):
+        columnas_tasas = {col["name"] for col in inspector.get_columns("tasas_diarias")}
+        if "recargo_confirmado" not in columnas_tasas:
+            with motor.begin() as conexion:
+                conexion.execute(
+                    text(
+                        "ALTER TABLE tasas_diarias "
+                        "ADD COLUMN recargo_confirmado BOOLEAN NOT NULL DEFAULT FALSE"
+                    )
+                )
+        if "fuente_tasa" not in columnas_tasas:
+            with motor.begin() as conexion:
+                conexion.execute(
+                    text(
+                        "ALTER TABLE tasas_diarias "
+                        "ADD COLUMN fuente_tasa VARCHAR(30) NOT NULL DEFAULT 'MANUAL'"
+                    )
+                )
 
 
 @asynccontextmanager

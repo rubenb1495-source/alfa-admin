@@ -28,12 +28,14 @@ import {
   Shield,
   ShoppingBag,
   ShoppingCart,
+  SlidersHorizontal,
   Truck,
   Users,
   Wrench,
   X,
 } from "lucide-react";
 import LogoAlfa from "@/components/LogoAlfa";
+import ModalAperturaDiaria from "@/components/ModalAperturaDiaria";
 import { usarSesion } from "@/contexto/SesionContexto";
 import {
   esRolAdministrativo,
@@ -66,11 +68,13 @@ export default function DisenoDashboard({
     cargandoTasa,
     cerrarSesion,
     recargarTasaHoy,
+    actualizarTasaHoyLocal,
   } = usarSesion();
   const router = useRouter();
   const rutaActual = usePathname();
   const [menuMovilAbierto, setMenuMovilAbierto] = useState(false);
   const [sidebarColapsado, setSidebarColapsado] = useState(false);
+  const [modalTasasAbierto, setModalTasasAbierto] = useState(false);
 
   useEffect(() => {
     if (!cargandoSesion && !usuario) {
@@ -484,12 +488,21 @@ export default function DisenoDashboard({
 
               <button
                 type="button"
+                onClick={() => setModalTasasAbierto(true)}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-[#003566] bg-[#EDF3FA]/80 hover:bg-[#EDF3FA] border border-[#003566]/20 transition-colors cursor-pointer"
+                title="Ajustar tasas BCV/USDT o porcentaje de recargo del día"
+              >
+                <SlidersHorizontal className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Ajustar</span>
+              </button>
+
+              <button
+                type="button"
                 onClick={() => void recargarTasaHoy()}
                 className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium text-gray-500 hover:text-[#000814] hover:bg-white/80 transition-colors cursor-pointer"
                 title="Actualizar tasas del día"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Actualizar</span>
               </button>
             </div>
 
@@ -518,6 +531,23 @@ export default function DisenoDashboard({
           {children}
         </main>
       </div>
+
+      {/* Modal obligatorio de apertura diaria (bloqueante si recargo_confirmado === false) o edición manual */}
+      {tasaHoy && (!tasaHoy.recargo_confirmado || modalTasasAbierto) && (
+        <ModalAperturaDiaria
+          tasaHoy={tasaHoy}
+          bloqueante={!tasaHoy.recargo_confirmado}
+          alCerrar={
+            tasaHoy.recargo_confirmado
+              ? () => setModalTasasAbierto(false)
+              : undefined
+          }
+          alConfirmar={(tasaConfirmada) => {
+            actualizarTasaHoyLocal(tasaConfirmada);
+            setModalTasasAbierto(false);
+          }}
+        />
+      )}
     </div>
   );
 }
