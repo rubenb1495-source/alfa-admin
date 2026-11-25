@@ -189,6 +189,56 @@ export interface ReporteComisiones {
   comisiones: ComisionPersona[];
 }
 
+export interface ResumenGeneralComisiones {
+  total_ventas: number;
+  volumen_promo_usd: number;
+  pasillo_usd: number;
+  lead_usd: number;
+  total_comisiones_usd: number;
+}
+
+export interface ComisionPorPersonaReporte {
+  personal_id: number;
+  nombre: string;
+  rol: string;
+  es_encargado: boolean;
+  modalidad: string;
+  telefono: string;
+  porcentaje_pasillo: number;
+  porcentaje_lead: number;
+  cantidad_pasillo: number;
+  base_pasillo_usd: number;
+  comision_pasillo_usd: number;
+  cantidad_lead: number;
+  base_lead_usd: number;
+  comision_lead_usd: number;
+  total_ventas: number;
+  total_comision_usd: number;
+}
+
+export interface DetalleVentaComision {
+  venta_id: number;
+  personal_id: number;
+  asesor: string;
+  fecha: string;
+  numero_venta: string;
+  cliente: string;
+  producto: string;
+  origen: "PASILLO" | "LEAD" | string;
+  base_promo_usd: number;
+  porcentaje_aplicado: number;
+  comision_usd: number;
+}
+
+export interface ReporteComisionesAvanzado {
+  fecha_inicio: string;
+  fecha_fin: string;
+  tasa_bcv_referencia: number | null;
+  resumen_general: ResumenGeneralComisiones;
+  por_persona: ComisionPorPersonaReporte[];
+  detalle_ventas: DetalleVentaComision[];
+}
+
 export interface TableroFinanciero {
   desde: string;
   hasta: string;

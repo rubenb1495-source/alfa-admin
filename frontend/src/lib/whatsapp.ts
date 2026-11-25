@@ -1,5 +1,10 @@
 import { formatearBs, formatearUsd } from "@/servicios/api";
-import type { PagoBandeja, VentaResumen } from "@/tipos/finanzas";
+import type {
+  ComisionPorPersonaReporte,
+  DetalleVentaComision,
+  PagoBandeja,
+  VentaResumen,
+} from "@/tipos/finanzas";
 import type { TrasladoResumen } from "@/tipos/logistica";
 import type {
   CotizacionResumen,
@@ -463,5 +468,90 @@ export function formatearWhatsAppCotizacion(cot: CotizacionResumen): string {
     "",
     "⚠️ _Presupuesto sujeto a disponibilidad de inventario y tasa BCV vigente al momento del pago._"
   );
+  return lineas.join("\n");
+}
+
+/**
+ * Normaliza un número venezolano para enlaces https://wa.me/<numero>:
+ * limpia espacios/guiones/símbolos y convierte prefijo local 04... en 584...
+ */
+export function normalizarTelefonoVenezuela(
+  telefono?: string | null
+): string {
+  if (!telefono) return "";
+  const soloDigitos = telefono.replace(/\D+/g, "");
+  if (!soloDigitos) return "";
+  if (soloDigitos.startsWith("04") && soloDigitos.length === 11) {
+    return `58${soloDigitos.slice(1)}`;
+  }
+  if (soloDigitos.startsWith("0058")) {
+    return soloDigitos.slice(2);
+  }
+  if (soloDigitos.startsWith("4") && soloDigitos.length === 10) {
+    return `58${soloDigitos}`;
+  }
+  return soloDigitos;
+}
+
+export function construirUrlWhatsApp(
+  mensaje: string,
+  telefono?: string | null
+): string {
+  const tel = normalizarTelefonoVenezuela(telefono);
+  const textoCodificado = encodeURIComponent(mensaje);
+  return tel
+    ? `https://wa.me/${tel}?text=${textoCodificado}`
+    : `https://wa.me/?text=${textoCodificado}`;
+}
+
+/**
+ * 7. Resumen de Comisiones para enviar por WhatsApp a un asesor o encargado.
+ */
+export function formatearWhatsAppComisionPersona(
+  persona: ComisionPorPersonaReporte,
+  detalles: DetalleVentaComision[],
+  fechaInicio: string,
+  fechaFin: string,
+  tasaBcv?: number | null
+): string {
+  const rolTexto = persona.es_encargado
+    ? "Encargado de Tienda"
+    : persona.rol === "ASESORA"
+    ? "Asesor de Ventas"
+    : persona.rol;
+  const modTexto = persona.modalidad === "ONLINE" ? " (Online)" : "";
+
+  const lineas: string[] = [
+    `📊 *ALFA DIGITAL STORE · Resumen de Comisiones*`,
+    `📅 Período: *${fechaInicio}* al *${fechaFin}*`,
+    `👤 Colaborador: *${persona.nombre}* (${rolTexto}${modTexto})`,
+    "",
+    "💼 *Desglose por origen (Base Precio Promo USD):*",
+    `• Pasillo (${persona.porcentaje_pasillo}%): ${persona.cantidad_pasillo} venta(s) · Base ${formatearUsd(persona.base_pasillo_usd)} → *${formatearUsd(persona.comision_pasillo_usd)}*`,
+    `• Lead (${persona.porcentaje_lead}%): ${persona.cantidad_lead} venta(s) · Base ${formatearUsd(persona.base_lead_usd)} → *${formatearUsd(persona.comision_lead_usd)}*`,
+    "",
+    `💵 *TOTAL COMISIÓN A PAGAR:* *${formatearUsd(persona.total_comision_usd)} USD*`,
+  ];
+
+  if (tasaBcv && tasaBcv > 0 && persona.total_comision_usd > 0) {
+    const equivBs = persona.total_comision_usd * tasaBcv;
+    lineas.push(
+      `💱 _Ref. BCV (${formatearBs(tasaBcv)}):_ ≈ ${formatearBs(equivBs)}`
+    );
+  }
+
+  if (detalles.length > 0) {
+    lineas.push("", "🧾 *Detalle de ventas incluidas:*");
+    for (const d of detalles) {
+      const oriTag = d.origen === "LEAD" ? "Lead" : "Pasillo";
+      const prodCorto =
+        d.producto.length > 42 ? `${d.producto.slice(0, 42)}…` : d.producto;
+      lineas.push(
+        `• ${d.fecha} · *${d.numero_venta}* · ${prodCorto} (${oriTag} ${d.porcentaje_aplicado}%) → *${formatearUsd(d.comision_usd)}*`
+      );
+    }
+  }
+
+  lineas.push("", "✅ _ALFA IMPORTACIONES, C.A. · RIF J-50793794-1_");
   return lineas.join("\n");
 }

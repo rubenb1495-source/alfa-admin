@@ -48,6 +48,7 @@ from app.seguridad import ROLES_ADMINISTRATIVOS, obtener_usuario_actual, requeri
 
 
 enrutador = APIRouter(prefix="/api/finanzas", tags=["Finanzas, Conciliación y Cierres"])
+enrutador_comisiones = APIRouter(prefix="/api/comisiones", tags=["Reporte de Comisiones"])
 
 
 # ---------------- Instrumentos y Pagos ----------------
@@ -785,4 +786,265 @@ def cerrar_mes(
         "mes": cierre.mes,
         "bloqueado": cierre.bloqueado,
         "cerrado_por": usuario_actual.nombre,
+    }
+
+
+@enrutador_comisiones.get("/reporte")
+def obtener_reporte_comisiones_avanzado(
+    fecha_inicio: date | None = Query(default=None),
+    fecha_fin: date | None = Query(default=None),
+    personal_id: int | None = Query(default=None),
+    rol: str | None = Query(default=None),
+    origen: str | None = Query(default=None),
+    sucursal_id: int | None = Query(default=None),
+    _usuario: Usuario = Depends(requerir_roles(*ROLES_ADMINISTRATIVOS)),
+    bd: Session = Depends(obtener_bd),
+) -> dict[str, Any]:
+    """
+    Reporte avanzado de comisiones Alfa por rango de fechas, asesor/encargado (con o sin acceso) y origen.
+    Calcula estrictamente sobre Precio Promo USD excluyendo ventas ANULADA / DEVUELTA y Tienda (asesor_id=None).
+    """
+    hoy = obtener_fecha_hoy()
+    f_inicio = fecha_inicio or date(hoy.year, hoy.month, 1 if hoy.day <= 15 else 16)
+    f_fin = fecha_fin or hoy
+    if f_inicio > f_fin:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La fecha_inicio no puede ser mayor que fecha_fin.",
+        )
+
+    origen_norm = origen.strip().upper() if origen and origen.strip() else None
+    if origen_norm and origen_norm not in (OrigenVenta.PASILLO.value, OrigenVenta.LEAD.value):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El filtro origen debe ser PASILLO o LEAD.",
+        )
+
+    rol_norm = rol.strip().upper() if rol and rol.strip() else None
+
+    def _coincide_rol(u_rol: str) -> bool:
+        if not rol_norm:
+            return True
+        if rol_norm in ("ENCARGADO", "ENCARGADO_TIENDA", "LIDER"):
+            return u_rol in (RolUsuario.ENCARGADO_TIENDA.value, RolUsuario.LIDER.value)
+        if rol_norm in ("ASESOR", "ASESORA"):
+            return u_rol == RolUsuario.ASESORA.value
+        return u_rol == rol_norm
+
+    usuarios = bd.query(Usuario).all()
+    usuarios_map = {u.id: u for u in usuarios}
+
+    consulta_ventas = (
+        bd.query(Venta)
+        .options(
+            joinedload(Venta.cliente),
+            joinedload(Venta.asesor),
+            joinedload(Venta.detalles).joinedload(VentaDetalle.articulo),
+        )
+        .filter(
+            Venta.estado.notin_([EstadoVenta.ANULADA.value, EstadoVenta.DEVUELTA.value]),
+            Venta.asesor_id.isnot(None),
+            Venta.fecha >= f_inicio,
+            Venta.fecha <= f_fin,
+        )
+    )
+    if personal_id is not None:
+        consulta_ventas = consulta_ventas.filter(Venta.asesor_id == personal_id)
+    if sucursal_id is not None:
+        consulta_ventas = consulta_ventas.filter(Venta.sucursal_id == sucursal_id)
+    if origen_norm is not None:
+        consulta_ventas = consulta_ventas.filter(Venta.origen_venta == origen_norm)
+
+    ventas = consulta_ventas.order_by(Venta.fecha.desc(), Venta.id.desc()).all()
+
+    acumulado: dict[int, dict[str, Any]] = {}
+    detalle_ventas: list[dict[str, Any]] = []
+
+    def _asegurar_persona(u: Usuario) -> dict[str, Any]:
+        if u.id not in acumulado:
+            es_enc = u.rol in (RolUsuario.ENCARGADO_TIENDA.value, RolUsuario.LIDER.value)
+            acumulado[u.id] = {
+                "personal_id": u.id,
+                "nombre": u.nombre,
+                "rol": u.rol,
+                "es_encargado": es_enc,
+                "modalidad": getattr(u, "modalidad", "PRESENCIAL") or "PRESENCIAL",
+                "telefono": getattr(u, "telefono", "") or "",
+                "porcentaje_pasillo": 5 if es_enc else 1,
+                "porcentaje_lead": 8,
+                "cantidad_pasillo": 0,
+                "base_pasillo_usd": Decimal("0"),
+                "comision_pasillo_usd": Decimal("0"),
+                "cantidad_lead": 0,
+                "base_lead_usd": Decimal("0"),
+                "comision_lead_usd": Decimal("0"),
+                "total_ventas": 0,
+                "total_comision_usd": Decimal("0"),
+            }
+        return acumulado[u.id]
+
+    for v in ventas:
+        if v.asesor_id is None or v.asesor_id not in usuarios_map:
+            continue
+        u = usuarios_map[v.asesor_id]
+        if not _coincide_rol(u.rol):
+            continue
+
+        # Calcular base Precio Promo USD excluyendo Servicio Técnico
+        if not v.detalles:
+            base_promo = v.total_promo_usd
+            productos_txt = "Venta general"
+        else:
+            base_promo = Decimal("0")
+            nombres_prod: list[str] = []
+            for det in v.detalles:
+                es_serv = det.articulo is not None and det.articulo.tipo == TipoArticulo.SERVICIO.value
+                if not es_serv:
+                    base_promo += det.precio_promo_usd * Decimal(det.cantidad)
+                    desc = det.descripcion or (det.articulo.descripcion if det.articulo else "Producto")
+                    nombres_prod.append(f"{det.cantidad}x {desc}" if det.cantidad > 1 else desc)
+            productos_txt = ", ".join(nombres_prod) if nombres_prod else "Servicio Técnico"
+
+        if base_promo <= 0:
+            continue
+
+        origen_vta = (getattr(v, "origen_venta", OrigenVenta.PASILLO.value) or OrigenVenta.PASILLO.value).upper()
+        es_lead = origen_vta == OrigenVenta.LEAD.value
+        es_enc = u.rol in (RolUsuario.ENCARGADO_TIENDA.value, RolUsuario.LIDER.value)
+        pct = 8 if es_lead else (5 if es_enc else 1)
+        comision = (base_promo * Decimal(pct) / Decimal("100")).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
+
+        acc = _asegurar_persona(u)
+        acc["total_ventas"] += 1
+        if es_lead:
+            acc["cantidad_lead"] += 1
+            acc["base_lead_usd"] += base_promo
+            acc["comision_lead_usd"] += comision
+        else:
+            acc["cantidad_pasillo"] += 1
+            acc["base_pasillo_usd"] += base_promo
+            acc["comision_pasillo_usd"] += comision
+        acc["total_comision_usd"] += comision
+
+        detalle_ventas.append(
+            {
+                "venta_id": v.id,
+                "personal_id": u.id,
+                "asesor": u.nombre,
+                "fecha": v.fecha.isoformat(),
+                "numero_venta": v.numero_venta,
+                "cliente": v.cliente.nombre if v.cliente else "Cliente general",
+                "producto": productos_txt,
+                "origen": origen_vta,
+                "base_promo_usd": redondear_usd(base_promo),
+                "porcentaje_aplicado": pct,
+                "comision_usd": redondear_usd(comision),
+            }
+        )
+
+    # Ajustes por cambios Upgrade (+) y Downgrade (-) dentro del rango
+    from app.modelos_operaciones import DevolucionGarantia, TipoResolucionDevolucion
+
+    ajustes_dev = (
+        bd.query(DevolucionGarantia)
+        .options(joinedload(DevolucionGarantia.venta))
+        .filter(
+            DevolucionGarantia.tipo_resolucion.in_(
+                [
+                    TipoResolucionDevolucion.CAMBIO_UPGRADE.value,
+                    TipoResolucionDevolucion.CAMBIO_DOWNGRADE.value,
+                ]
+            ),
+            DevolucionGarantia.fecha >= f_inicio,
+            DevolucionGarantia.fecha <= f_fin,
+        )
+        .all()
+    )
+    for dev in ajustes_dev:
+        vta = dev.venta
+        if vta is None or vta.asesor_id is None or vta.asesor_id not in usuarios_map:
+            continue
+        if vta.estado in (EstadoVenta.ANULADA.value, EstadoVenta.DEVUELTA.value):
+            continue
+        if personal_id is not None and vta.asesor_id != personal_id:
+            continue
+        if sucursal_id is not None and vta.sucursal_id != sucursal_id:
+            continue
+        u = usuarios_map[vta.asesor_id]
+        if not _coincide_rol(u.rol):
+            continue
+        origen_dev = (getattr(vta, "origen_venta", OrigenVenta.PASILLO.value) or OrigenVenta.PASILLO.value).upper()
+        if origen_norm is not None and origen_dev != origen_norm:
+            continue
+
+        dif = dev.diferencia_promo_usd or Decimal("0")
+        if dif == 0:
+            continue
+        es_lead = origen_dev == OrigenVenta.LEAD.value
+        es_enc = u.rol in (RolUsuario.ENCARGADO_TIENDA.value, RolUsuario.LIDER.value)
+        pct = 8 if es_lead else (5 if es_enc else 1)
+        com_dif = (dif * Decimal(pct) / Decimal("100")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+        acc = _asegurar_persona(u)
+        if es_lead:
+            acc["base_lead_usd"] = max(Decimal("0"), acc["base_lead_usd"] + dif)
+            acc["comision_lead_usd"] = max(Decimal("0"), acc["comision_lead_usd"] + com_dif)
+        else:
+            acc["base_pasillo_usd"] = max(Decimal("0"), acc["base_pasillo_usd"] + dif)
+            acc["comision_pasillo_usd"] = max(Decimal("0"), acc["comision_pasillo_usd"] + com_dif)
+        acc["total_comision_usd"] = acc["comision_pasillo_usd"] + acc["comision_lead_usd"]
+
+    por_persona_lista = sorted(
+        acumulado.values(),
+        key=lambda x: (-float(x["total_comision_usd"]), x["nombre"]),
+    )
+    por_persona_serializado = [
+        {
+            "personal_id": p["personal_id"],
+            "nombre": p["nombre"],
+            "rol": p["rol"],
+            "es_encargado": p["es_encargado"],
+            "modalidad": p["modalidad"],
+            "telefono": p["telefono"],
+            "porcentaje_pasillo": p["porcentaje_pasillo"],
+            "porcentaje_lead": p["porcentaje_lead"],
+            "cantidad_pasillo": p["cantidad_pasillo"],
+            "base_pasillo_usd": redondear_usd(p["base_pasillo_usd"]),
+            "comision_pasillo_usd": redondear_usd(p["comision_pasillo_usd"]),
+            "cantidad_lead": p["cantidad_lead"],
+            "base_lead_usd": redondear_usd(p["base_lead_usd"]),
+            "comision_lead_usd": redondear_usd(p["comision_lead_usd"]),
+            "total_ventas": p["total_ventas"],
+            "total_comision_usd": redondear_usd(p["total_comision_usd"]),
+        }
+        for p in por_persona_lista
+    ]
+
+    total_ventas_gen = sum(p["total_ventas"] for p in por_persona_lista)
+    vol_promo_gen = sum(
+        (p["base_pasillo_usd"] + p["base_lead_usd"] for p in por_persona_lista),
+        Decimal("0"),
+    )
+    pasillo_gen = sum((p["comision_pasillo_usd"] for p in por_persona_lista), Decimal("0"))
+    lead_gen = sum((p["comision_lead_usd"] for p in por_persona_lista), Decimal("0"))
+    total_com_gen = pasillo_gen + lead_gen
+
+    ultima_tasa = bd.query(TasaDiaria).order_by(TasaDiaria.fecha.desc()).first()
+    tasa_bcv_ref = float(ultima_tasa.tasa_bcv) if ultima_tasa and ultima_tasa.tasa_bcv > 0 else None
+
+    return {
+        "fecha_inicio": f_inicio.isoformat(),
+        "fecha_fin": f_fin.isoformat(),
+        "tasa_bcv_referencia": tasa_bcv_ref,
+        "resumen_general": {
+            "total_ventas": total_ventas_gen,
+            "volumen_promo_usd": redondear_usd(vol_promo_gen),
+            "pasillo_usd": redondear_usd(pasillo_gen),
+            "lead_usd": redondear_usd(lead_gen),
+            "total_comisiones_usd": redondear_usd(total_com_gen),
+        },
+        "por_persona": por_persona_serializado,
+        "detalle_ventas": detalle_ventas,
     }
