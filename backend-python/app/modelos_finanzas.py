@@ -403,3 +403,31 @@ class MovimientoTesoreria(Base):
     pago_entrada = relationship("Pago", foreign_keys=[pago_entrada_id])
     registrado_por = relationship("Usuario", foreign_keys=[registrado_por_id])
     anulado_por = relationship("Usuario", foreign_keys=[anulado_por_id])
+
+
+class ConfiguracionAlertas(Base):
+    __tablename__ = "configuracion_alertas"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    stock_minimo_global: Mapped[int] = mapped_column(Integer, default=2, nullable=False)
+    dias_alerta_cxp: Mapped[int] = mapped_column(Integer, default=5, nullable=False)
+    actualizado_por: Mapped[str] = mapped_column(String(150), default="", nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class CuentaPorPagar(Base):
+    __tablename__ = "cuentas_por_pagar"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    proveedor_nombre: Mapped[str] = mapped_column(String(160), nullable=False, index=True)
+    concepto: Mapped[str] = mapped_column(String(255), nullable=False)
+    referencia: Mapped[str] = mapped_column(String(120), default="", nullable=False)
+    fecha_vencimiento: Mapped[date] = mapped_column(Date, index=True, nullable=False)
+    monto_original_usd: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    monto_pendiente_usd: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    estado: Mapped[str] = mapped_column(String(20), default="PENDIENTE", nullable=False, index=True)
+    origen_tipo: Mapped[str] = mapped_column(String(40), default="FACTURA", nullable=False)
+    origen_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    creado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)

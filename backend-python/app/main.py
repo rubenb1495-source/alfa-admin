@@ -13,7 +13,7 @@ from app import modelos_finanzas as _modelos_finanzas  # noqa: F401
 from app import modelos_logistica as _modelos_logistica  # noqa: F401
 from app import modelos_operaciones as _modelos_operaciones  # noqa: F401
 from app import modelos_taller as _modelos_taller  # noqa: F401
-from app.rutas import autenticacion, catalogo, cierre_diario, direccion, finanzas, logistica, logistica_avanzada, operaciones, taller, tasas, tesoreria, usuarios, ventas
+from app.rutas import alertas, autenticacion, catalogo, cierre_diario, direccion, finanzas, logistica, logistica_avanzada, operaciones, taller, tasas, tesoreria, usuarios, ventas
 from app.semilla import ejecutar_semilla
 from app.semilla_finanzas import ejecutar_semilla_finanzas
 
@@ -164,6 +164,7 @@ def asegurar_columnas_compatibles() -> None:
         nuevas_cmp = [
             ("proveedor_nombre", "VARCHAR(160) NOT NULL DEFAULT ''"),
             ("tracking_guia", "VARCHAR(120) NOT NULL DEFAULT ''"),
+            ("fecha_vencimiento", "DATE NULL"),
         ]
         for nombre_col, ddl_col in nuevas_cmp:
             if nombre_col not in columnas_cmp:
@@ -171,6 +172,16 @@ def asegurar_columnas_compatibles() -> None:
                     conexion.execute(
                         text(f"ALTER TABLE compras ADD COLUMN {nombre_col} {ddl_col}")
                     )
+    if inspector.has_table("catalogo_articulos"):
+        columnas_cat = {col["name"] for col in inspector.get_columns("catalogo_articulos")}
+        if "stock_minimo" not in columnas_cat:
+            with motor.begin() as conexion:
+                conexion.execute(
+                    text(
+                        "ALTER TABLE catalogo_articulos "
+                        "ADD COLUMN stock_minimo INTEGER NOT NULL DEFAULT 2"
+                    )
+                )
 
 
 @asynccontextmanager
@@ -218,5 +229,6 @@ app.include_router(finanzas.enrutador)
 app.include_router(finanzas.enrutador_comisiones)
 app.include_router(tesoreria.enrutador)
 app.include_router(direccion.enrutador)
+app.include_router(alertas.enrutador)
 app.include_router(cierre_diario.enrutador)
 app.include_router(operaciones.enrutador)

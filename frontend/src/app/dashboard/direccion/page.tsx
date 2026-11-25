@@ -22,6 +22,7 @@ import {
   formatearUsd,
   solicitarApi,
 } from "@/servicios/api";
+import CentroAlertas from "@/components/CentroAlertas";
 import type { Sucursal } from "@/tipos/dominio";
 
 interface ResumenDireccion {
@@ -289,6 +290,9 @@ export default function PaginaPanelDireccion() {
         </div>
       ) : (
         <>
+          {/* Centro de Alertas Inteligentes (Stock + CxP) */}
+          <CentroAlertas />
+
           {/* KPIs principales */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div className="rounded-2xl border border-[#003566]/20 bg-[#003566] p-5 text-white shadow-sm">

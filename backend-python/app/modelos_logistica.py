@@ -140,6 +140,7 @@ class Compra(Base):
     origen: Mapped[str] = mapped_column(String(30), nullable=False)
     proveedor_id: Mapped[int | None] = mapped_column(ForeignKey("terceros.id"), nullable=True)
     fecha: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    fecha_vencimiento: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
     factura_orden: Mapped[str] = mapped_column(String(100), default="", nullable=False)
     proveedor_nombre: Mapped[str] = mapped_column(String(160), default="", nullable=False)
     tracking_guia: Mapped[str] = mapped_column(String(120), default="", nullable=False)

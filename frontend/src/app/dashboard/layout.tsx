@@ -37,6 +37,7 @@ import {
   X,
 } from "lucide-react";
 import BotonInstalarPWA from "@/components/BotonInstalarPWA";
+import CampanaAlertas from "@/components/CampanaAlertas";
 import LogoAlfa from "@/components/LogoAlfa";
 import ModalAperturaDiaria from "@/components/ModalAperturaDiaria";
 import { usarSesion } from "@/contexto/SesionContexto";
@@ -563,8 +564,9 @@ export default function DisenoDashboard({
               </button>
             </div>
 
-            {/* Derecha: Instalar PWA + Sucursal activa + Perfil de usuario */}
+            {/* Derecha: Campana Alertas (solo ADMIN/DIRECTOR) + Instalar PWA + Sucursal + Perfil */}
             <div className="flex items-center gap-2 text-xs">
+              {(esAdmin || esDirector) && <CampanaAlertas />}
               <BotonInstalarPWA compacto />
               {usuario.sucursal && (
                 <span className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/80 border border-gray-200/80 text-[#000814] font-semibold">
