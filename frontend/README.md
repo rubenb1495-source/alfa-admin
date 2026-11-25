@@ -1,4 +1,4 @@
-# Frontend - Tekio Electronics
+# Frontend - Alfa Electronics
 
 Aplicación web administrativa construida con **Next.js**, **React** y **TypeScript**, gestionada con `pnpm`.
 

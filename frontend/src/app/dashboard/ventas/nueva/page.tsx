@@ -1549,7 +1549,7 @@ export default function PaginaNuevaVentaPOS() {
                       <button
                         type="button"
                         onClick={() => agregarEquipoPorObj(eq)}
-                        className="shrink-0 px-2.5 py-1.5 rounded-lg bg-[#003566] hover:bg-[#C9461A] text-white text-[11px] font-bold cursor-pointer"
+                        className="shrink-0 px-2.5 py-1.5 rounded-lg bg-[#003566] hover:bg-[#001D3D] text-white text-[11px] font-bold cursor-pointer"
                       >
                         + Añadir
                       </button>
@@ -2254,7 +2254,7 @@ export default function PaginaNuevaVentaPOS() {
           <button
             type="submit"
             disabled={guardando || carrito.length === 0 || ventaCreada !== null}
-            className="w-full py-3 rounded-xl bg-[#003566] hover:bg-[#C9461A] disabled:opacity-50 disabled:cursor-not-allowed text-white font-black text-sm cursor-pointer transition-colors"
+            className="w-full py-3 rounded-xl bg-[#003566] hover:bg-[#001D3D] disabled:opacity-50 disabled:cursor-not-allowed text-white font-black text-sm cursor-pointer transition-colors"
           >
             {guardando
               ? "Registrando venta..."

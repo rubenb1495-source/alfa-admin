@@ -172,7 +172,7 @@ export default function PaginaRecepcion() {
                       <td className="px-3 py-2 text-right">
                         {formatearUsd(p.costo_compra_usd)}
                       </td>
-                      <td className="px-3 py-2 text-right font-bold text-[#C9461A]">
+                      <td className="px-3 py-2 text-right font-bold text-[#001D3D]">
                         {formatearUsd(p.costo_flete_usd)}
                       </td>
                     </tr>
@@ -294,7 +294,7 @@ export default function PaginaRecepcion() {
                     {serialesEscaneados.map((s) => (
                       <span
                         key={s}
-                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-orange-100 text-[#C9461A] font-mono text-xs font-bold"
+                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-orange-100 text-[#001D3D] font-mono text-xs font-bold"
                       >
                         {s}
                         <button
@@ -319,7 +319,7 @@ export default function PaginaRecepcion() {
               <button
                 type="submit"
                 disabled={procesando}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#003566] hover:bg-[#C9461A] text-white text-sm font-bold disabled:opacity-60 cursor-pointer"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#003566] hover:bg-[#001D3D] text-white text-sm font-bold disabled:opacity-60 cursor-pointer"
               >
                 <ShieldCheck className="w-4 h-4" />
                 {procesando

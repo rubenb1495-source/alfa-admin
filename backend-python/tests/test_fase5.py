@@ -76,7 +76,7 @@ def _login(cliente: TestClient, correo: str, clave: str) -> dict[str, str]:
 
 
 def _preparar_escenario_base(cliente: TestClient) -> dict:
-    headers_dir = _login(cliente, "direccion@tekioelectronics.com", "Tekio2026!")
+    headers_dir = _login(cliente, "direccion@alfaelectronics.com", "Alfa2026!")
 
     # Crear asesora y asegurar tasa del día
     resp_as = cliente.post(
@@ -84,7 +84,7 @@ def _preparar_escenario_base(cliente: TestClient) -> dict:
         headers=headers_dir,
         json={
             "nombre": "Valeria Asesora",
-            "correo": "valeria.f5@tekio.com",
+            "correo": "valeria.f5@alfa.com",
             "clave": "Password123!",
             "rol": "ASESORA",
             "sucursal_id": 1,
@@ -92,7 +92,7 @@ def _preparar_escenario_base(cliente: TestClient) -> dict:
     )
     assert resp_as.status_code == 201, resp_as.text
     asesora_id = resp_as.json()["id"]
-    headers_as = _login(cliente, "valeria.f5@tekio.com", "Password123!")
+    headers_as = _login(cliente, "valeria.f5@alfa.com", "Password123!")
 
     hoy = obtener_fecha_hoy().isoformat()
     cliente.post(

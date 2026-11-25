@@ -1,4 +1,4 @@
-# Backend Node.js - Tekio Electronics
+# Backend Node.js - Alfa Electronics
 
 Servicios backend en **Node.js** con **TypeScript**, gestionados con `pnpm`.
 

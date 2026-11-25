@@ -17,6 +17,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from app.base_datos import obtener_bd
+from app.core.brand import dibujar_encabezado_y_marca_agua_alfa
 from app.modelos import Sucursal, TasaDiaria, Usuario
 from app.modelos_admin import (
     ActivoFijo,
@@ -588,32 +589,26 @@ def descargar_comprobante_retencion_pdf(
 
     buf = io.BytesIO()
     c = canvas.Canvas(buf, pagesize=letter)
-    c.setFont("Helvetica-Bold", 14)
-    c.drawString(45, 745, f"COMPROBANTE DE RETENCIÓN DE {ret.tipo}")
+    y = dibujar_encabezado_y_marca_agua_alfa(
+        c,
+        f"COMPROBANTE DE RETENCIÓN DE {ret.tipo}",
+        f"Nro. Comprobante: {ret.numero_comprobante}  |  Fecha: {ret.fecha_emision.isoformat()}  |  Periodo: {ret.periodo_fiscal}",
+    )
     c.setFont("Helvetica", 10)
-    c.drawString(45, 725, "Agente de Retención: ALFA IMPORTACIONES, C.A. | RIF: J-50793794-1")
-    c.drawString(45, 710, "Dirección: CC Free Market, Local T38, Naguanagua, Valencia")
-    c.line(45, 700, 565, 700)
+    c.drawString(45, y, f"Sujeto Retenido: {ret.razon_social}")
+    c.drawString(45, y - 16, f"RIF Sujeto Retenido: {ret.rif_sujeto}")
+    c.drawString(45, y - 32, f"Factura Ref.: {ret.numero_factura_ref or '—'}   Control: {ret.numero_control_ref or '—'}")
+    c.drawString(45, y - 48, f"Concepto: {ret.concepto}")
 
-    c.setFont("Helvetica-Bold", 10)
-    c.drawString(45, 680, f"Nro. Comprobante: {ret.numero_comprobante}")
-    c.drawString(350, 680, f"Fecha: {ret.fecha_emision.isoformat()}  |  Periodo: {ret.periodo_fiscal}")
-
-    c.setFont("Helvetica", 10)
-    c.drawString(45, 655, f"Sujeto Retenido: {ret.razon_social}")
-    c.drawString(45, 640, f"RIF Sujeto Retenido: {ret.rif_sujeto}")
-    c.drawString(45, 625, f"Factura Ref.: {ret.numero_factura_ref or '—'}   Control: {ret.numero_control_ref or '—'}")
-    c.drawString(45, 610, f"Concepto: {ret.concepto}")
-
-    c.line(45, 595, 565, 595)
+    c.line(45, y - 62, 565, y - 62)
     c.setFont("Helvetica-Bold", 11)
-    c.drawString(45, 575, f"Base Imponible / Impuesto: Bs. {float(ret.base_imponible_bs):,.2f}")
-    c.drawString(45, 558, f"Porcentaje de Retención: {float(ret.porcentaje_retencion):.2f}%")
-    c.drawString(45, 540, f"MONTO RETENIDO: Bs. {float(ret.monto_retenido_bs):,.2f}  (Ref. USD ${float(ret.monto_retenido_usd):,.2f})")
+    c.drawString(45, y - 82, f"Base Imponible / Impuesto: Bs. {float(ret.base_imponible_bs):,.2f}")
+    c.drawString(45, y - 99, f"Porcentaje de Retención: {float(ret.porcentaje_retencion):.2f}%")
+    c.drawString(45, y - 117, f"MONTO RETENIDO: Bs. {float(ret.monto_retenido_bs):,.2f}  (Ref. USD ${float(ret.monto_retenido_usd):,.2f})")
 
     c.setFont("Helvetica", 9)
-    c.drawString(45, 480, "_______________________________                    _______________________________")
-    c.drawString(45, 466, "Firma y Sello Agente de Retención                   Firma y Sello Sujeto Retenido")
+    c.drawString(45, y - 180, "_______________________________                    _______________________________")
+    c.drawString(45, y - 194, "Firma y Sello Agente de Retención                   Firma y Sello Sujeto Retenido")
     c.showPage()
     c.save()
     return Response(
@@ -961,18 +956,19 @@ def descargar_recibo_nomina_pdf(
 
     buf = io.BytesIO()
     c = canvas.Canvas(buf, pagesize=letter)
-    c.setFont("Helvetica-Bold", 14)
-    c.drawString(45, 745, "RECIBO DE PAGO DE NÓMINA — ALFA IMPORTACIONES, C.A.")
+    y = dibujar_encabezado_y_marca_agua_alfa(
+        c,
+        "RECIBO DE PAGO DE NÓMINA",
+        f"Nómina: {det.nomina.codigo}  |  Periodo: {det.nomina.fecha_inicio} al {det.nomina.fecha_fin}",
+    )
     c.setFont("Helvetica", 10)
-    c.drawString(45, 725, f"RIF: J-50793794-1  |  Nómina: {det.nomina.codigo} ({det.nomina.fecha_inicio} al {det.nomina.fecha_fin})")
-    c.line(45, 715, 565, 715)
-    c.drawString(45, 695, f"Trabajador: {det.nombre_trabajador}  |  Cargo: {det.cargo}")
-    c.drawString(45, 675, f"Salario periodo: ${float(det.salario_periodo_usd):,.2f}   |   Cestaticket: ${float(det.cestaticket_usd):,.2f}   |   Bonos: ${float(det.bonos_extras_usd):,.2f}")
-    c.drawString(45, 655, f"Deducciones LOTTT -> IVSS (4%): -${float(det.ivss_usd):,.2f} | RPE (0.5%): -${float(det.rpe_usd):,.2f} | FAOV (1%): -${float(det.faov_usd):,.2f} | Otras: -${float(det.otras_deducciones_usd):,.2f}")
+    c.drawString(45, y, f"Trabajador: {det.nombre_trabajador}  |  Cargo: {det.cargo}")
+    c.drawString(45, y - 20, f"Salario periodo: ${float(det.salario_periodo_usd):,.2f}   |   Cestaticket: ${float(det.cestaticket_usd):,.2f}   |   Bonos: ${float(det.bonos_extras_usd):,.2f}")
+    c.drawString(45, y - 40, f"Deducciones LOTTT -> IVSS (4%): -${float(det.ivss_usd):,.2f} | RPE (0.5%): -${float(det.rpe_usd):,.2f} | FAOV (1%): -${float(det.faov_usd):,.2f} | Otras: -${float(det.otras_deducciones_usd):,.2f}")
     c.setFont("Helvetica-Bold", 12)
-    c.drawString(45, 625, f"NETO A PAGAR: ${float(det.neto_pagar_usd):,.2f} USD  (Bs. {float(det.neto_pagar_bs):,.2f})")
+    c.drawString(45, y - 70, f"NETO A PAGAR: ${float(det.neto_pagar_usd):,.2f} USD  (Bs. {float(det.neto_pagar_bs):,.2f})")
     c.setFont("Helvetica", 9)
-    c.drawString(45, 560, "Firma del Trabajador: ___________________________   C.I.: _______________")
+    c.drawString(45, y - 135, "Firma del Trabajador: ___________________________   C.I.: _______________")
     c.showPage()
     c.save()
     return Response(
@@ -1482,12 +1478,11 @@ def exportar_pnl_pdf(
     pnl = obtener_estado_resultados(fecha_inicio, fecha_fin, None, usuario, bd)
     buf = io.BytesIO()
     c = canvas.Canvas(buf, pagesize=letter)
-    c.setFont("Helvetica-Bold", 14)
-    c.drawString(45, 745, "ESTADO DE RESULTADOS GERENCIAL (P&L) — ALFA IMPORTACIONES, C.A.")
-    c.setFont("Helvetica", 10)
-    c.drawString(45, 725, f"RIF: J-50793794-1  |  Periodo: {pnl['periodo']['fecha_inicio']} al {pnl['periodo']['fecha_fin']}")
-    c.line(45, 715, 565, 715)
-    y = 690
+    y = dibujar_encabezado_y_marca_agua_alfa(
+        c,
+        "ESTADO DE RESULTADOS GERENCIAL (P&L)",
+        f"Periodo: {pnl['periodo']['fecha_inicio']} al {pnl['periodo']['fecha_fin']}",
+    )
     for etiqueta, clave, negrita in [
         ("Ingresos por Ventas", "ingresos_ventas_usd", False),
         ("(-) Costo de Ventas (COGS)", "costo_ventas_usd", False),

@@ -1,6 +1,6 @@
-# Sistema Administrativo Tekio Electronics
+# Sistema Administrativo Alfa Electronics
 
-Sistema administrativo integral para la gestión operativa interna de **Tekio Electronics**.
+Sistema administrativo integral para la gestión operativa interna de **Alfa Electronics**.
 
 ## Estructura del repositorio
 

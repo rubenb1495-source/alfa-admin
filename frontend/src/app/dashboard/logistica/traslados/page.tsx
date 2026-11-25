@@ -657,7 +657,7 @@ export default function PaginaTraslados() {
                 <button
                   type="submit"
                   disabled={procesando}
-                  className="px-4 py-2 rounded-xl bg-[#003566] hover:bg-[#C9461A] text-white text-sm font-bold disabled:opacity-60 cursor-pointer"
+                  className="px-4 py-2 rounded-xl bg-[#003566] hover:bg-[#001D3D] text-white text-sm font-bold disabled:opacity-60 cursor-pointer"
                 >
                   {procesando ? "Enviando..." : "Enviar traslado"}
                 </button>

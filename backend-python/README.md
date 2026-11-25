@@ -1,4 +1,4 @@
-# Backend Python (FastAPI) - Tekio Electronics
+# Backend Python (FastAPI) - Alfa Electronics
 
 API y servicios en **Python** con **FastAPI** y **Pydantic**, gestionados con `uv`.
 

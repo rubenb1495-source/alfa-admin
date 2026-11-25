@@ -136,7 +136,7 @@ export default function PaginaHistorialVentas() {
 
         <Link
           href="/dashboard/ventas/nueva"
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#003566] hover:bg-[#C9461A] text-white text-sm font-bold"
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#003566] hover:bg-[#001D3D] text-white text-sm font-bold"
         >
           <Plus className="w-4 h-4" />
           Nueva venta POS

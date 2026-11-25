@@ -76,9 +76,9 @@ def crear_usuario_rol(
 
 
 def test_venta_mixta_pdf_bloqueo_serial_sucursal_cerrada_y_rbac(cliente: TestClient) -> None:
-    cab_dir, _ = login(cliente, "direccion@tekioelectronics.com", "Tekio2026!")
+    cab_dir, _ = login(cliente, "direccion@alfaelectronics.com", "Alfa2026!")
     cab_asesora, asesora_u = crear_usuario_rol(
-        cliente, cab_dir, "Caira Asesora", "caira_v@tekioelectronics.com", "ASESORA", 2
+        cliente, cab_dir, "Caira Asesora", "caira_v@alfaelectronics.com", "ASESORA", 2
     )
     hoy = obtener_fecha_hoy()
 
@@ -95,7 +95,7 @@ def test_venta_mixta_pdf_bloqueo_serial_sucursal_cerrada_y_rbac(cliente: TestCli
     )
 
     sucs = {s["nombre"]: s["id"] for s in cliente.get("/api/sucursales", headers=cab_dir).json()}
-    central_id = sucs["Tekio central"]
+    central_id = sucs["Alfa central"]
     bodega_id = sucs["Bodega"]
     infot_id = sucs["INFOT"]
 
@@ -104,7 +104,7 @@ def test_venta_mixta_pdf_bloqueo_serial_sucursal_cerrada_y_rbac(cliente: TestCli
         for i in cliente.get("/api/finanzas/instrumentos", headers=cab_dir).json()
     }
 
-    # 2. Ingresar 2 equipos LISTO: uno en Tekio central ($200 promo) y uno en Bodega
+    # 2. Ingresar 2 equipos LISTO: uno en Alfa central ($200 promo) y uno en Bodega
     cliente.post(
         "/api/logistica/compras",
         headers=cab_dir,
@@ -145,7 +145,7 @@ def test_venta_mixta_pdf_bloqueo_serial_sucursal_cerrada_y_rbac(cliente: TestCli
     )
     assert resp_infot.status_code == 403
 
-    # 4. Intentar vender equipo de Bodega desde Tekio central -> 400
+    # 4. Intentar vender equipo de Bodega desde Alfa central -> 400
     resp_otra_suc = cliente.post(
         "/api/ventas",
         headers=cab_asesora,
@@ -219,17 +219,17 @@ def test_venta_mixta_pdf_bloqueo_serial_sucursal_cerrada_y_rbac(cliente: TestCli
 
 
 def test_devolucion_comisiones_y_cierre_mensual_bloquea_periodo(cliente: TestClient) -> None:
-    cab_dir, _ = login(cliente, "direccion@tekioelectronics.com", "Tekio2026!")
+    cab_dir, _ = login(cliente, "direccion@alfaelectronics.com", "Alfa2026!")
     cab_lider, lider_u = crear_usuario_rol(
-        cliente, cab_dir, "Caira Líder", "lider@tekioelectronics.com", "LIDER", 2
+        cliente, cab_dir, "Caira Líder", "lider@alfaelectronics.com", "LIDER", 2
     )
     cab_asesora, asesora_u = crear_usuario_rol(
-        cliente, cab_dir, "Gabriela Asesora", "gabriela@tekioelectronics.com", "ASESORA", 2
+        cliente, cab_dir, "Gabriela Asesora", "gabriela@alfaelectronics.com", "ASESORA", 2
     )
     hoy = obtener_fecha_hoy()
 
     sucs = {s["nombre"]: s["id"] for s in cliente.get("/api/sucursales", headers=cab_dir).json()}
-    central_id = sucs["Tekio central"]
+    central_id = sucs["Alfa central"]
     insts = {
         i["nombre"]: i["id"]
         for i in cliente.get("/api/finanzas/instrumentos", headers=cab_dir).json()
@@ -336,9 +336,9 @@ def test_devolucion_comisiones_y_cierre_mensual_bloquea_periodo(cliente: TestCli
 
 
 def test_venta_cashea_con_inicial_divisas_aplica_precio_regular_estricto(cliente: TestClient) -> None:
-    cab_dir, _ = login(cliente, "direccion@tekioelectronics.com", "Tekio2026!")
+    cab_dir, _ = login(cliente, "direccion@alfaelectronics.com", "Alfa2026!")
     cab_asesora, asesora_u = crear_usuario_rol(
-        cliente, cab_dir, "Asesora Cashea", "asesora_cashea@tekioelectronics.com", "ASESORA", 2
+        cliente, cab_dir, "Asesora Cashea", "asesora_cashea@alfaelectronics.com", "ASESORA", 2
     )
     hoy = obtener_fecha_hoy()
 
@@ -355,7 +355,7 @@ def test_venta_cashea_con_inicial_divisas_aplica_precio_regular_estricto(cliente
     )
 
     sucs = {s["nombre"]: s["id"] for s in cliente.get("/api/sucursales", headers=cab_dir).json()}
-    central_id = sucs["Tekio central"]
+    central_id = sucs["Alfa central"]
     insts = {
         i["nombre"]: i["id"]
         for i in cliente.get("/api/finanzas/instrumentos", headers=cab_dir).json()
@@ -466,15 +466,15 @@ def test_venta_cashea_con_inicial_divisas_aplica_precio_regular_estricto(cliente
 def test_servicio_tecnico_combinado_con_repuesto_tecnico_obligatorio_y_comisiones_promo(
     cliente: TestClient,
 ) -> None:
-    cab_dir, _ = login(cliente, "direccion@tekioelectronics.com", "Tekio2026!")
+    cab_dir, _ = login(cliente, "direccion@alfaelectronics.com", "Alfa2026!")
     cab_asesora, _ = crear_usuario_rol(
-        cliente, cab_dir, "Asesora ST", "asesora_st@tekioelectronics.com", "ASESORA", 2
+        cliente, cab_dir, "Asesora ST", "asesora_st@alfaelectronics.com", "ASESORA", 2
     )
     cab_lider, lider_u = crear_usuario_rol(
-        cliente, cab_dir, "Líder ST", "lider_st@tekioelectronics.com", "LIDER", 2
+        cliente, cab_dir, "Líder ST", "lider_st@alfaelectronics.com", "LIDER", 2
     )
     cab_tecnico, tecnico_u = crear_usuario_rol(
-        cliente, cab_dir, "Técnico Luis", "tecnico_st@tekioelectronics.com", "TECNICO", 2
+        cliente, cab_dir, "Técnico Luis", "tecnico_st@alfaelectronics.com", "TECNICO", 2
     )
     hoy = obtener_fecha_hoy()
 
@@ -499,7 +499,7 @@ def test_servicio_tecnico_combinado_con_repuesto_tecnico_obligatorio_y_comisione
     )
 
     sucs = {s["nombre"]: s["id"] for s in cliente.get("/api/sucursales", headers=cab_dir).json()}
-    central_id = sucs["Tekio central"]
+    central_id = sucs["Alfa central"]
     insts = {
         i["nombre"]: i["id"]
         for i in cliente.get("/api/finanzas/instrumentos", headers=cab_dir).json()
@@ -535,7 +535,7 @@ def test_servicio_tecnico_combinado_con_repuesto_tecnico_obligatorio_y_comisione
     assert resp_bat.status_code == 201, resp_bat.text
     bat_id = resp_bat.json()["id"]
 
-    # Cargar stock de 2 baterías en Tekio central vía compra nacional
+    # Cargar stock de 2 baterías en Alfa central vía compra nacional
     resp_cmp = cliente.post(
         "/api/logistica/compras",
         headers=cab_dir,
@@ -648,14 +648,14 @@ def test_servicio_tecnico_combinado_con_repuesto_tecnico_obligatorio_y_comisione
 
 
 def test_obsequio_imputa_costo_al_equipo_descuenta_stock_y_rbac(cliente: TestClient) -> None:
-    cab_dir, _ = login(cliente, "direccion@tekioelectronics.com", "Tekio2026!")
+    cab_dir, _ = login(cliente, "direccion@alfaelectronics.com", "Alfa2026!")
     cab_asesora, asesora_u = crear_usuario_rol(
-        cliente, cab_dir, "Asesora Obsequio", "asesora_obs@tekioelectronics.com", "ASESORA", 2
+        cliente, cab_dir, "Asesora Obsequio", "asesora_obs@alfaelectronics.com", "ASESORA", 2
     )
     hoy = obtener_fecha_hoy()
 
     sucs = {s["nombre"]: s["id"] for s in cliente.get("/api/sucursales", headers=cab_dir).json()}
-    central_id = sucs["Tekio central"]
+    central_id = sucs["Alfa central"]
     insts = {
         i["nombre"]: i["id"]
         for i in cliente.get("/api/finanzas/instrumentos", headers=cab_dir).json()
@@ -774,24 +774,24 @@ def test_obsequio_imputa_costo_al_equipo_descuenta_stock_y_rbac(cliente: TestCli
     assert "J-50637518-4" in texto_pdf
     assert "180" in texto_pdf
     assert "OBSEQUIO" in texto_pdf
-    assert "Entregado por (Tekio Electronics)" in texto_pdf
+    assert "Entregado por (Alfa Electronics)" in texto_pdf
     assert "Firma del Cliente" in texto_pdf
 
 
 def test_lider_multitienda_comision_en_multiples_sucursales(cliente: TestClient) -> None:
-    cab_dir, _ = login(cliente, "direccion@tekioelectronics.com", "Tekio2026!")
+    cab_dir, _ = login(cliente, "direccion@alfaelectronics.com", "Alfa2026!")
     sucs = {s["nombre"]: s["id"] for s in cliente.get("/api/sucursales", headers=cab_dir).json()}
-    central_id = sucs["Tekio central"]
+    central_id = sucs["Alfa central"]
     gran_bazar_id = sucs["Gran Bazar"]
 
     _, lider_u = crear_usuario_rol(
-        cliente, cab_dir, "Líder Multi", "lider_multi@tekioelectronics.com", "LIDER", central_id
+        cliente, cab_dir, "Líder Multi", "lider_multi@alfaelectronics.com", "LIDER", central_id
     )
     _, asesora_c = crear_usuario_rol(
-        cliente, cab_dir, "Asesora Central", "asesora_c@tekioelectronics.com", "ASESORA", central_id
+        cliente, cab_dir, "Asesora Central", "asesora_c@alfaelectronics.com", "ASESORA", central_id
     )
     _, asesora_gb = crear_usuario_rol(
-        cliente, cab_dir, "Asesora GB", "asesora_gb@tekioelectronics.com", "ASESORA", gran_bazar_id
+        cliente, cab_dir, "Asesora GB", "asesora_gb@alfaelectronics.com", "ASESORA", gran_bazar_id
     )
     hoy = obtener_fecha_hoy()
     insts = {
@@ -818,7 +818,7 @@ def test_lider_multitienda_comision_en_multiples_sucursales(cliente: TestClient)
         for e in cliente.get("/api/logistica/inventario/equipos", headers=cab_dir).json()
     }
 
-    # Venta 1: Líder $500 en Tekio central -> 1% = $5.00
+    # Venta 1: Líder $500 en Alfa central -> 1% = $5.00
     assert cliente.post(
         "/api/ventas",
         headers=cab_dir,
@@ -830,7 +830,7 @@ def test_lider_multitienda_comision_en_multiples_sucursales(cliente: TestClient)
         },
     ).status_code == 201
 
-    # Venta 2: Asesora Central $400 en Tekio central -> 0.5% al Líder = $2.00
+    # Venta 2: Asesora Central $400 en Alfa central -> 0.5% al Líder = $2.00
     assert cliente.post(
         "/api/ventas",
         headers=cab_dir,
@@ -869,9 +869,9 @@ def test_lider_multitienda_comision_en_multiples_sucursales(cliente: TestClient)
 def test_creacion_rapida_clientes_natural_juridico_duplicado_409_y_pdf(
     cliente: TestClient,
 ) -> None:
-    cab_dir, _ = login(cliente, "direccion@tekioelectronics.com", "Tekio2026!")
+    cab_dir, _ = login(cliente, "direccion@alfaelectronics.com", "Alfa2026!")
     cab_asesora, asesora_u = crear_usuario_rol(
-        cliente, cab_dir, "Asesora Clientes", "asesora_cli@tekioelectronics.com", "ASESORA", 2
+        cliente, cab_dir, "Asesora Clientes", "asesora_cli@alfaelectronics.com", "ASESORA", 2
     )
     hoy = obtener_fecha_hoy()
 
@@ -930,7 +930,7 @@ def test_creacion_rapida_clientes_natural_juridico_duplicado_409_y_pdf(
 
     # 4. Registrar venta con el cliente Jurídico y verificar que el PDF incluye documento, teléfono y dirección
     sucs = {s["nombre"]: s["id"] for s in cliente.get("/api/sucursales", headers=cab_dir).json()}
-    central_id = sucs["Tekio central"]
+    central_id = sucs["Alfa central"]
     insts = {
         i["nombre"]: i["id"]
         for i in cliente.get("/api/finanzas/instrumentos", headers=cab_dir).json()
@@ -1011,9 +1011,9 @@ def _extraer_texto_pdf(pdf_bytes: bytes) -> str:
 def test_pdf_sin_etiquetas_internas_monto_total_regular_bs_y_envio_nacional(
     cliente: TestClient,
 ) -> None:
-    cab_dir, _ = login(cliente, "direccion@tekioelectronics.com", "Tekio2026!")
+    cab_dir, _ = login(cliente, "direccion@alfaelectronics.com", "Alfa2026!")
     cab_asesora, asesora_u = crear_usuario_rol(
-        cliente, cab_dir, "Asesora PDF", "asesora_pdf@tekioelectronics.com", "ASESORA", 2
+        cliente, cab_dir, "Asesora PDF", "asesora_pdf@alfaelectronics.com", "ASESORA", 2
     )
     hoy = obtener_fecha_hoy()
 
@@ -1030,7 +1030,7 @@ def test_pdf_sin_etiquetas_internas_monto_total_regular_bs_y_envio_nacional(
     )
 
     sucs = {s["nombre"]: s["id"] for s in cliente.get("/api/sucursales", headers=cab_dir).json()}
-    central_id = sucs["Tekio central"]
+    central_id = sucs["Alfa central"]
     insts = {
         i["nombre"]: i["id"]
         for i in cliente.get("/api/finanzas/instrumentos", headers=cab_dir).json()

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import SplashAlfa from "@/components/SplashAlfa";
+import { MARCA_ALFA } from "@/config/brand";
 import { ProveedorSesion } from "@/contexto/SesionContexto";
 import "./globals.css";
 
@@ -19,9 +20,8 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Sistema Administrativo · Alfa Digital Store",
-  description:
-    "Sistema administrativo centralizado de Alfa Importaciones, C.A. (Alfa Digital Store).",
+  title: MARCA_ALFA.tituloApp,
+  description: `Sistema administrativo centralizado de ${MARCA_ALFA.razonSocial} (${MARCA_ALFA.nombreComercial}).`,
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,

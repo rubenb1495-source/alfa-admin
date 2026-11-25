@@ -1,9 +1,9 @@
-# SPEC: Fase 2 - Logística, Compras, Guías, Recepción por Serial y Traslados en 2 Pasos - Tekio Electronics
+# SPEC: Fase 2 - Logística, Compras, Guías, Recepción por Serial y Traslados en 2 Pasos - Alfa Electronics
 
 ## 1. Objetivo del Módulo
 - **Qué resuelve:** Centraliza el ingreso de mercancía (compras nacionales, importaciones, inventario existente y equipos en parte de pago), el control de guías de casillero con prorrateo automático de flete, la recepción serial por serial con doble verificación y los traslados seguros en 2 pasos entre `Bodega` y sucursales.
-- **Tipo de tarea:** Refactorización con mejoras (reemplaza `TEKIO · Logística`, `TEKIO · Plantilla de carga` y las pestañas de `Compras`, `Guías` y `Recepción`).
-- **Código legacy de referencia:** `../tekio-erp` según `CONTEXT.md`.
+- **Tipo de tarea:** Refactorización con mejoras (reemplaza `ALFA · Logística`, `ALFA · Plantilla de carga` y las pestañas de `Compras`, `Guías` y `Recepción`).
+- **Código legacy de referencia:** `../alfa-erp` según `CONTEXT.md`.
 
 ## 2. Arquitectura y Alcance
 - **Backend asignado:** **Python / FastAPI** (manteniendo consistencia con Fase 1 y validación estricta con Pydantic).

@@ -259,7 +259,7 @@ export default function PaginaTasas() {
               <button
                 type="submit"
                 disabled={guardando}
-                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#003566] hover:bg-[#C9461A] text-white text-sm font-bold disabled:opacity-60 cursor-pointer"
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#003566] hover:bg-[#001D3D] text-white text-sm font-bold disabled:opacity-60 cursor-pointer"
               >
                 <Save className="w-4 h-4" />
                 {guardando ? "Guardando..." : "Guardar tasa hoy"}
@@ -340,7 +340,7 @@ export default function PaginaTasas() {
                     <td className="px-4 py-3">
                       {formatearPorcentaje(t.brecha_porcentaje)}
                     </td>
-                    <td className="px-4 py-3 font-semibold text-[#C9461A]">
+                    <td className="px-4 py-3 font-semibold text-[#001D3D]">
                       {formatearPorcentaje(t.recargo_porcentaje)}
                     </td>
                     <td className="px-4 py-3">

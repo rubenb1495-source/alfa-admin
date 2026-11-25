@@ -98,7 +98,7 @@ export default function PaginaDevoluciones() {
         <button
           type="button"
           onClick={() => setModalNueva(true)}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#003566] hover:bg-[#C9461A] text-white text-sm font-bold cursor-pointer"
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#003566] hover:bg-[#001D3D] text-white text-sm font-bold cursor-pointer"
         >
           <Plus className="w-4 h-4" />
           Nueva Nota de Crédito
@@ -154,7 +154,7 @@ export default function PaginaDevoluciones() {
                   <td className="px-4 py-3 font-mono">
                     {n.serial || n.sku || "—"}
                   </td>
-                  <td className="px-4 py-3 text-right font-bold text-[#C9461A]">
+                  <td className="px-4 py-3 text-right font-bold text-[#001D3D]">
                     {formatearUsd(n.monto_reconocido_promo_usd)}
                   </td>
                   <td className="px-4 py-3">

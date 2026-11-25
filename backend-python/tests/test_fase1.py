@@ -51,15 +51,15 @@ def iniciar_sesion_como(cliente: TestClient, correo: str, clave: str) -> dict[st
 
 
 def test_semilla_sucursales_y_login_direccion(cliente: TestClient) -> None:
-    cabeceras = iniciar_sesion_como(cliente, "direccion@tekioelectronics.com", "Tekio2026!")
+    cabeceras = iniciar_sesion_como(cliente, "direccion@alfaelectronics.com", "Alfa2026!")
 
     resp = cliente.get("/api/sucursales", headers=cabeceras)
     assert resp.status_code == 200
     sucursales = {s["nombre"]: s for s in resp.json()}
 
-    assert set(sucursales.keys()) == {"Bodega", "Tekio central", "Gran Bazar", "INFOT", "Free Market C13"}
+    assert set(sucursales.keys()) == {"Bodega", "Alfa central", "Gran Bazar", "INFOT", "Free Market C13"}
     assert sucursales["Bodega"]["estado"] == "ACTIVA"
-    assert sucursales["Tekio central"]["estado"] == "ACTIVA"
+    assert sucursales["Alfa central"]["estado"] == "ACTIVA"
     assert sucursales["Gran Bazar"]["estado"] == "ACTIVA"
     assert sucursales["INFOT"]["estado"] == "CERRADA"
     assert sucursales["INFOT"]["fecha_cierre"] == "2026-11-08"
@@ -68,7 +68,7 @@ def test_semilla_sucursales_y_login_direccion(cliente: TestClient) -> None:
 
 
 def test_rbac_oculta_costos_y_bloquea_usuarios_para_asesora_y_tecnico(cliente: TestClient) -> None:
-    cab_dir = iniciar_sesion_como(cliente, "direccion@tekioelectronics.com", "Tekio2026!")
+    cab_dir = iniciar_sesion_como(cliente, "direccion@alfaelectronics.com", "Alfa2026!")
 
     # Crear usuaria ASESORA y usuario TECNICO
     resp_asesora = cliente.post(
@@ -76,7 +76,7 @@ def test_rbac_oculta_costos_y_bloquea_usuarios_para_asesora_y_tecnico(cliente: T
         headers=cab_dir,
         json={
             "nombre": "Caira Asesora",
-            "correo": "caira@tekioelectronics.com",
+            "correo": "caira@alfaelectronics.com",
             "clave": "ClaveSegura123",
             "rol": "ASESORA",
             "sucursal_id": 2,
@@ -89,7 +89,7 @@ def test_rbac_oculta_costos_y_bloquea_usuarios_para_asesora_y_tecnico(cliente: T
         headers=cab_dir,
         json={
             "nombre": "Cristihan Técnico",
-            "correo": "cristihan@tekioelectronics.com",
+            "correo": "cristihan@alfaelectronics.com",
             "clave": "ClaveSegura123",
             "rol": "TECNICO",
             "sucursal_id": 1,
@@ -116,7 +116,7 @@ def test_rbac_oculta_costos_y_bloquea_usuarios_para_asesora_y_tecnico(cliente: T
     assert datos_art["costo_referencia_usd"] == 22.5
 
     # Verificar que ASESORA y TECNICO no acceden a /api/usuarios ni ven costo_referencia_usd
-    for correo in ("caira@tekioelectronics.com", "cristihan@tekioelectronics.com"):
+    for correo in ("caira@alfaelectronics.com", "cristihan@alfaelectronics.com"):
         cab = iniciar_sesion_como(cliente, correo, "ClaveSegura123")
         assert cliente.get("/api/usuarios", headers=cab).status_code == 403
 
@@ -131,13 +131,13 @@ def test_rbac_oculta_costos_y_bloquea_usuarios_para_asesora_y_tecnico(cliente: T
 
 
 def test_borrado_logico_usuario(cliente: TestClient) -> None:
-    cab_dir = iniciar_sesion_como(cliente, "direccion@tekioelectronics.com", "Tekio2026!")
+    cab_dir = iniciar_sesion_como(cliente, "direccion@alfaelectronics.com", "Alfa2026!")
     resp_u = cliente.post(
         "/api/usuarios",
         headers=cab_dir,
         json={
             "nombre": "Usuario Temporal",
-            "correo": "temporal@tekioelectronics.com",
+            "correo": "temporal@alfaelectronics.com",
             "clave": "ClaveSegura123",
             "rol": "LOGISTICA",
         },
@@ -154,13 +154,13 @@ def test_borrado_logico_usuario(cliente: TestClient) -> None:
 
     resp_login = cliente.post(
         "/api/auth/login",
-        json={"correo": "temporal@tekioelectronics.com", "clave": "ClaveSegura123"},
+        json={"correo": "temporal@alfaelectronics.com", "clave": "ClaveSegura123"},
     )
     assert resp_login.status_code == 403
 
 
 def test_tasas_bloqueo_sin_tasa_inmutabilidad_y_actualizacion_hoy(cliente: TestClient) -> None:
-    cab_dir = iniciar_sesion_como(cliente, "direccion@tekioelectronics.com", "Tekio2026!")
+    cab_dir = iniciar_sesion_como(cliente, "direccion@alfaelectronics.com", "Alfa2026!")
     hoy = obtener_fecha_hoy()
     ayer = hoy - timedelta(days=1)
 
@@ -216,7 +216,7 @@ def test_tasas_bloqueo_sin_tasa_inmutabilidad_y_actualizacion_hoy(cliente: TestC
 
 
 def test_sku_duplicado_409_e_historial_precios_inmutable(cliente: TestClient) -> None:
-    cab_dir = iniciar_sesion_como(cliente, "direccion@tekioelectronics.com", "Tekio2026!")
+    cab_dir = iniciar_sesion_como(cliente, "direccion@alfaelectronics.com", "Alfa2026!")
     hoy = obtener_fecha_hoy()
 
     # Registrar tasa hoy (BCV = 60, Recargo = 30%)

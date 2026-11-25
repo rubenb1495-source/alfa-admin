@@ -1,4 +1,4 @@
-# SPEC: Fase 4 - Ventas Multimoneda, Pagos Mixtos, Cashea, Devoluciones, Conciliación y Comisiones - Tekio Electronics
+# SPEC: Fase 4 - Ventas Multimoneda, Pagos Mixtos, Cashea, Devoluciones, Conciliación y Comisiones - Alfa Electronics
 
 ## 1. Objetivo del Módulo
 - **Qué resuelve:** Ciclo comercial y financiero completo: POS multimoneda con pagos mixtos (Promo vs. Regular), Cashea y cuentas por cobrar, Nota de Entrega PDF y reporte WhatsApp, Devoluciones (Notas de Crédito), verificación de pagos digitales, conciliación bancaria por CSV/Excel, comisiones por rol y cierre de mes inmutable.

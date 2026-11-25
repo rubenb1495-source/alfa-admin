@@ -402,7 +402,7 @@ export default function PaginaFinanzasPagos() {
                   </td>
                   <td className="px-4 py-3">{c.sucursal}</td>
                   <td className="px-4 py-3">{c.cliente}</td>
-                  <td className="px-4 py-3 text-right font-black text-[#C9461A]">
+                  <td className="px-4 py-3 text-right font-black text-[#001D3D]">
                     {formatearUsd(c.saldo_pendiente_usd)}
                   </td>
                   <td className="px-4 py-3 text-right">

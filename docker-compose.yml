@@ -1,27 +1,27 @@
 # ==============================================================================
-# Docker Compose - Sistema Administrativo Tekio Electronics
+# Docker Compose - Sistema Administrativo Alfa Electronics
 # ==============================================================================
 
 services:
   base_datos:
     image: postgres:16-alpine
-    container_name: tekio_postgres
+    container_name: alfa_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-tekio_admin}
-      POSTGRES_USER: ${POSTGRES_USER:-tekio_usuario}
+      POSTGRES_DB: ${POSTGRES_DB:-alfa_admin}
+      POSTGRES_USER: ${POSTGRES_USER:-alfa_usuario}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cambiar_esta_contrasena}
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - datos_postgres:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tekio_usuario} -d ${POSTGRES_DB:-tekio_admin}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-alfa_usuario} -d ${POSTGRES_DB:-alfa_admin}"]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
-      - red_tekio
+      - red_alfa
 
   # Los servicios de aplicación se habilitarán al crear sus respectivos Dockerfile:
   # - frontend (/frontend)
@@ -32,5 +32,5 @@ volumes:
   datos_postgres:
 
 networks:
-  red_tekio:
+  red_alfa:
     driver: bridge

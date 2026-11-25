@@ -1,6 +1,11 @@
 @import "tailwindcss";
 
 :root {
+  --brand-primary: #003566;
+  --brand-secondary: #001d3d;
+  --brand-surface: #edf3fa;
+  --brand-ink: #000814;
+  --brand-bg: #f7f9fc;
   --alfa-azul: #003566;
   --alfa-azul-hover: #001d3d;
   --alfa-azul-suave: #edf3fa;
@@ -10,6 +15,9 @@
 }
 
 @theme inline {
+  --color-brand-primary: #003566;
+  --color-brand-secondary: #001d3d;
+  --color-brand-surface: #edf3fa;
   --color-alfa-azul: #003566;
   --color-alfa-azul-hover: #001d3d;
   --color-alfa-azul-suave: #edf3fa;

@@ -289,7 +289,7 @@ export default function PaginaCasosTaller() {
         <button
           type="button"
           onClick={() => setModalCrear(true)}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#003566] hover:bg-[#C9461A] text-white text-sm font-bold cursor-pointer"
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#003566] hover:bg-[#001D3D] text-white text-sm font-bold cursor-pointer"
         >
           <Plus className="w-4 h-4" />
           Nuevo caso GT / ST
@@ -369,7 +369,7 @@ export default function PaginaCasosTaller() {
                     <span className="font-mono font-black text-slate-900">
                       {c.numero_caso}
                     </span>
-                    <span className="px-2 py-0.5 rounded-md bg-orange-100 text-[#C9461A] text-xs font-bold">
+                    <span className="px-2 py-0.5 rounded-md bg-orange-100 text-[#001D3D] text-xs font-bold">
                       {c.estado}
                     </span>
                     <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-xs font-bold">

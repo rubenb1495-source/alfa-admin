@@ -1,4 +1,4 @@
-# SPEC: Fase 3 - Taller, Preparaciones por Serial, Hospital/Repuestos y Casos GT/ST - Tekio Electronics
+# SPEC: Fase 3 - Taller, Preparaciones por Serial, Hospital/Repuestos y Casos GT/ST - Alfa Electronics
 
 ## 1. Objetivo del Módulo
 - **Qué resuelve:** Flujo completo del taller técnico: preparación de equipos por serial (actualizando estado y `costo_taller_usd` sin exponer costos al técnico), conexión automática `HOSPITAL` → `Repuestos por comprar` → alerta *"Repuestos que llegaron"*, gestión de casos `GT`/`ST` con aprobación obligatoria de presupuesto y resumen mensual del técnico.

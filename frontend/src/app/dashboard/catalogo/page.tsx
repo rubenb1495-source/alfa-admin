@@ -255,7 +255,7 @@ export default function PaginaCatalogo() {
               setErrorModal(null);
               setModalCrear(true);
             }}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#003566] hover:bg-[#C9461A] text-white text-sm font-bold cursor-pointer"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#003566] hover:bg-[#001D3D] text-white text-sm font-bold cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             Nuevo artículo
@@ -371,7 +371,7 @@ export default function PaginaCatalogo() {
                     <td className="px-4 py-3 text-right font-bold text-emerald-700">
                       {formatearUsd(art.precio_promo_usd)}
                     </td>
-                    <td className="px-4 py-3 text-right font-bold text-[#C9461A]">
+                    <td className="px-4 py-3 text-right font-bold text-[#001D3D]">
                       {formatearUsd(art.precio_regular_usd)}
                     </td>
                     <td className="px-4 py-3 text-right font-semibold text-slate-700">
@@ -431,7 +431,7 @@ export default function PaginaCatalogo() {
                 {sku.trim() && (
                   <p className="text-[11px] text-slate-500 mt-1">
                     Se guardará como:{" "}
-                    <strong className="font-mono text-[#C9461A]">
+                    <strong className="font-mono text-[#001D3D]">
                       {normalizarSkuCliente(sku)}
                     </strong>
                   </p>
@@ -540,7 +540,7 @@ export default function PaginaCatalogo() {
                 <button
                   type="submit"
                   disabled={guardando}
-                  className="px-4 py-2 rounded-xl bg-[#003566] hover:bg-[#C9461A] text-white text-sm font-bold disabled:opacity-60 cursor-pointer"
+                  className="px-4 py-2 rounded-xl bg-[#003566] hover:bg-[#001D3D] text-white text-sm font-bold disabled:opacity-60 cursor-pointer"
                 >
                   {guardando ? "Guardando..." : "Crear artículo"}
                 </button>
@@ -648,7 +648,7 @@ export default function PaginaCatalogo() {
                   <button
                     type="submit"
                     disabled={guardando}
-                    className="px-4 py-2 rounded-xl bg-[#003566] hover:bg-[#C9461A] text-white text-xs font-bold disabled:opacity-60 cursor-pointer"
+                    className="px-4 py-2 rounded-xl bg-[#003566] hover:bg-[#001D3D] text-white text-xs font-bold disabled:opacity-60 cursor-pointer"
                   >
                     {guardando ? "Registrando..." : "Guardar nuevo precio"}
                   </button>

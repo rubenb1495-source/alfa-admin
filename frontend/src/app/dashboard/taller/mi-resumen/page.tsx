@@ -128,7 +128,7 @@ export default function PaginaMiResumenTecnico() {
                 {formatearUsd(resumen.comision_asesor_usd)}
               </p>
             </div>
-            <div className="bg-gradient-to-br from-[#003566] to-[#C9461A] p-5 rounded-2xl text-white">
+            <div className="bg-gradient-to-br from-[#003566] to-[#001D3D] p-5 rounded-2xl text-white">
               <p className="text-xs font-bold uppercase text-orange-100">
                 Total del mes
               </p>

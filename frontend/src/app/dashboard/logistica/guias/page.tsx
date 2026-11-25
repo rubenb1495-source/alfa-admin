@@ -138,7 +138,7 @@ export default function PaginaGuias() {
         <button
           type="button"
           onClick={() => setModalCrear(true)}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#003566] hover:bg-[#C9461A] text-white text-sm font-bold cursor-pointer"
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#003566] hover:bg-[#001D3D] text-white text-sm font-bold cursor-pointer"
         >
           <Plus className="w-4 h-4" />
           Nueva guía
@@ -212,7 +212,7 @@ export default function PaginaGuias() {
                     <td className="px-4 py-3 text-xs">
                       {g.compras.map((c) => c.numero_compra).join(", ")}
                     </td>
-                    <td className="px-4 py-3 text-right font-bold text-[#C9461A]">
+                    <td className="px-4 py-3 text-right font-bold text-[#001D3D]">
                       {formatearUsd(g.costo_total_guia_usd)}
                     </td>
                     <td className="px-4 py-3">
@@ -359,7 +359,7 @@ export default function PaginaGuias() {
                 <button
                   type="submit"
                   disabled={guardando}
-                  className="px-4 py-2 rounded-xl bg-[#003566] hover:bg-[#C9461A] text-white text-sm font-bold disabled:opacity-60 cursor-pointer"
+                  className="px-4 py-2 rounded-xl bg-[#003566] hover:bg-[#001D3D] text-white text-sm font-bold disabled:opacity-60 cursor-pointer"
                 >
                   {guardando ? "Guardando..." : "Crear guía"}
                 </button>

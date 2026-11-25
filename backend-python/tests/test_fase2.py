@@ -75,9 +75,9 @@ def crear_usuario_rol(
 
 
 def test_prorrateo_flete_y_doble_verificacion_en_guia(cliente: TestClient) -> None:
-    cab_dir, dir_user = login(cliente, "direccion@tekioelectronics.com", "Tekio2026!")
+    cab_dir, dir_user = login(cliente, "direccion@alfaelectronics.com", "Alfa2026!")
     cab_log, log_user = crear_usuario_rol(
-        cliente, cab_dir, "Luis Logística", "logistica@tekioelectronics.com", "LOGISTICA", 1
+        cliente, cab_dir, "Luis Logística", "logistica@alfaelectronics.com", "LOGISTICA", 1
     )
 
     # 1. Crear compra de importación con 2 equipos de $100 y $300
@@ -154,7 +154,7 @@ def test_prorrateo_flete_y_doble_verificacion_en_guia(cliente: TestClient) -> No
 
 
 def test_validar_archivo_excel_bloquea_serial_duplicado(cliente: TestClient) -> None:
-    cab_dir, _ = login(cliente, "direccion@tekioelectronics.com", "Tekio2026!")
+    cab_dir, _ = login(cliente, "direccion@alfaelectronics.com", "Alfa2026!")
 
     # Crear equipo previo en inventario
     cliente.post(
@@ -201,12 +201,12 @@ def test_validar_archivo_excel_bloquea_serial_duplicado(cliente: TestClient) -> 
 
 
 def test_traslado_en_dos_pasos_bloqueo_y_confirmacion(cliente: TestClient) -> None:
-    cab_dir, _ = login(cliente, "direccion@tekioelectronics.com", "Tekio2026!")
+    cab_dir, _ = login(cliente, "direccion@alfaelectronics.com", "Alfa2026!")
 
-    # Obtener IDs de Bodega y Tekio central
+    # Obtener IDs de Bodega y Alfa central
     sucs = {s["nombre"]: s["id"] for s in cliente.get("/api/sucursales", headers=cab_dir).json()}
     bodega_id = sucs["Bodega"]
-    central_id = sucs["Tekio central"]
+    central_id = sucs["Alfa central"]
 
     # Crear equipo LISTO en Bodega
     cliente.post(
@@ -231,7 +231,7 @@ def test_traslado_en_dos_pasos_bloqueo_y_confirmacion(cliente: TestClient) -> No
     assert eq["ubicacion_id"] == bodega_id
     assert eq["estado"] == "LISTO"
 
-    # Paso 1: Crear traslado de Bodega -> Tekio central
+    # Paso 1: Crear traslado de Bodega -> Alfa central
     resp_trs = cliente.post(
         "/api/logistica/traslados",
         headers=cab_dir,
@@ -245,7 +245,7 @@ def test_traslado_en_dos_pasos_bloqueo_y_confirmacion(cliente: TestClient) -> No
     assert resp_trs.status_code == 201, resp_trs.text
     trs_id = resp_trs.json()["id"]
 
-    # Verificar que mientras está EN_TRANSITO sigue sin aparecer en Tekio central y estado = EN_TRANSITO
+    # Verificar que mientras está EN_TRANSITO sigue sin aparecer en Alfa central y estado = EN_TRANSITO
     eq_transito = cliente.get("/api/logistica/inventario/equipos?busqueda=TRS-EQ-1", headers=cab_dir).json()[0]
     assert eq_transito["estado"] == "EN_TRANSITO"
     assert eq_transito["ubicacion_id"] == bodega_id
@@ -264,15 +264,15 @@ def test_traslado_en_dos_pasos_bloqueo_y_confirmacion(cliente: TestClient) -> No
 
 
 def test_ajuste_pendiente_solo_aprobable_por_direccion_y_rbac_oculta_costos(cliente: TestClient) -> None:
-    cab_dir, _ = login(cliente, "direccion@tekioelectronics.com", "Tekio2026!")
+    cab_dir, _ = login(cliente, "direccion@alfaelectronics.com", "Alfa2026!")
     cab_log, _ = crear_usuario_rol(
-        cliente, cab_dir, "Logística", "log2@tekioelectronics.com", "LOGISTICA", 1
+        cliente, cab_dir, "Logística", "log2@alfaelectronics.com", "LOGISTICA", 1
     )
     cab_asesora, _ = crear_usuario_rol(
-        cliente, cab_dir, "Asesora", "asesora2@tekioelectronics.com", "ASESORA", 2
+        cliente, cab_dir, "Asesora", "asesora2@alfaelectronics.com", "ASESORA", 2
     )
     cab_tecnico, _ = crear_usuario_rol(
-        cliente, cab_dir, "Técnico", "tecnico2@tekioelectronics.com", "TECNICO", 1
+        cliente, cab_dir, "Técnico", "tecnico2@alfaelectronics.com", "TECNICO", 1
     )
 
     sucs = {s["nombre"]: s["id"] for s in cliente.get("/api/sucursales", headers=cab_dir).json()}

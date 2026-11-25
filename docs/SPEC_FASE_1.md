@@ -1,9 +1,9 @@
-# SPEC: Fase 1 - Seguridad (RBAC), Tasas Diarias y Catálogo Normalizado - Tekio Electronics
+# SPEC: Fase 1 - Seguridad (RBAC), Tasas Diarias y Catálogo Normalizado - Alfa Electronics
 
 ## 1. Objetivo del Módulo
 - **Qué resuelve:** Establece la base centralizada del sistema: control de acceso por roles (para ocultar costos a asesoras y técnicos), gestión inmutable de tasas diarias (BCV, USDT y recargo) y catálogo maestro con SKUs normalizados e historial de precios.
-- **Tipo de tarea:** Refactorización con mejoras (reemplaza el archivo `TEKIO · Configuración` en Google Sheets).
-- **Código legacy de referencia:** `../tekio-erp` (revisado en `CONTEXT.md`; el proyecto nuevo en `tekio-admin` parte limpio).
+- **Tipo de tarea:** Refactorización con mejoras (reemplaza el archivo `ALFA · Configuración` en Google Sheets).
+- **Código legacy de referencia:** `../alfa-erp` (revisado en `CONTEXT.md`; el proyecto nuevo en `alfa-admin` parte limpio).
 
 ## 2. Arquitectura y Alcance
 - **Backend asignado:** **Python / FastAPI** (con Pydantic para validación estricta y tipado), centralizando en esta Fase 1 `auth`, `usuarios`, `sucursales`, `tasas` y `catalogo` en `/backend-python`.
@@ -48,7 +48,7 @@
 ## 4. Reglas de Negocio Clave
 - **Roles válidos (RBAC):** `DIRECCION`, `ADMINISTRACION`, `LOGISTICA`, `LIDER`, `ASESORA`, `TECNICO`.
 - **Protección de costos en Backend:** El campo `costo_referencia_usd` (y cualquier costo futuro) debe **filtrarse en el esquema de respuesta del backend** según el rol del JWT; nunca confiar solo en ocultarlo en el frontend.
-- **Sucursales precargadas (Seed):** `Bodega`, `Tekio central`, `Gran Bazar` (`ACTIVA`); `INFOT` (cierre `2026-11-08`) y `Free Market C13` (cierre `2026-11-16`) en estado `CERRADA`.
+- **Sucursales precargadas (Seed):** `Bodega`, `Alfa central`, `Gran Bazar` (`ACTIVA`); `INFOT` (cierre `2026-11-08`) y `Free Market C13` (cierre `2026-11-16`) en estado `CERRADA`.
 - **Inmutabilidad de tasas:** Nunca permitir modificar ni eliminar tasas de fechas pasadas. Si no existe registro para la fecha actual, `GET /api/tasas/hoy` debe devolver `permite_bolivares: false` y una alerta visible. Si no se carga `% recargo`, heredar automáticamente el del último día registrado.
 - **Normalización estricta de SKU:** Al crear o buscar un SKU, transformar automáticamente con `trim()`, convertir a **MAYÚSCULAS** y reemplazar espacios internos por guiones (`-`). Rechazar con `409 Conflict` cualquier SKU duplicado.
 - **Inmutabilidad de precios:** Para cambiar un precio nunca se sobrescribe el registro anterior; se inserta una nueva fila en `catalogo_precios` con `fecha_vigencia`. El precio vigente es el más reciente cuya `fecha_vigencia <= hoy`.
@@ -62,7 +62,7 @@
 - **Estados obligatorios:** *Skeleton* de carga, estado vacío con acción rápida, alertas de error de red y validación de formularios en español.
 
 ## 6. Criterios de Aceptación (Definición de Terminado)
-- [ ] Seed inicial creado con las 5 sucursales reales de Tekio y un usuario `DIRECCION` de prueba.
+- [ ] Seed inicial creado con las 5 sucursales reales de Alfa y un usuario `DIRECCION` de prueba.
 - [ ] Un usuario con rol `ASESORA` o `TECNICO` no recibe ningún campo de costo en el JSON de `/api/catalogo` ni puede acceder a `/dashboard/usuarios`.
 - [ ] Intentar crear un SKU duplicado (ej. `bat-33ydh` cuando existe `BAT-33YDH`) devuelve error `409` en español.
 - [ ] Intentar modificar una tasa de ayer o anterior devuelve error `403` o `400`.

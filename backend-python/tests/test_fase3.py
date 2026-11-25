@@ -72,9 +72,9 @@ def crear_usuario_rol(
 
 
 def test_preparacion_listo_descuenta_ram_actualiza_costo_y_oculta_al_tecnico(cliente: TestClient) -> None:
-    cab_dir, _ = login(cliente, "direccion@tekioelectronics.com", "Tekio2026!")
+    cab_dir, _ = login(cliente, "direccion@alfaelectronics.com", "Alfa2026!")
     cab_tec, _ = crear_usuario_rol(
-        cliente, cab_dir, "Cristihan Técnico", "cristihan@tekioelectronics.com", "TECNICO"
+        cliente, cab_dir, "Cristihan Técnico", "cristihan@alfaelectronics.com", "TECNICO"
     )
 
     sucs = {s["nombre"]: s["id"] for s in cliente.get("/api/sucursales", headers=cab_dir).json()}
@@ -159,12 +159,12 @@ def test_preparacion_listo_descuenta_ram_actualiza_costo_y_oculta_al_tecnico(cli
 
 
 def test_hospital_crea_repuesto_y_logistica_activa_alerta_en_cola(cliente: TestClient) -> None:
-    cab_dir, _ = login(cliente, "direccion@tekioelectronics.com", "Tekio2026!")
+    cab_dir, _ = login(cliente, "direccion@alfaelectronics.com", "Alfa2026!")
     cab_tec, _ = crear_usuario_rol(
-        cliente, cab_dir, "Técnico Hospital", "tec_hosp@tekioelectronics.com", "TECNICO"
+        cliente, cab_dir, "Técnico Hospital", "tec_hosp@alfaelectronics.com", "TECNICO"
     )
     cab_log, _ = crear_usuario_rol(
-        cliente, cab_dir, "Logística Repuestos", "log_rep@tekioelectronics.com", "LOGISTICA"
+        cliente, cab_dir, "Logística Repuestos", "log_rep@alfaelectronics.com", "LOGISTICA"
     )
 
     sucs = {s["nombre"]: s["id"] for s in cliente.get("/api/sucursales", headers=cab_dir).json()}
@@ -223,9 +223,9 @@ def test_hospital_crea_repuesto_y_logistica_activa_alerta_en_cola(cliente: TestC
 
 
 def test_caso_st_bloquea_terminado_sin_presupuesto_y_calcula_resumen_tecnico(cliente: TestClient) -> None:
-    cab_dir, _ = login(cliente, "direccion@tekioelectronics.com", "Tekio2026!")
+    cab_dir, _ = login(cliente, "direccion@alfaelectronics.com", "Alfa2026!")
     cab_tec, tec_user = crear_usuario_rol(
-        cliente, cab_dir, "Técnico ST", "tec_st@tekioelectronics.com", "TECNICO"
+        cliente, cab_dir, "Técnico ST", "tec_st@alfaelectronics.com", "TECNICO"
     )
     sucs = {s["nombre"]: s["id"] for s in cliente.get("/api/sucursales", headers=cab_dir).json()}
     bodega_id = sucs["Bodega"]
@@ -281,7 +281,7 @@ def test_caso_st_bloquea_terminado_sin_presupuesto_y_calcula_resumen_tecnico(cli
         headers=cab_tec,
         json={
             "tipo": "SERVICIO",
-            "sucursal_id": sucs["Tekio central"],
+            "sucursal_id": sucs["Alfa central"],
             "descripcion_equipo": "Laptop ASUS VivoBook",
             "falla_reportada": "No enciende el sistema operativo",
         },
