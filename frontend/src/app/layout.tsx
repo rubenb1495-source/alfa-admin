@@ -15,6 +15,11 @@ export const metadata: Metadata = {
   title: "Sistema Administrativo · Alfa Digital Store",
   description:
     "Sistema administrativo centralizado de Alfa Importaciones, C.A. (Alfa Digital Store).",
+  icons: {
+    icon: [{ url: "/alfa-favicon.png?v=alfa1", type: "image/png" }],
+    shortcut: "/alfa-favicon.png?v=alfa1",
+    apple: "/alfa-favicon.png?v=alfa1",
+  },
 };
 
 export default function DisenoRaiz({
