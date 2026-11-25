@@ -59,7 +59,7 @@ from app.modelos_logistica import (
 )
 from app.rutas.logistica import calcular_stock_componente, generar_correlativo
 from app.rutas.tasas import obtener_fecha_hoy
-from app.seguridad import obtener_usuario_actual, puede_ver_costos, requerir_admin
+from app.seguridad import obtener_usuario_actual, puede_ver_costos, requerir_admin, requerir_escritura_operativa
 from app.servicios.pdf_nota import generar_pdf_nota_entrega
 
 
@@ -678,7 +678,7 @@ def listar_ventas(
 @enrutador.post("/ventas", status_code=status.HTTP_201_CREATED)
 def crear_venta(
     datos: VentaCrearEntrada,
-    usuario_actual: Usuario = Depends(obtener_usuario_actual),
+    usuario_actual: Usuario = Depends(requerir_escritura_operativa),
     bd: Session = Depends(obtener_bd),
 ) -> dict[str, Any]:
     fecha_op = datos.fecha or obtener_fecha_hoy()

@@ -1,12 +1,19 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session, joinedload
 
 from app.base_datos import obtener_bd
 from app.esquemas import LoginEntrada, LoginSalida, UsuarioSalida
 from app.modelos import Usuario
-from app.seguridad import crear_token_acceso, obtener_permisos_rol, obtener_usuario_actual, verificar_clave
+from app.seguridad import (
+    crear_token_acceso,
+    generar_hash_clave,
+    obtener_permisos_rol,
+    obtener_usuario_actual,
+    verificar_clave,
+)
 
 
 enrutador = APIRouter(prefix="/api/auth", tags=["Autenticación"])
@@ -57,3 +64,25 @@ def iniciar_sesion(datos: LoginEntrada, bd: Session = Depends(obtener_bd)) -> Lo
 @enrutador.get("/me", response_model=UsuarioSalida)
 def obtener_perfil(usuario_actual: Usuario = Depends(obtener_usuario_actual)) -> UsuarioSalida:
     return _serializar_usuario_con_permisos(usuario_actual)
+
+
+class CambiarClaveEntrada(BaseModel):
+    clave_actual: str = Field(min_length=4, max_length=128)
+    nueva_clave: str = Field(min_length=6, max_length=128)
+
+
+@enrutador.post("/cambiar-clave")
+def cambiar_mi_clave(
+    datos: CambiarClaveEntrada,
+    usuario_actual: Usuario = Depends(obtener_usuario_actual),
+    bd: Session = Depends(obtener_bd),
+) -> dict[str, str]:
+    if not usuario_actual.clave_hash or not verificar_clave(datos.clave_actual, usuario_actual.clave_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La contraseña actual es incorrecta.",
+        )
+    usuario_actual.clave_hash = generar_hash_clave(datos.nueva_clave)
+    usuario_actual.debe_cambiar_clave = False
+    bd.commit()
+    return {"mensaje": "Contraseña actualizada correctamente."}

@@ -1,6 +1,7 @@
 export type RolUsuario =
   | "DIRECCION"
   | "ADMINISTRACION"
+  | "DIRECTOR"
   | "LOGISTICA"
   | "LIDER"
   | "ENCARGADO_TIENDA"
@@ -33,6 +34,7 @@ export interface Usuario {
   telefono?: string;
   cedula?: string;
   tiene_acceso?: boolean;
+  debe_cambiar_clave?: boolean;
   activo: boolean;
   motivo_estado: string | null;
   creado_en: string;

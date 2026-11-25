@@ -70,7 +70,7 @@ def listar_instrumentos(
         .order_by(InstrumentoFinanciero.id.asc())
         .all()
     )
-    incluir_saldos = es_administrador(usuario_actual.rol)
+    incluir_saldos = es_administrador(usuario_actual.rol) or usuario_actual.rol == RolUsuario.DIRECTOR.value
     neto_por_inst: dict[int, Decimal] = {}
     if incluir_saldos:
         pagos_activos = bd.query(Pago).filter(Pago.anulado.is_(False)).all()

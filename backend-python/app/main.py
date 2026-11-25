@@ -13,7 +13,7 @@ from app import modelos_finanzas as _modelos_finanzas  # noqa: F401
 from app import modelos_logistica as _modelos_logistica  # noqa: F401
 from app import modelos_operaciones as _modelos_operaciones  # noqa: F401
 from app import modelos_taller as _modelos_taller  # noqa: F401
-from app.rutas import autenticacion, catalogo, cierre_diario, finanzas, logistica, logistica_avanzada, operaciones, taller, tasas, usuarios, ventas
+from app.rutas import autenticacion, catalogo, cierre_diario, direccion, finanzas, logistica, logistica_avanzada, operaciones, taller, tasas, tesoreria, usuarios, ventas
 from app.semilla import ejecutar_semilla
 from app.semilla_finanzas import ejecutar_semilla_finanzas
 
@@ -105,6 +105,7 @@ def asegurar_columnas_compatibles() -> None:
             ("telefono", "VARCHAR(40) NOT NULL DEFAULT ''"),
             ("cedula", "VARCHAR(40) NOT NULL DEFAULT ''"),
             ("tiene_acceso", "BOOLEAN NOT NULL DEFAULT TRUE"),
+            ("debe_cambiar_clave", "BOOLEAN NOT NULL DEFAULT FALSE"),
         ]
         for nombre_col, ddl_col in nuevas_usuarios:
             if nombre_col not in columnas_usr:
@@ -215,5 +216,7 @@ app.include_router(taller.enrutador)
 app.include_router(ventas.enrutador)
 app.include_router(finanzas.enrutador)
 app.include_router(finanzas.enrutador_comisiones)
+app.include_router(tesoreria.enrutador)
+app.include_router(direccion.enrutador)
 app.include_router(cierre_diario.enrutador)
 app.include_router(operaciones.enrutador)

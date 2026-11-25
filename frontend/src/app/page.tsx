@@ -11,7 +11,9 @@ export default function PaginaInicio() {
   useEffect(() => {
     if (cargandoSesion) return;
     if (usuario) {
-      router.replace("/dashboard/tasas");
+      router.replace(
+        usuario.rol === "DIRECTOR" ? "/dashboard/direccion" : "/dashboard/tasas"
+      );
     } else {
       router.replace("/login");
     }

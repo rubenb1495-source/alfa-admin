@@ -47,6 +47,7 @@ class UsuarioSalida(BaseModel):
     telefono: str = ""
     cedula: str = ""
     tiene_acceso: bool = True
+    debe_cambiar_clave: bool = False
     activo: bool
     motivo_estado: str | None = None
     creado_en: datetime

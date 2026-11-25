@@ -29,11 +29,14 @@ import {
   ShoppingBag,
   ShoppingCart,
   SlidersHorizontal,
+  TrendingUp,
   Truck,
   Users,
+  Wallet,
   Wrench,
   X,
 } from "lucide-react";
+import BotonInstalarPWA from "@/components/BotonInstalarPWA";
 import LogoAlfa from "@/components/LogoAlfa";
 import ModalAperturaDiaria from "@/components/ModalAperturaDiaria";
 import { usarSesion } from "@/contexto/SesionContexto";
@@ -86,12 +89,23 @@ export default function DisenoDashboard({
   useEffect(() => {
     if (cargandoSesion || !usuario) return;
     const esAdm = esRolAdministrativo(usuario.rol);
+    const esDir = usuario.rol === "DIRECTOR";
     const rutaRestringidaAdmin =
-      rutaActual.startsWith("/dashboard/finanzas") ||
-      rutaActual.startsWith("/dashboard/usuarios");
+      (rutaActual.startsWith("/dashboard/finanzas") &&
+        !(esDir && rutaActual.startsWith("/dashboard/finanzas/tesoreria"))) ||
+      rutaActual.startsWith("/dashboard/usuarios") ||
+      (rutaActual.startsWith("/dashboard/direccion") && !esDir);
     if (rutaRestringidaAdmin && !esAdm) {
       setAvisoPermiso("No tienes permisos para acceder a esta sección.");
-      router.replace("/dashboard/ventas/nueva");
+      router.replace(esDir ? "/dashboard/direccion" : "/dashboard/ventas/nueva");
+    }
+    if (
+      esDir &&
+      (rutaActual.startsWith("/dashboard/ventas/nueva") ||
+        rutaActual.startsWith("/dashboard/cierre-diario") ||
+        rutaActual.startsWith("/dashboard/logistica/compras"))
+    ) {
+      router.replace("/dashboard/direccion");
     }
   }, [rutaActual, usuario, cargandoSesion, router]);
 
@@ -109,6 +123,7 @@ export default function DisenoDashboard({
   }
 
   const esAdmin = esRolAdministrativo(usuario.rol);
+  const esDirector = usuario.rol === "DIRECTOR";
   const esLogistica = puedeGestionarCatalogo(usuario.rol);
   const esTallerOAdmin =
     esLogistica ||
@@ -117,13 +132,24 @@ export default function DisenoDashboard({
 
   const grupos: GrupoNav[] = [
     {
+      titulo: "Dirección",
+      enlaces: [
+        {
+          href: "/dashboard/direccion",
+          etiqueta: "Panel Ejecutivo",
+          icono: <TrendingUp className="w-4 h-4 shrink-0" />,
+          visible: esAdmin || esDirector,
+        },
+      ],
+    },
+    {
       titulo: "Operaciones",
       enlaces: [
         {
           href: "/dashboard/ventas/nueva",
           etiqueta: "POS · Nueva Venta",
           icono: <ShoppingCart className="w-4 h-4 shrink-0" />,
-          visible: true,
+          visible: !esDirector,
         },
         {
           href: "/dashboard/ventas",
@@ -135,19 +161,19 @@ export default function DisenoDashboard({
           href: "/dashboard/cotizaciones",
           etiqueta: "Cotizaciones",
           icono: <ClipboardList className="w-4 h-4 shrink-0" />,
-          visible: true,
+          visible: !esDirector,
         },
         {
           href: "/dashboard/ventas/devoluciones",
           etiqueta: "Devoluciones y Garantías",
           icono: <RotateCcw className="w-4 h-4 shrink-0" />,
-          visible: true,
+          visible: !esDirector,
         },
         {
           href: "/dashboard/tasas",
           etiqueta: "Tasas Diarias",
           icono: <ArrowLeftRight className="w-4 h-4 shrink-0" />,
-          visible: true,
+          visible: !esDirector,
         },
         {
           href: "/dashboard/cierre-diario",
@@ -233,6 +259,12 @@ export default function DisenoDashboard({
     {
       titulo: "Finanzas",
       enlaces: [
+        {
+          href: "/dashboard/finanzas/tesoreria",
+          etiqueta: "Tesorería y Cambios",
+          icono: <Wallet className="w-4 h-4 shrink-0" />,
+          visible: esAdmin || esDirector,
+        },
         {
           href: "/dashboard/finanzas/pagos",
           etiqueta: "Pagos y CxC",
@@ -531,8 +563,9 @@ export default function DisenoDashboard({
               </button>
             </div>
 
-            {/* Derecha: Sucursal activa + Perfil de usuario */}
+            {/* Derecha: Instalar PWA + Sucursal activa + Perfil de usuario */}
             <div className="flex items-center gap-2 text-xs">
+              <BotonInstalarPWA compacto />
               {usuario.sucursal && (
                 <span className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/80 border border-gray-200/80 text-[#000814] font-semibold">
                   <Building2 className="w-3.5 h-3.5 text-[#003566]" />
@@ -573,7 +606,7 @@ export default function DisenoDashboard({
       </div>
 
       {/* Modal obligatorio de apertura diaria (bloqueante si recargo_confirmado === false) o edición manual */}
-      {tasaHoy && (!tasaHoy.recargo_confirmado || modalTasasAbierto) && (
+      {!esDirector && tasaHoy && (!tasaHoy.recargo_confirmado || modalTasasAbierto) && (
         <ModalAperturaDiaria
           tasaHoy={tasaHoy}
           bloqueante={!tasaHoy.recargo_confirmado}

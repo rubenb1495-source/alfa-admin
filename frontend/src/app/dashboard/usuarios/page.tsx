@@ -4,16 +4,21 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
   Building2,
+  Check,
+  Copy,
   Globe,
   KeyRound,
   Lock,
+  MessageCircle,
   Pencil,
   Phone,
   Plus,
+  Share2,
   ShieldAlert,
   UserCheck,
   UserX,
   Users,
+  X,
 } from "lucide-react";
 import BuscadorTabla from "@/componentes/BuscadorTabla";
 import { usarSesion } from "@/contexto/SesionContexto";
@@ -26,6 +31,7 @@ import type {
 } from "@/tipos/dominio";
 
 const ROLES_DISPONIBLES: RolUsuario[] = [
+  "DIRECTOR",
   "ASESORA",
   "ENCARGADO_TIENDA",
   "TECNICO",
@@ -36,8 +42,9 @@ const ROLES_DISPONIBLES: RolUsuario[] = [
 ];
 
 const ETIQUETAS_ROL: Record<string, string> = {
-  DIRECCION: "Dirección",
-  ADMINISTRACION: "Administración",
+  DIRECCION: "Dirección (Admin Total)",
+  ADMINISTRACION: "Administración (Admin Total)",
+  DIRECTOR: "Director (Solo Lectura Ejecutiva)",
   LOGISTICA: "Logística",
   ENCARGADO_TIENDA: "Encargado de Tienda (5% Pasillo / 8% Lead)",
   LIDER: "Encargado de Tienda (5% Pasillo / 8% Lead)",
@@ -49,6 +56,7 @@ const ETIQUETAS_ROL: Record<string, string> = {
 const ETIQUETA_CORTA_ROL: Record<string, string> = {
   DIRECCION: "Dirección",
   ADMINISTRACION: "Administración",
+  DIRECTOR: "Director (Solo Lectura)",
   LOGISTICA: "Logística",
   ENCARGADO_TIENDA: "Encargado (5%/8%)",
   LIDER: "Encargado (5%/8%)",
@@ -63,6 +71,66 @@ export default function PaginaPersonalYUsuarios() {
   const [sucursales, setSucursales] = useState<Sucursal[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Modal compartir acceso / restablecer clave
+  const [credencialesCompartir, setCredencialesCompartir] = useState<{
+    nombre: string;
+    correo: string;
+    rol: string;
+    telefono: string;
+    clave_temporal: string;
+    url_app: string;
+  } | null>(null);
+  const [copiadoCreds, setCopiadoCreds] = useState(false);
+  const [restableciendoId, setRestableciendoId] = useState<number | null>(null);
+
+  const manejarCompartirAcceso = async (u: Usuario) => {
+    setRestableciendoId(u.id);
+    setError(null);
+    try {
+      const resp = await solicitarApi<{
+        nombre: string;
+        correo: string;
+        rol: string;
+        telefono: string;
+        clave_temporal: string;
+        url_app: string;
+      }>(`/api/usuarios/${u.id}/restablecer-clave`, {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+      setCredencialesCompartir(resp);
+      setCopiadoCreds(false);
+    } catch (err) {
+      setError(
+        err instanceof ErrorApi
+          ? err.message
+          : "No se pudo generar la clave temporal."
+      );
+    } finally {
+      setRestableciendoId(null);
+    }
+  };
+
+  const construirMensajeAcceso = (c: {
+    nombre: string;
+    correo: string;
+    rol: string;
+    clave_temporal: string;
+    url_app: string;
+  }) => {
+    return [
+      `Hola ${c.nombre}, aquí tienes tu acceso a *Alfa Admin*:`,
+      ``,
+      `🔗 *Enlace:* ${c.url_app}`,
+      `📧 *Correo:* ${c.correo}`,
+      `🔑 *Clave temporal:* ${c.clave_temporal}`,
+      `🛡️ *Rol asignado:* ${ETIQUETA_CORTA_ROL[c.rol] || c.rol}`,
+      ``,
+      `ℹ️ Tus permisos en la plataforma dependen de tu rol asignado.`,
+      `📲 *Instalar como App:* Al abrir el enlace, pulsa "Instalar App" (en Windows/Mac/Android) o Compartir → "Agregar a pantalla de inicio" (en iPhone Safari).`,
+    ].join("\n");
+  };
 
   const [filtroRol, setFiltroRol] = useState<string>("");
   const [filtroAcceso, setFiltroAcceso] = useState<string>("");
@@ -464,6 +532,18 @@ export default function PaginaPersonalYUsuarios() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right space-x-1.5 whitespace-nowrap">
+                        {conAcceso && u.correo && (
+                          <button
+                            type="button"
+                            disabled={restableciendoId === u.id}
+                            onClick={() => void manejarCompartirAcceso(u)}
+                            title="Generar clave temporal y compartir por WhatsApp"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold cursor-pointer disabled:opacity-50"
+                          >
+                            <Share2 className="w-3.5 h-3.5" />
+                            {restableciendoId === u.id ? "..." : "Compartir acceso"}
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={() => abrirModalEditar(u)}
@@ -793,6 +873,93 @@ export default function PaginaPersonalYUsuarios() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Compartir Acceso / Credenciales */}
+      {credencialesCompartir && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl border border-slate-200">
+            <div className="flex items-center justify-between bg-[#003566] px-5 py-3.5 text-white">
+              <div className="flex items-center gap-2">
+                <KeyRound className="h-4 w-4 text-sky-300" />
+                <h3 className="text-sm font-bold">
+                  Acceso listo para compartir
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCredencialesCompartir(null)}
+                className="rounded-lg p-1 hover:bg-white/10"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4 text-xs">
+              <div className="rounded-xl bg-slate-50 border border-slate-200 p-3.5 space-y-1.5">
+                <p>
+                  <span className="text-slate-500">Usuario:</span>{" "}
+                  <strong className="text-[#001D3D]">{credencialesCompartir.nombre}</strong>
+                </p>
+                <p>
+                  <span className="text-slate-500">Enlace:</span>{" "}
+                  <strong className="text-[#003566]">{credencialesCompartir.url_app}</strong>
+                </p>
+                <p>
+                  <span className="text-slate-500">Correo:</span>{" "}
+                  <strong className="font-mono">{credencialesCompartir.correo}</strong>
+                </p>
+                <p>
+                  <span className="text-slate-500">Clave temporal:</span>{" "}
+                  <strong className="font-mono text-sm text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
+                    {credencialesCompartir.clave_temporal}
+                  </strong>
+                </p>
+                <p>
+                  <span className="text-slate-500">Rol:</span>{" "}
+                  <strong>
+                    {ETIQUETA_CORTA_ROL[credencialesCompartir.rol] ||
+                      credencialesCompartir.rol}
+                  </strong>
+                </p>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    void navigator.clipboard.writeText(
+                      construirMensajeAcceso(credencialesCompartir)
+                    );
+                    setCopiadoCreds(true);
+                  }}
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer"
+                >
+                  {copiadoCreds ? (
+                    <>
+                      <Check className="h-4 w-4 text-emerald-600" />
+                      Copiado
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-4 w-4" />
+                      Copiar credenciales
+                    </>
+                  )}
+                </button>
+                <a
+                  href={`https://wa.me/${(credencialesCompartir.telefono || "").replace(/\D/g, "")}?text=${encodeURIComponent(
+                    construirMensajeAcceso(credencialesCompartir)
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-emerald-700"
+                >
+                  <MessageCircle className="h-4 w-4" />
+                  Enviar por WhatsApp
+                </a>
+              </div>
+            </div>
           </div>
         </div>
       )}

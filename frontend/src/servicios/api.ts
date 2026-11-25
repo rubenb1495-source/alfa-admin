@@ -64,6 +64,7 @@ export function puedeVerCostos(rol: RolUsuario): boolean {
   return (
     rol === "DIRECCION" ||
     rol === "ADMINISTRACION" ||
+    rol === "DIRECTOR" ||
     rol === "LOGISTICA"
   );
 }

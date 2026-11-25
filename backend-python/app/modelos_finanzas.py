@@ -71,6 +71,7 @@ class TipoDocumentoPago(str, Enum):
     PARTE_DE_PAGO = "PARTE_DE_PAGO"
     DEVOLUCION = "DEVOLUCION"
     COMISION = "COMISION"
+    TESORERIA = "TESORERIA"
 
 
 class EstadoVerificacionPago(str, Enum):
@@ -327,3 +328,78 @@ class CierreDiario(Base):
     sucursal = relationship("Sucursal")
     encargado_tienda = relationship("Usuario", foreign_keys=[encargado_tienda_id])
     cerrado_por = relationship("Usuario", foreign_keys=[cerrado_por_id])
+
+
+class TipoMovimientoTesoreria(str, Enum):
+    TRASLADO = "TRASLADO"
+    CAMBIO_DIVISA = "CAMBIO_DIVISA"
+    INGRESO_ADMIN = "INGRESO_ADMIN"
+    EGRESO_ADMIN = "EGRESO_ADMIN"
+
+
+class EstadoMovimientoTesoreria(str, Enum):
+    CONFIRMADO = "CONFIRMADO"
+    ANULADO = "ANULADO"
+
+
+class ResultadoCambiario(str, Enum):
+    GANANCIA = "GANANCIA"
+    PERDIDA = "PERDIDA"
+    NEUTRO = "NEUTRO"
+
+
+class MovimientoTesoreria(Base):
+    __tablename__ = "movimientos_tesoreria"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    codigo: Mapped[str] = mapped_column(String(40), unique=True, index=True, nullable=False)
+    tipo: Mapped[str] = mapped_column(String(25), index=True, nullable=False)
+    fecha: Mapped[date] = mapped_column(Date, index=True, nullable=False)
+    estado: Mapped[str] = mapped_column(
+        String(20), default=EstadoMovimientoTesoreria.CONFIRMADO.value, nullable=False, index=True
+    )
+
+    cuenta_origen_id: Mapped[int | None] = mapped_column(
+        ForeignKey("instrumentos_financieros.id"), nullable=True, index=True
+    )
+    moneda_origen: Mapped[str] = mapped_column(String(10), default="", nullable=False)
+    monto_salida: Mapped[Decimal] = mapped_column(Numeric(16, 2), default=Decimal("0"), nullable=False)
+
+    cuenta_destino_id: Mapped[int | None] = mapped_column(
+        ForeignKey("instrumentos_financieros.id"), nullable=True, index=True
+    )
+    moneda_destino: Mapped[str] = mapped_column(String(10), default="", nullable=False)
+    monto_entrada: Mapped[Decimal] = mapped_column(Numeric(16, 2), default=Decimal("0"), nullable=False)
+
+    comision_usd: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"), nullable=False)
+    tasa_referencia_tipo: Mapped[str] = mapped_column(String(10), default="BCV", nullable=False)
+    tasa_bcv_dia: Mapped[Decimal] = mapped_column(Numeric(14, 4), default=Decimal("0"), nullable=False)
+    tasa_usdt_dia: Mapped[Decimal] = mapped_column(Numeric(14, 4), default=Decimal("0"), nullable=False)
+    tasa_referencia_aplicada: Mapped[Decimal] = mapped_column(Numeric(14, 4), default=Decimal("0"), nullable=False)
+    tasa_operacion: Mapped[Decimal | None] = mapped_column(Numeric(14, 4), nullable=True)
+
+    equivalente_salida_usd: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"), nullable=False)
+    equivalente_entrada_usd: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"), nullable=False)
+    diferencial_usd: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"), nullable=False)
+    diferencial_porcentaje: Mapped[Decimal] = mapped_column(Numeric(8, 2), default=Decimal("0"), nullable=False)
+    resultado_tipo: Mapped[str] = mapped_column(
+        String(15), default=ResultadoCambiario.NEUTRO.value, nullable=False
+    )
+
+    concepto: Mapped[str] = mapped_column(String(200), default="", nullable=False)
+    referencia: Mapped[str] = mapped_column(String(120), default="", nullable=False)
+    observaciones: Mapped[str] = mapped_column(Text, default="", nullable=False)
+
+    pago_salida_id: Mapped[int | None] = mapped_column(ForeignKey("pagos.id"), nullable=True)
+    pago_entrada_id: Mapped[int | None] = mapped_column(ForeignKey("pagos.id"), nullable=True)
+    registrado_por_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), nullable=False)
+    anulado_por_id: Mapped[int | None] = mapped_column(ForeignKey("usuarios.id"), nullable=True)
+    motivo_anulacion: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    creado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    cuenta_origen = relationship("InstrumentoFinanciero", foreign_keys=[cuenta_origen_id])
+    cuenta_destino = relationship("InstrumentoFinanciero", foreign_keys=[cuenta_destino_id])
+    pago_salida = relationship("Pago", foreign_keys=[pago_salida_id])
+    pago_entrada = relationship("Pago", foreign_keys=[pago_entrada_id])
+    registrado_por = relationship("Usuario", foreign_keys=[registrado_por_id])
+    anulado_por = relationship("Usuario", foreign_keys=[anulado_por_id])

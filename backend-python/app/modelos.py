@@ -28,6 +28,7 @@ class EstadoSucursal(str, Enum):
 class RolUsuario(str, Enum):
     DIRECCION = "DIRECCION"
     ADMINISTRACION = "ADMINISTRACION"
+    DIRECTOR = "DIRECTOR"
     LOGISTICA = "LOGISTICA"
     LIDER = "LIDER"
     ENCARGADO_TIENDA = "ENCARGADO_TIENDA"
@@ -77,6 +78,7 @@ class Usuario(Base):
     telefono: Mapped[str] = mapped_column(String(40), default="", nullable=False)
     cedula: Mapped[str] = mapped_column(String(40), default="", nullable=False)
     tiene_acceso: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    debe_cambiar_clave: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     sucursal_id: Mapped[int | None] = mapped_column(ForeignKey("sucursales.id"), nullable=True)
     activo: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     motivo_estado: Mapped[str | None] = mapped_column(String(255), nullable=True)

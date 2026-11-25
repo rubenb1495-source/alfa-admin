@@ -248,3 +248,55 @@ def cambiar_estado_usuario(
     bd.commit()
     bd.refresh(usuario)
     return UsuarioSalida.model_validate(usuario)
+
+
+@enrutador.post("/usuarios/{usuario_id}/restablecer-clave")
+def restablecer_clave_usuario(
+    usuario_id: int,
+    payload: dict | None = None,
+    _usuario_actual: Usuario = Depends(requerir_roles(*ROLES_ADMINISTRATIVOS)),
+    bd: Session = Depends(obtener_bd),
+) -> dict[str, object]:
+    """Genera una contraseña temporal compartible para un usuario con acceso al sistema."""
+    import secrets
+    import string
+
+    usuario = (
+        bd.query(Usuario)
+        .options(joinedload(Usuario.sucursal))
+        .filter(Usuario.id == usuario_id)
+        .first()
+    )
+    if usuario is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Usuario no encontrado.",
+        )
+    if not getattr(usuario, "tiene_acceso", True) or not usuario.correo:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Este colaborador no tiene acceso al sistema habilitado. Habilita su acceso y correo primero.",
+        )
+
+    clave_manual = (payload or {}).get("nueva_clave") if isinstance(payload, dict) else None
+    if clave_manual and isinstance(clave_manual, str) and len(clave_manual.strip()) >= 6:
+        clave_temporal = clave_manual.strip()
+    else:
+        alfabeto = string.ascii_uppercase + string.digits
+        sufijo = "".join(secrets.choice(alfabeto) for _ in range(5))
+        clave_temporal = f"Alfa-{sufijo}!"
+
+    usuario.clave_hash = generar_hash_clave(clave_temporal)
+    usuario.debe_cambiar_clave = True
+    bd.commit()
+
+    return {
+        "usuario_id": usuario.id,
+        "nombre": usuario.nombre,
+        "correo": usuario.correo,
+        "rol": usuario.rol,
+        "telefono": usuario.telefono or "",
+        "clave_temporal": clave_temporal,
+        "debe_cambiar_clave": True,
+        "url_app": "https://alfa-admin-web.vercel.app",
+    }

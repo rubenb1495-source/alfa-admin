@@ -18,7 +18,9 @@ export default function PaginaLogin() {
 
   useEffect(() => {
     if (!cargandoSesion && usuario) {
-      router.replace("/dashboard/tasas");
+      router.replace(
+        usuario.rol === "DIRECTOR" ? "/dashboard/direccion" : "/dashboard/tasas"
+      );
     }
   }, [usuario, cargandoSesion, router]);
 

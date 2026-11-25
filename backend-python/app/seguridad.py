@@ -31,10 +31,21 @@ ROLES_ADMINISTRATIVOS: tuple[str, ...] = (
     RolUsuario.ADMINISTRACION.value,
 )
 
+ROLES_LECTURA_EJECUTIVA: tuple[str, ...] = (
+    RolUsuario.DIRECCION.value,
+    RolUsuario.ADMINISTRACION.value,
+    RolUsuario.DIRECTOR.value,
+)
+
 
 def es_administrador(rol: str) -> bool:
     """Devuelve True solo para roles con acceso administrativo total (DIRECCION / ADMINISTRACION)."""
     return rol in ROLES_ADMINISTRATIVOS
+
+
+def es_director_solo_lectura(rol: str) -> bool:
+    """Devuelve True si el rol es DIRECTOR (acceso ejecutivo de solo lectura)."""
+    return rol == RolUsuario.DIRECTOR.value
 
 
 def obtener_permisos_rol(rol: str) -> list[str]:
@@ -42,9 +53,12 @@ def obtener_permisos_rol(rol: str) -> list[str]:
     if rol in ROLES_ADMINISTRATIVOS:
         return [
             "admin:all",
+            "direccion:read",
             "costos:read",
             "finanzas:read",
             "finanzas:write",
+            "tesoreria:read",
+            "tesoreria:write",
             "comisiones:read",
             "comisiones:write",
             "usuarios:write",
@@ -58,6 +72,15 @@ def obtener_permisos_rol(rol: str) -> list[str]:
             "garantias:write",
             "cierre:write",
             "cierre:reopen",
+        ]
+    if rol == RolUsuario.DIRECTOR.value:
+        return [
+            "direccion:read",
+            "costos:read",
+            "finanzas:read",
+            "tesoreria:read",
+            "comisiones:read",
+            "inventario:read",
         ]
     if rol in (RolUsuario.ENCARGADO_TIENDA.value, RolUsuario.LIDER.value):
         return [
@@ -205,5 +228,18 @@ def requerir_roles(*roles_permitidos: str) -> Callable[[Usuario], Usuario]:
 
 # Alias explícito reutilizable para endpoints exclusivos de Administrador
 requerir_admin = requerir_roles(*ROLES_ADMINISTRATIVOS)
+requerir_direccion_lectura = requerir_roles(*ROLES_LECTURA_EJECUTIVA)
 require_roles = requerir_roles
 require_admin = requerir_admin
+
+
+def requerir_escritura_operativa(
+    usuario_actual: Usuario = Depends(obtener_usuario_actual),
+) -> Usuario:
+    """Impide que el rol DIRECTOR (solo lectura) realice mutaciones operativas."""
+    if usuario_actual.rol == RolUsuario.DIRECTOR.value:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="El rol Director es de solo lectura y no puede crear ni modificar registros.",
+        )
+    return usuario_actual
