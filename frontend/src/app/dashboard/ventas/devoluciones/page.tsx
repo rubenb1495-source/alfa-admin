@@ -289,8 +289,8 @@ export default function PaginaDevolucionesGarantias() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-black text-tekio-carbon flex items-center gap-2">
-            <RotateCcw className="w-6 h-6 text-tekio-naranja" />
+          <h2 className="text-2xl font-black text-alfa-marino flex items-center gap-2">
+            <RotateCcw className="w-6 h-6 text-alfa-azul" />
             Devoluciones, Cambios y Garantías
           </h2>
           <p className="text-sm text-neutral-500">
@@ -325,7 +325,7 @@ export default function PaginaDevolucionesGarantias() {
             <select
               value={ventaId}
               onChange={(e) => setVentaId(e.target.value)}
-              className="w-full rounded-xl border border-neutral-200 bg-white px-3 py-2.5 text-sm text-tekio-carbon"
+              className="w-full rounded-xl border border-neutral-200 bg-white px-3 py-2.5 text-sm text-alfa-marino"
               required
             >
               <option value="">Selecciona una venta...</option>
@@ -344,7 +344,7 @@ export default function PaginaDevolucionesGarantias() {
             <select
               value={equipoOrigenId}
               onChange={(e) => setEquipoOrigenId(e.target.value)}
-              className="w-full rounded-xl border border-neutral-200 bg-white px-3 py-2.5 text-sm text-tekio-carbon"
+              className="w-full rounded-xl border border-neutral-200 bg-white px-3 py-2.5 text-sm text-alfa-marino"
               disabled={!ventaSeleccionada || equiposDeVenta.length === 0}
             >
               <option value="">
@@ -378,14 +378,14 @@ export default function PaginaDevolucionesGarantias() {
                   onClick={() => setTipoResolucion(esc.valor)}
                   className={`text-left p-3 rounded-xl border transition-all ${
                     activo
-                      ? "border-tekio-naranja bg-tekio-naranja-suave/70 shadow-sm"
+                      ? "border-alfa-azul bg-alfa-azul-suave/70 shadow-sm"
                       : "border-neutral-200 bg-white/80 hover:border-neutral-300"
                   } ${bloqueado ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
                 >
-                  <p className="text-xs font-bold text-tekio-carbon flex items-center justify-between gap-1">
+                  <p className="text-xs font-bold text-alfa-marino flex items-center justify-between gap-1">
                     <span>{esc.titulo}</span>
                     {esc.soloAdmin && (
-                      <ShieldAlert className="w-3.5 h-3.5 text-tekio-naranja shrink-0" />
+                      <ShieldAlert className="w-3.5 h-3.5 text-alfa-azul shrink-0" />
                     )}
                   </p>
                   <p className="text-[11px] text-neutral-500 mt-1 leading-snug">
@@ -491,7 +491,7 @@ export default function PaginaDevolucionesGarantias() {
 
           {tipoResolucion === "CAMBIO_DOWNGRADE" && (
             <div className="md:col-span-3 flex flex-wrap items-center gap-4 rounded-xl bg-neutral-50 border border-neutral-200 px-4 py-3">
-              <label className="inline-flex items-center gap-2 text-sm font-medium text-tekio-carbon cursor-pointer">
+              <label className="inline-flex items-center gap-2 text-sm font-medium text-alfa-marino cursor-pointer">
                 <input
                   type="radio"
                   checked={dejarSaldoFavor || !esAdmin}
@@ -500,7 +500,7 @@ export default function PaginaDevolucionesGarantias() {
                 Acreditar diferencia como Saldo a Favor del cliente
               </label>
               {esAdmin && (
-                <label className="inline-flex items-center gap-2 text-sm font-medium text-tekio-carbon cursor-pointer">
+                <label className="inline-flex items-center gap-2 text-sm font-medium text-alfa-marino cursor-pointer">
                   <input
                     type="radio"
                     checked={!dejarSaldoFavor}
@@ -582,7 +582,7 @@ export default function PaginaDevolucionesGarantias() {
           <button
             type="submit"
             disabled={guardando}
-            className="inline-flex items-center gap-2 rounded-xl bg-tekio-naranja hover:bg-tekio-naranja-hover text-white px-5 py-2.5 text-sm font-bold transition-colors disabled:opacity-60"
+            className="inline-flex items-center gap-2 rounded-xl bg-alfa-azul hover:bg-alfa-azul-hover text-white px-5 py-2.5 text-sm font-bold transition-colors disabled:opacity-60"
           >
             {guardando ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -597,7 +597,7 @@ export default function PaginaDevolucionesGarantias() {
       {/* Historial */}
       <div className="bg-white/75 backdrop-blur-md border border-white/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-2xl p-5 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h3 className="text-base font-bold text-tekio-carbon">
+          <h3 className="text-base font-bold text-alfa-marino">
             Historial de Devoluciones y Garantías ({filtradas.length})
           </h3>
           <div className="w-full sm:w-80">
@@ -637,19 +637,19 @@ export default function PaginaDevolucionesGarantias() {
                 {filtradas.map((d) => (
                   <tr key={d.id} className="hover:bg-white/60">
                     <td className="py-3 px-3">
-                      <p className="font-bold text-tekio-carbon">
+                      <p className="font-bold text-alfa-marino">
                         {d.numero_operacion}
                       </p>
                       <p className="text-xs text-neutral-500">{d.fecha}</p>
                     </td>
                     <td className="py-3 px-3">
-                      <p className="font-semibold text-tekio-carbon">
+                      <p className="font-semibold text-alfa-marino">
                         {d.numero_venta}
                       </p>
                       <p className="text-xs text-neutral-500">{d.cliente}</p>
                     </td>
                     <td className="py-3 px-3">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-tekio-naranja-suave text-tekio-naranja">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-alfa-azul-suave text-alfa-azul">
                         {d.tipo_resolucion}
                       </span>
                       <p className="text-xs text-neutral-500 mt-0.5 max-w-xs truncate">
@@ -675,7 +675,7 @@ export default function PaginaDevolucionesGarantias() {
                         </p>
                       )}
                       {d.caso_taller_numero && (
-                        <p className="inline-flex items-center gap-1 text-tekio-naranja font-semibold">
+                        <p className="inline-flex items-center gap-1 text-alfa-azul font-semibold">
                           <Wrench className="w-3 h-3" /> {d.caso_taller_numero}
                         </p>
                       )}
@@ -698,10 +698,10 @@ export default function PaginaDevolucionesGarantias() {
                         <button
                           type="button"
                           onClick={() => void abrirPdf(d)}
-                          className="inline-flex items-center gap-1 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-50 px-2.5 py-1.5 text-xs font-semibold text-tekio-carbon"
+                          className="inline-flex items-center gap-1 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-50 px-2.5 py-1.5 text-xs font-semibold text-alfa-marino"
                           title="Descargar Comprobante PDF"
                         >
-                          <FileDown className="w-3.5 h-3.5 text-tekio-naranja" />
+                          <FileDown className="w-3.5 h-3.5 text-alfa-azul" />
                           PDF
                         </button>
                         <button

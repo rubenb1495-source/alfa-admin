@@ -20,7 +20,7 @@ export default function PaginaInicio() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50">
       <div className="animate-pulse text-sm font-semibold text-slate-500">
-        Cargando Sistema Administrativo Tekio Electronics...
+        Cargando Sistema Administrativo ALFA DIGITAL STORE...
       </div>
     </div>
   );

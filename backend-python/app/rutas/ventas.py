@@ -36,6 +36,7 @@ from app.modelos_finanzas import (
     InstrumentoFinanciero,
     MonedaInstrumento,
     NotaCredito,
+    OrigenVenta,
     Pago,
     TipoCuentaPorCobrar,
     TipoDocumentoPago,
@@ -460,6 +461,7 @@ def serializar_venta(venta: Venta, incluir_costos: bool) -> dict[str, Any]:
         "tecnico_id": venta.tecnico_id,
         "tecnico": venta.tecnico.nombre if venta.tecnico else None,
         "canal_visita": venta.canal_visita,
+        "origen_venta": getattr(venta, "origen_venta", OrigenVenta.PASILLO.value) or OrigenVenta.PASILLO.value,
         "tipo_entrega": venta.tipo_entrega,
         "datos_entrega": (
             json.loads(venta.datos_entrega_json)
@@ -735,6 +737,7 @@ def crear_venta(
         asesor_id=datos.asesor_id,
         tecnico_id=datos.tecnico_id,
         canal_visita=datos.canal_visita.strip(),
+        origen_venta=datos.origen_venta.value,
         tipo_entrega=datos.entrega.strip(),
         datos_entrega_json=(
             json.dumps(datos.datos_entrega, ensure_ascii=False)

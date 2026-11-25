@@ -264,7 +264,7 @@ export default function PaginaRecepcion() {
 
                 <div className="flex gap-2">
                   <div className="relative flex-1">
-                    <ScanBarcode className="w-4 h-4 text-[#E85A28] absolute left-3 top-1/2 -translate-y-1/2" />
+                    <ScanBarcode className="w-4 h-4 text-[#003566] absolute left-3 top-1/2 -translate-y-1/2" />
                     <input
                       ref={refInput}
                       type="text"
@@ -277,7 +277,7 @@ export default function PaginaRecepcion() {
                         }
                       }}
                       placeholder="Escanea o escribe el serial y presiona Enter..."
-                      className="w-full pl-9 pr-3 py-2.5 rounded-xl border-2 border-[#E85A28]/40 bg-white text-sm font-mono focus:outline-none focus:border-[#E85A28]"
+                      className="w-full pl-9 pr-3 py-2.5 rounded-xl border-2 border-[#003566]/40 bg-white text-sm font-mono focus:outline-none focus:border-[#003566]"
                     />
                   </div>
                   <button
@@ -319,7 +319,7 @@ export default function PaginaRecepcion() {
               <button
                 type="submit"
                 disabled={procesando}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#E85A28] hover:bg-[#C9461A] text-white text-sm font-bold disabled:opacity-60 cursor-pointer"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#003566] hover:bg-[#C9461A] text-white text-sm font-bold disabled:opacity-60 cursor-pointer"
               >
                 <ShieldCheck className="w-4 h-4" />
                 {procesando

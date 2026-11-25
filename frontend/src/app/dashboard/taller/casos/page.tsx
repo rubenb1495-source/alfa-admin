@@ -238,7 +238,7 @@ export default function PaginaCasosTaller() {
       Number(manoObra || 0) +
       (repuestoDesc.trim() ? Number(repuestoPrecio || 0) : 0);
     const texto = [
-      `*TEKIO ELECTRONICS · Presupuesto ${caso.numero_caso}*`,
+      `*ALFA DIGITAL STORE · Presupuesto ${caso.numero_caso}*`,
       `Equipo: ${caso.descripcion_equipo}`,
       `Mano de obra: ${formatearUsd(Number(manoObra || 0))}`,
       repuestoDesc.trim()
@@ -289,7 +289,7 @@ export default function PaginaCasosTaller() {
         <button
           type="button"
           onClick={() => setModalCrear(true)}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#E85A28] hover:bg-[#C9461A] text-white text-sm font-bold cursor-pointer"
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#003566] hover:bg-[#C9461A] text-white text-sm font-bold cursor-pointer"
         >
           <Plus className="w-4 h-4" />
           Nuevo caso GT / ST
@@ -435,7 +435,7 @@ export default function PaginaCasosTaller() {
                     }}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-300 text-xs font-bold hover:bg-slate-50 cursor-pointer"
                   >
-                    <Wrench className="w-3.5 h-3.5 text-[#E85A28]" />
+                    <Wrench className="w-3.5 h-3.5 text-[#003566]" />
                     Actualizar caso
                   </button>
                 </div>
@@ -579,7 +579,7 @@ export default function PaginaCasosTaller() {
                 <button
                   type="submit"
                   disabled={guardando}
-                  className="px-4 py-2 rounded-xl bg-[#E85A28] text-white text-sm font-bold cursor-pointer"
+                  className="px-4 py-2 rounded-xl bg-[#003566] text-white text-sm font-bold cursor-pointer"
                 >
                   Registrar caso
                 </button>
@@ -649,7 +649,7 @@ export default function PaginaCasosTaller() {
                   <button
                     type="submit"
                     disabled={guardando}
-                    className="px-4 py-2 rounded-xl bg-[#E85A28] text-white text-xs font-bold cursor-pointer"
+                    className="px-4 py-2 rounded-xl bg-[#003566] text-white text-xs font-bold cursor-pointer"
                   >
                     Guardar presupuesto
                   </button>
@@ -717,7 +717,7 @@ export default function PaginaCasosTaller() {
                 <button
                   type="submit"
                   disabled={guardando}
-                  className="px-4 py-2 rounded-xl bg-[#E85A28] text-white text-sm font-bold cursor-pointer"
+                  className="px-4 py-2 rounded-xl bg-[#003566] text-white text-sm font-bold cursor-pointer"
                 >
                   Guardar cambios
                 </button>

@@ -368,7 +368,7 @@ export default function PaginaFinanzasPagos() {
                         setCxcAbono(c);
                         setMontoAbono(String(c.saldo_pendiente_usd));
                       }}
-                      className="px-3 py-1.5 rounded-lg bg-[#E85A28] text-white text-xs font-bold cursor-pointer"
+                      className="px-3 py-1.5 rounded-lg bg-[#003566] text-white text-xs font-bold cursor-pointer"
                     >
                       Registrar abono
                     </button>
@@ -425,7 +425,7 @@ export default function PaginaFinanzasPagos() {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-xl bg-[#E85A28] text-white text-sm font-bold cursor-pointer"
+                  className="px-4 py-2 rounded-xl bg-[#003566] text-white text-sm font-bold cursor-pointer"
                 >
                   Guardar abono
                 </button>

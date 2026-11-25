@@ -33,7 +33,7 @@ import {
   Wrench,
   X,
 } from "lucide-react";
-import LogoTekio from "@/components/LogoTekio";
+import LogoAlfa from "@/components/LogoAlfa";
 import { usarSesion } from "@/contexto/SesionContexto";
 import {
   esRolAdministrativo,
@@ -82,7 +82,7 @@ export default function DisenoDashboard({
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="space-y-3 text-center">
-          <LogoTekio variante="isotipo" tema="claro" tamano="md" />
+          <LogoAlfa variante="isotipo" tema="claro" tamano="md" />
           <p className="text-xs font-medium text-neutral-500">
             Verificando sesión...
           </p>
@@ -254,7 +254,7 @@ export default function DisenoDashboard({
   };
 
   return (
-    <div className="min-h-screen flex text-[#191818] relative">
+    <div className="min-h-screen flex text-[#000814] relative">
       {/* Sidebar escritorio claro translúcido (glassmorphism) */}
       <aside
         className={`hidden lg:flex lg:flex-col bg-white/80 backdrop-blur-lg border-r border-gray-200/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shrink-0 z-20 transition-all duration-200 ${
@@ -274,17 +274,17 @@ export default function DisenoDashboard({
               title="Expandir menú"
               className="cursor-pointer"
             >
-              <LogoTekio variante="isotipo" tema="claro" tamano="sm" />
+              <LogoAlfa variante="isotipo" tema="claro" tamano="sm" />
             </button>
           ) : (
             <>
-              <LogoTekio variante="horizontal" tema="claro" tamano="sm" />
+              <LogoAlfa variante="horizontal" tema="claro" tamano="sm" />
               <button
                 type="button"
                 onClick={() => setSidebarColapsado(true)}
                 title="Colapsar menú"
                 aria-label="Colapsar menú"
-                className="p-1.5 rounded-lg text-gray-400 hover:text-[#191818] hover:bg-gray-100/80 transition-colors cursor-pointer"
+                className="p-1.5 rounded-lg text-gray-400 hover:text-[#000814] hover:bg-gray-100/80 transition-colors cursor-pointer"
               >
                 <PanelLeftClose className="w-4 h-4" />
               </button>
@@ -314,8 +314,8 @@ export default function DisenoDashboard({
                         : "gap-2.5 px-3 py-2"
                     } ${
                       activo
-                        ? "bg-[#FDF0EB] text-[#E85A28] font-bold border-l-[3px] border-[#E85A28]"
-                        : "text-[#4B5563] font-medium hover:bg-gray-100/80 hover:text-[#191818]"
+                        ? "bg-[#EDF3FA] text-[#003566] font-bold border-l-[3px] border-[#003566]"
+                        : "text-[#4B5563] font-medium hover:bg-gray-100/80 hover:text-[#000814]"
                     }`}
                   >
                     {enlace.icono}
@@ -337,7 +337,7 @@ export default function DisenoDashboard({
                 type="button"
                 onClick={() => setSidebarColapsado(false)}
                 title="Expandir menú"
-                className="p-2 rounded-lg text-gray-500 hover:text-[#191818] hover:bg-gray-100 cursor-pointer"
+                className="p-2 rounded-lg text-gray-500 hover:text-[#000814] hover:bg-gray-100 cursor-pointer"
               >
                 <PanelLeftOpen className="w-4 h-4" />
               </button>
@@ -345,7 +345,7 @@ export default function DisenoDashboard({
                 type="button"
                 onClick={manejarSalir}
                 title="Cerrar sesión"
-                className="p-2 rounded-lg text-gray-500 hover:text-[#E85A28] hover:bg-[#FDF0EB] cursor-pointer"
+                className="p-2 rounded-lg text-gray-500 hover:text-[#003566] hover:bg-[#EDF3FA] cursor-pointer"
               >
                 <LogOut className="w-4 h-4" />
               </button>
@@ -353,7 +353,7 @@ export default function DisenoDashboard({
           ) : (
             <>
               <div className="text-xs px-1">
-                <p className="font-bold text-[#191818] truncate">
+                <p className="font-bold text-[#000814] truncate">
                   {usuario.nombre}
                 </p>
                 <p className="text-[11px] text-gray-500 truncate">
@@ -363,7 +363,7 @@ export default function DisenoDashboard({
               <button
                 type="button"
                 onClick={manejarSalir}
-                className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-[#4B5563] bg-white/80 border border-gray-200 hover:border-[#E85A28] hover:text-[#E85A28] hover:bg-[#FDF0EB]/60 transition-colors cursor-pointer"
+                className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-[#4B5563] bg-white/80 border border-gray-200 hover:border-[#003566] hover:text-[#003566] hover:bg-[#EDF3FA]/60 transition-colors cursor-pointer"
               >
                 <LogOut className="w-3.5 h-3.5" />
                 Cerrar sesión
@@ -380,13 +380,13 @@ export default function DisenoDashboard({
             className="fixed inset-0 bg-black/30 backdrop-blur-xs"
             onClick={() => setMenuMovilAbierto(false)}
           />
-          <div className="relative w-72 bg-white/95 backdrop-blur-xl text-[#191818] flex flex-col z-10 shadow-2xl border-r border-gray-200">
+          <div className="relative w-72 bg-white/95 backdrop-blur-xl text-[#000814] flex flex-col z-10 shadow-2xl border-r border-gray-200">
             <div className="h-16 px-4 border-b border-gray-200/80 flex items-center justify-between">
-              <LogoTekio variante="horizontal" tema="claro" tamano="sm" />
+              <LogoAlfa variante="horizontal" tema="claro" tamano="sm" />
               <button
                 type="button"
                 onClick={() => setMenuMovilAbierto(false)}
-                className="p-1.5 rounded-lg text-gray-500 hover:text-[#191818] hover:bg-gray-100"
+                className="p-1.5 rounded-lg text-gray-500 hover:text-[#000814] hover:bg-gray-100"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -404,8 +404,8 @@ export default function DisenoDashboard({
                       onClick={() => setMenuMovilAbierto(false)}
                       className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm ${
                         rutaActual === enlace.href
-                          ? "bg-[#FDF0EB] text-[#E85A28] font-bold border-l-[3px] border-[#E85A28]"
-                          : "text-[#4B5563] font-medium hover:bg-gray-100 hover:text-[#191818]"
+                          ? "bg-[#EDF3FA] text-[#003566] font-bold border-l-[3px] border-[#003566]"
+                          : "text-[#4B5563] font-medium hover:bg-gray-100 hover:text-[#000814]"
                       }`}
                     >
                       {enlace.icono}
@@ -419,7 +419,7 @@ export default function DisenoDashboard({
               <button
                 type="button"
                 onClick={manejarSalir}
-                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold text-white bg-[#E85A28] hover:bg-[#D14D1F]"
+                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold text-white bg-[#003566] hover:bg-[#001D3D]"
               >
                 <LogOut className="w-3.5 h-3.5" />
                 Cerrar sesión
@@ -434,10 +434,10 @@ export default function DisenoDashboard({
         {/* Marca de agua sutil fija detrás del contenido del dashboard */}
         <div
           aria-hidden="true"
-          className="marca-agua-tekio pointer-events-none select-none fixed inset-0 lg:left-64 z-0 flex items-center justify-center opacity-[0.04]"
+          className="marca-agua-alfa pointer-events-none select-none fixed inset-0 lg:left-64 z-0 flex items-center justify-center opacity-[0.04]"
         >
           <img
-            src="/brand/tekio-isotipo.png"
+            src="/brand/alfa-isotipo.png"
             alt=""
             className="w-[420px] h-[420px] object-contain"
           />
@@ -451,7 +451,7 @@ export default function DisenoDashboard({
                 type="button"
                 onClick={() => setMenuMovilAbierto(true)}
                 aria-label="Abrir menú"
-                className="lg:hidden p-2 rounded-xl border border-gray-200/80 bg-white/80 text-[#191818] hover:bg-gray-50"
+                className="lg:hidden p-2 rounded-xl border border-gray-200/80 bg-white/80 text-[#000814] hover:bg-gray-50"
               >
                 <Menu className="w-5 h-5" />
               </button>
@@ -460,15 +460,15 @@ export default function DisenoDashboard({
                 <div className="h-7 w-72 rounded-lg bg-gray-200/70 animate-pulse" />
               ) : tasaHoy && tasaHoy.permite_bolivares ? (
                 <div className="flex flex-wrap items-center gap-1.5 text-xs cifra-tabular">
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/80 border border-gray-200/80 text-[#191818] font-bold">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/80 border border-gray-200/80 text-[#000814] font-bold">
                     <span className="text-gray-500 font-medium">BCV</span>
                     {formatearBs(tasaHoy.tasa_bcv)}
                   </span>
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/80 border border-gray-200/80 text-[#191818] font-bold">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/80 border border-gray-200/80 text-[#000814] font-bold">
                     <span className="text-gray-500 font-medium">USDT</span>
                     {formatearBs(tasaHoy.tasa_usdt)}
                   </span>
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#FDF0EB] border border-[#E85A28]/25 text-[#E85A28] font-bold">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#EDF3FA] border border-[#003566]/25 text-[#003566] font-bold">
                     Recargo {formatearPorcentaje(tasaHoy.recargo_porcentaje)}
                   </span>
                 </div>
@@ -485,7 +485,7 @@ export default function DisenoDashboard({
               <button
                 type="button"
                 onClick={() => void recargarTasaHoy()}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium text-gray-500 hover:text-[#191818] hover:bg-white/80 transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium text-gray-500 hover:text-[#000814] hover:bg-white/80 transition-colors cursor-pointer"
                 title="Actualizar tasas del día"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
@@ -496,16 +496,16 @@ export default function DisenoDashboard({
             {/* Derecha: Sucursal activa + Perfil de usuario */}
             <div className="flex items-center gap-2 text-xs">
               {usuario.sucursal && (
-                <span className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/80 border border-gray-200/80 text-[#191818] font-semibold">
-                  <Building2 className="w-3.5 h-3.5 text-[#E85A28]" />
+                <span className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/80 border border-gray-200/80 text-[#000814] font-semibold">
+                  <Building2 className="w-3.5 h-3.5 text-[#003566]" />
                   {usuario.sucursal.nombre}
                 </span>
               )}
               <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-white/80 border border-gray-200/80">
-                <span className="font-bold text-[#191818] max-w-[140px] truncate">
+                <span className="font-bold text-[#000814] max-w-[140px] truncate">
                   {usuario.nombre}
                 </span>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#FDF0EB] text-[#E85A28] font-bold text-[10px] tracking-wide">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#EDF3FA] text-[#003566] font-bold text-[10px] tracking-wide">
                   <Shield className="w-2.5 h-2.5" />
                   {usuario.rol}
                 </span>

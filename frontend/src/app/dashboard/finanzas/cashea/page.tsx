@@ -135,7 +135,7 @@ export default function PaginaFinanzasCashea() {
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-black text-slate-900 flex items-center gap-2">
-          <CreditCard className="w-6 h-6 text-[#E85A28]" />
+          <CreditCard className="w-6 h-6 text-[#003566]" />
           Por Cobrar Cashea y Liquidaciones
         </h2>
         <p className="text-sm text-slate-500">
@@ -232,7 +232,7 @@ export default function PaginaFinanzasCashea() {
         <button
           type="submit"
           disabled={seleccionadas.length === 0}
-          className="px-4 py-2.5 rounded-xl bg-[#E85A28] disabled:opacity-40 text-white text-xs font-bold cursor-pointer"
+          className="px-4 py-2.5 rounded-xl bg-[#003566] disabled:opacity-40 text-white text-xs font-bold cursor-pointer"
         >
           Liquidar ({seleccionadas.length})
         </button>

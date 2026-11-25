@@ -39,6 +39,11 @@ class EstadoVenta(str, Enum):
     DEVUELTA = "DEVUELTA"
 
 
+class OrigenVenta(str, Enum):
+    PASILLO = "PASILLO"
+    LEAD = "LEAD"
+
+
 class TipoMovimientoPago(str, Enum):
     INGRESO = "INGRESO"
     EGRESO = "EGRESO"
@@ -102,6 +107,7 @@ class Venta(Base):
     asesor_id: Mapped[int | None] = mapped_column(ForeignKey("usuarios.id"), nullable=True)
     tecnico_id: Mapped[int | None] = mapped_column(ForeignKey("usuarios.id"), nullable=True)
     canal_visita: Mapped[str] = mapped_column(String(60), default="Tienda", nullable=False)
+    origen_venta: Mapped[str] = mapped_column(String(20), default=OrigenVenta.PASILLO.value, nullable=False, index=True)
     tipo_entrega: Mapped[str] = mapped_column(String(60), default="Tienda", nullable=False)
     datos_entrega_json: Mapped[str] = mapped_column(Text, default="", nullable=False)
     origen_equipo: Mapped[str] = mapped_column(String(60), default="Propio", nullable=False)

@@ -9,13 +9,13 @@ from reportlab.pdfgen.canvas import Canvas
 
 
 ASSETS_DIR = Path(__file__).resolve().parent.parent.parent / "assets"
-RUTA_MARCA_AGUA = ASSETS_DIR / "tekio-watermark.png"
-RUTA_ISOTIPO = ASSETS_DIR / "tekio-isotipo.png"
+RUTA_MARCA_AGUA = ASSETS_DIR / "alfa-watermark.png"
+RUTA_ISOTIPO = ASSETS_DIR / "alfa-isotipo.png"
 
 
 def dibujar_marca_de_agua(pdf_canvas: Canvas, doc: Any = None) -> None:
     """
-    Dibuja la marca de agua oficial de Tekio Electronics centrada detrás del contenido
+    Dibuja la marca de agua oficial de Alfa Digital Store centrada detrás del contenido
     de cada página con opacidad sutil (~7%). Compatible con SimpleDocTemplate
     (onFirstPage / onLaterPages) y con uso directo sobre Canvas.
     """

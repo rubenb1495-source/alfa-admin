@@ -27,6 +27,7 @@ from app.modelos_finanzas import (
     ExtractoBancario,
     InstrumentoFinanciero,
     MonedaInstrumento,
+    OrigenVenta,
     Pago,
     TipoCuentaPorCobrar,
     TipoDocumentoPago,
@@ -500,11 +501,13 @@ def calcular_reporte_comisiones(
         else ventas_globales
     )
 
-    # Todas las comisiones se calculan estrictamente sobre Precio Promo USD pactado:
-    # - Productos/equipos/componentes -> 1% al asesor_id (0% si Tienda; obsequios $0 -> $0 comisión).
-    # - Asesor Líder (multi-tienda) -> 1% propio + 0.5% de todos los demás asesores en TODAS las sucursales (excluyendo ST).
-    # - Servicio Técnico / Mano de Obra (TipoArticulo.SERVICIO) -> 50% al tecnico_id (excluido de 1% asesor y 0.5% líder).
-    ventas_por_asesor: dict[int, Decimal] = {}
+    # Reglas de Comisiones Alfa Importaciones (estrictamente sobre Precio Promo USD, excluyendo ANULADA / DEVUELTA):
+    # - Asesor (ASESORA / TECNICO / otros no encargados): PASILLO -> 1%, LEAD -> 8%.
+    # - Encargado de Tienda (ENCARGADO_TIENDA): PASILLO -> 5%, LEAD -> 8%.
+    # - Tienda (asesor_id is None): 0%.
+    # - Servicio Técnico / Mano de Obra (TipoArticulo.SERVICIO): 50% al tecnico_id (excluido de comisión por ventas).
+    ventas_pasillo_por_asesor: dict[int, Decimal] = {}
+    ventas_leads_por_asesor: dict[int, Decimal] = {}
     ventas_globales_por_asesor: dict[int, Decimal] = {}
     total_ventas_con_asesor_global = Decimal("0")
     st_por_tecnico: dict[int, Decimal] = {}
@@ -528,9 +531,12 @@ def calcular_reporte_comisiones(
                 total_ventas_con_asesor_global += subtotal_promo
 
     for v in ventas:
+        es_lead = (getattr(v, "origen_venta", OrigenVenta.PASILLO.value) or OrigenVenta.PASILLO.value).upper() == OrigenVenta.LEAD.value
+        mapa_origen = ventas_leads_por_asesor if es_lead else ventas_pasillo_por_asesor
+
         if not v.detalles:
             if v.asesor_id is not None:
-                ventas_por_asesor[v.asesor_id] = ventas_por_asesor.get(v.asesor_id, Decimal("0")) + v.total_promo_usd
+                mapa_origen[v.asesor_id] = mapa_origen.get(v.asesor_id, Decimal("0")) + v.total_promo_usd
             continue
 
         for det in v.detalles:
@@ -544,7 +550,7 @@ def calcular_reporte_comisiones(
                     st_por_tecnico[v.tecnico_id] = st_por_tecnico.get(v.tecnico_id, Decimal("0")) + com_50
             else:
                 if v.asesor_id is not None:
-                    ventas_por_asesor[v.asesor_id] = ventas_por_asesor.get(v.asesor_id, Decimal("0")) + subtotal_promo
+                    mapa_origen[v.asesor_id] = mapa_origen.get(v.asesor_id, Decimal("0")) + subtotal_promo
 
     # Ajustes de comisión por cambios Upgrade (+) y Downgrade (-) del período
     from app.modelos_operaciones import DevolucionGarantia, TipoResolucionDevolucion
@@ -577,9 +583,11 @@ def calcular_reporte_comisiones(
         )
         total_ventas_con_asesor_global = max(Decimal("0"), total_ventas_con_asesor_global + dif)
         if sucursal_id is None or vta.sucursal_id == sucursal_id:
-            ventas_por_asesor[vta.asesor_id] = max(
+            es_lead_dev = (getattr(vta, "origen_venta", OrigenVenta.PASILLO.value) or OrigenVenta.PASILLO.value).upper() == OrigenVenta.LEAD.value
+            mapa_dev = ventas_leads_por_asesor if es_lead_dev else ventas_pasillo_por_asesor
+            mapa_dev[vta.asesor_id] = max(
                 Decimal("0"),
-                ventas_por_asesor.get(vta.asesor_id, Decimal("0")) + dif,
+                mapa_dev.get(vta.asesor_id, Decimal("0")) + dif,
             )
 
     # Preparaciones y servicios técnicos del mes
@@ -623,8 +631,17 @@ def calcular_reporte_comisiones(
 
     reporte: list[dict[str, Any]] = []
     for uid, u in usuarios_map.items():
-        ventas_propias = ventas_por_asesor.get(uid, Decimal("0"))
-        com_ventas_1 = (ventas_propias * Decimal("0.01")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        ventas_pasillo = ventas_pasillo_por_asesor.get(uid, Decimal("0"))
+        ventas_leads = ventas_leads_por_asesor.get(uid, Decimal("0"))
+        ventas_propias = ventas_pasillo + ventas_leads
+
+        es_encargado = u.rol == RolUsuario.ENCARGADO_TIENDA.value
+        tasa_pasillo = Decimal("0.05") if es_encargado else Decimal("0.01")
+        tasa_leads = Decimal("0.08")
+
+        com_pasillo = (ventas_pasillo * tasa_pasillo).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        com_leads = (ventas_leads * tasa_leads).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        com_ventas_total = com_pasillo + com_leads
 
         com_lider_05 = Decimal("0")
         if u.rol == RolUsuario.LIDER.value:
@@ -636,10 +653,11 @@ def calcular_reporte_comisiones(
 
         com_servicios = st_por_tecnico.get(uid, Decimal("0"))
         pago_preps = prep_por_tecnico.get(uid, Decimal("0"))
-        total_persona = com_ventas_1 + com_lider_05 + com_servicios + pago_preps
+        total_persona = com_ventas_total + com_lider_05 + com_servicios + pago_preps
 
         if total_persona > 0 or u.rol in (
             RolUsuario.ASESORA.value,
+            RolUsuario.ENCARGADO_TIENDA.value,
             RolUsuario.LIDER.value,
             RolUsuario.TECNICO.value,
         ):
@@ -648,8 +666,14 @@ def calcular_reporte_comisiones(
                     "usuario_id": uid,
                     "nombre": u.nombre,
                     "rol": u.rol,
+                    "ventas_pasillo_usd": redondear_usd(ventas_pasillo),
+                    "porcentaje_pasillo": 5 if es_encargado else 1,
+                    "comision_pasillo_usd": redondear_usd(com_pasillo),
+                    "ventas_leads_usd": redondear_usd(ventas_leads),
+                    "porcentaje_leads": 8,
+                    "comision_leads_usd": redondear_usd(com_leads),
                     "ventas_promo_usd": redondear_usd(ventas_propias),
-                    "comision_ventas_1_usd": redondear_usd(com_ventas_1),
+                    "comision_ventas_1_usd": redondear_usd(com_ventas_total),
                     "comision_lider_05_usd": redondear_usd(com_lider_05),
                     "comision_servicios_50_usd": redondear_usd(com_servicios),
                     "pago_preparaciones_usd": redondear_usd(pago_preps),

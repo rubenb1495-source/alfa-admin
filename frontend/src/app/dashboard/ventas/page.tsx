@@ -132,7 +132,7 @@ export default function PaginaHistorialVentas() {
 
         <Link
           href="/dashboard/ventas/nueva"
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#E85A28] hover:bg-[#C9461A] text-white text-sm font-bold"
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#003566] hover:bg-[#C9461A] text-white text-sm font-bold"
         >
           <Plus className="w-4 h-4" />
           Nueva venta POS
@@ -203,10 +203,23 @@ export default function PaginaHistorialVentas() {
                     </td>
                     <td className="px-4 py-3 text-xs">
                       <p className="font-semibold text-slate-800">{v.cliente}</p>
-                      <p className="text-slate-500">
-                        {v.asesor}
-                        {v.tecnico ? ` · Téc: ${v.tecnico}` : ""}
-                      </p>
+                      <div className="flex flex-wrap items-center gap-1.5 mt-0.5 text-slate-500">
+                        <span>
+                          {v.asesor}
+                          {v.tecnico ? ` · Téc: ${v.tecnico}` : ""}
+                        </span>
+                        <span
+                          className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold ${
+                            v.origen_venta === "LEAD"
+                              ? "bg-[#EDF3FA] text-[#003566]"
+                              : "bg-slate-100 text-slate-600"
+                          }`}
+                        >
+                          {v.origen_venta === "LEAD"
+                            ? "Lead"
+                            : "Pasillo"}
+                        </span>
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-right font-bold text-emerald-700">
                       {formatearUsd(v.total_promo_usd)}
@@ -233,7 +246,7 @@ export default function PaginaHistorialVentas() {
                             `Nota_${v.numero_venta}.pdf`
                           )
                         }
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#E85A28] text-white text-xs font-bold cursor-pointer"
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#003566] text-white text-xs font-bold cursor-pointer"
                       >
                         <FileDown className="w-3.5 h-3.5" />
                         PDF

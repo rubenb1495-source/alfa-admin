@@ -203,7 +203,7 @@ export default function PaginaInventario() {
           <button
             type="button"
             onClick={() => setModalAjuste(true)}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#E85A28] hover:bg-[#C9461A] text-white text-sm font-bold cursor-pointer"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#003566] hover:bg-[#C9461A] text-white text-sm font-bold cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             Solicitar ajuste
@@ -235,7 +235,7 @@ export default function PaginaInventario() {
             }
             className={`px-4 py-2 rounded-xl text-sm font-bold cursor-pointer ${
               pestana === tab.id
-                ? "bg-[#E85A28] text-white"
+                ? "bg-[#003566] text-white"
                 : "bg-white border border-slate-200 text-slate-700"
             }`}
           >
@@ -372,7 +372,7 @@ export default function PaginaInventario() {
                           <button
                             type="button"
                             onClick={() => void buscarTrazabilidad(eq.serial)}
-                            className="text-xs font-bold text-[#E85A28] hover:underline cursor-pointer"
+                            className="text-xs font-bold text-[#003566] hover:underline cursor-pointer"
                           >
                             Ver línea de tiempo
                           </button>
@@ -443,7 +443,7 @@ export default function PaginaInventario() {
             <button
               type="submit"
               disabled={buscandoTraz}
-              className="px-5 py-2 rounded-xl bg-[#E85A28] text-white text-sm font-bold cursor-pointer"
+              className="px-5 py-2 rounded-xl bg-[#003566] text-white text-sm font-bold cursor-pointer"
             >
               {buscandoTraz ? "Buscando..." : "Rastrear"}
             </button>
@@ -453,7 +453,7 @@ export default function PaginaInventario() {
             <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-5">
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-4">
                 <div>
-                  <p className="text-xs font-mono font-bold text-[#E85A28]">
+                  <p className="text-xs font-mono font-bold text-[#003566]">
                     {trazabilidad.equipo.serial}
                   </p>
                   <h3 className="text-lg font-black text-slate-900">
@@ -477,7 +477,7 @@ export default function PaginaInventario() {
                       key={i}
                       className="flex items-start gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200"
                     >
-                      <Clock className="w-4 h-4 text-[#E85A28] mt-0.5 shrink-0" />
+                      <Clock className="w-4 h-4 text-[#003566] mt-0.5 shrink-0" />
                       <div className="text-xs space-y-0.5">
                         <p className="font-bold text-slate-900">
                           {ev.tipo} · {ev.sucursal}{" "}
@@ -670,7 +670,7 @@ export default function PaginaInventario() {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-xl bg-[#E85A28] text-white text-sm font-bold cursor-pointer"
+                  className="px-4 py-2 rounded-xl bg-[#003566] text-white text-sm font-bold cursor-pointer"
                 >
                   Enviar a Dirección
                 </button>

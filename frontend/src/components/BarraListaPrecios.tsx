@@ -58,7 +58,7 @@ export default function BarraListaPrecios({
       const sufijo = tipoPrecio === "REGULAR" ? "Regular" : "Promo";
       await descargarPdfApi(
         `/api/catalogo/lista-precios-pdf${construirQuery()}`,
-        `Lista_Precios_Tekio_${sufijo}.pdf`
+        `Lista_Precios_Alfa_${sufijo}.pdf`
       );
     } catch (err) {
       setErrorMsg(
@@ -92,7 +92,7 @@ export default function BarraListaPrecios({
   return (
     <div className="bg-white/75 backdrop-blur-md border border-white/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-2xl px-4 py-3 flex flex-wrap items-center justify-between gap-3">
       <div className="min-w-0">
-        <p className="text-xs font-semibold uppercase tracking-wide text-tekio-naranja">
+        <p className="text-xs font-semibold uppercase tracking-wide text-alfa-azul">
           Lista de Precios · Equipos Disponibles (LISTO)
         </p>
         <p className="text-xs text-neutral-500">
@@ -115,8 +115,8 @@ export default function BarraListaPrecios({
             onClick={() => setTipoPrecio("PROMO")}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
               tipoPrecio === "PROMO"
-                ? "bg-tekio-naranja text-white shadow-xs"
-                : "text-neutral-600 hover:text-tekio-carbon"
+                ? "bg-alfa-azul text-white shadow-xs"
+                : "text-neutral-600 hover:text-alfa-marino"
             }`}
           >
             Precio Promo (USD)
@@ -126,8 +126,8 @@ export default function BarraListaPrecios({
             onClick={() => setTipoPrecio("REGULAR")}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
               tipoPrecio === "REGULAR"
-                ? "bg-tekio-carbon text-white shadow-xs"
-                : "text-neutral-600 hover:text-tekio-carbon"
+                ? "bg-alfa-marino text-white shadow-xs"
+                : "text-neutral-600 hover:text-alfa-marino"
             }`}
           >
             Precio Regular (USD / Bs)
@@ -137,7 +137,7 @@ export default function BarraListaPrecios({
         <select
           value={sucursalId}
           onChange={(e) => setSucursalId(e.target.value)}
-          className="rounded-xl border border-neutral-200 bg-white/90 px-3 py-2 text-xs font-medium text-tekio-carbon focus:outline-none focus:ring-2 focus:ring-tekio-naranja/40"
+          className="rounded-xl border border-neutral-200 bg-white/90 px-3 py-2 text-xs font-medium text-alfa-marino focus:outline-none focus:ring-2 focus:ring-alfa-azul/40"
           aria-label="Sucursal para lista de precios"
         >
           <option value="">Todas las sucursales</option>
@@ -152,7 +152,7 @@ export default function BarraListaPrecios({
           type="button"
           onClick={descargarPdf}
           disabled={descargandoPdf}
-          className="inline-flex items-center gap-1.5 rounded-xl bg-tekio-naranja hover:bg-tekio-naranja-hover text-white px-3.5 py-2 text-xs font-semibold transition-colors disabled:opacity-60"
+          className="inline-flex items-center gap-1.5 rounded-xl bg-alfa-azul hover:bg-alfa-azul-hover text-white px-3.5 py-2 text-xs font-semibold transition-colors disabled:opacity-60"
         >
           {descargandoPdf ? (
             <Loader2 className="w-3.5 h-3.5 animate-spin" />

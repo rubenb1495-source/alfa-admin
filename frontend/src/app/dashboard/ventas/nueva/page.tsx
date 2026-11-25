@@ -69,6 +69,7 @@ interface FilaPago {
 
 const ROLES_VENDEDORES = new Set([
   "ASESORA",
+  "ENCARGADO_TIENDA",
   "LIDER",
   "TECNICO",
   "ADMINISTRACION",
@@ -122,6 +123,7 @@ export default function PaginaNuevaVentaPOS() {
   const [asesorId, setAsesorId] = useState("");
   const [tecnicoId, setTecnicoId] = useState("");
   const [canalVisita, setCanalVisita] = useState("Tienda");
+  const [origenVenta, setOrigenVenta] = useState<"PASILLO" | "LEAD">("PASILLO");
   const [entrega, setEntrega] = useState("Tienda");
   const [quedaConSaldo, setQuedaConSaldo] = useState(false);
   const [nota, setNota] = useState("");
@@ -241,10 +243,11 @@ export default function PaginaNuevaVentaPOS() {
         setSucursalId(String(activas[0].id));
       }
 
-      // Preseleccionar Asesor si el usuario autenticado es ASESORA, LIDER o TECNICO
+      // Preseleccionar Asesor si el usuario autenticado es ASESORA, ENCARGADO_TIENDA, LIDER o TECNICO
       if (
         usuario &&
         (usuario.rol === "ASESORA" ||
+          usuario.rol === "ENCARGADO_TIENDA" ||
           usuario.rol === "LIDER" ||
           usuario.rol === "TECNICO")
       ) {
@@ -727,6 +730,7 @@ export default function PaginaNuevaVentaPOS() {
           asesor_id: asesorId ? Number(asesorId) : null,
           tecnico_id: tecnicoId ? Number(tecnicoId) : null,
           canal_visita: canalVisita,
+          origen_venta: origenVenta,
           entrega,
           datos_entrega: datosEntregaPayload,
           items: carrito.map((c) => ({
@@ -816,6 +820,7 @@ export default function PaginaNuevaVentaPOS() {
     setServicioDescripcion("");
     setPanelServicioAbierto(false);
     setCanalVisita("Tienda");
+    setOrigenVenta("PASILLO");
     setEntrega("Tienda");
     setQuedaConSaldo(false);
     setNota("");
@@ -839,6 +844,7 @@ export default function PaginaNuevaVentaPOS() {
     if (
       usuario &&
       (usuario.rol === "ASESORA" ||
+        usuario.rol === "ENCARGADO_TIENDA" ||
         usuario.rol === "LIDER" ||
         usuario.rol === "TECNICO")
     ) {
@@ -935,7 +941,7 @@ export default function PaginaNuevaVentaPOS() {
     <div ref={inicioPosRef} className="space-y-6 min-w-0">
       <div>
         <h2 className="text-2xl font-black text-slate-900 flex items-center gap-2">
-          <ShoppingCart className="w-6 h-6 text-[#E85A28] shrink-0" />
+          <ShoppingCart className="w-6 h-6 text-[#003566] shrink-0" />
           Punto de Venta (POS) · Pagos Mixtos y Servicio Técnico
         </h2>
         <p className="text-sm text-slate-500">
@@ -945,7 +951,7 @@ export default function PaginaNuevaVentaPOS() {
       </div>
 
       {cotizacionNumero && (
-        <div className="flex items-center justify-between gap-2.5 p-3.5 rounded-xl bg-tekio-naranja-suave/80 border border-tekio-naranja/30 text-sm text-tekio-carbon">
+        <div className="flex items-center justify-between gap-2.5 p-3.5 rounded-xl bg-alfa-azul-suave/80 border border-alfa-azul/30 text-sm text-alfa-marino">
           <span>
             Convirtiendo cotización <strong>{cotizacionNumero}</strong> a venta. Al registrar el pago se marcará automáticamente como <strong>CONVERTIDA</strong>.
           </span>
@@ -1195,7 +1201,7 @@ export default function PaginaNuevaVentaPOS() {
                     setMenuClientesAbierto(true);
                   }}
                   placeholder={`Buscar cliente por nombre, cédula/RIF o teléfono (${clientes.length})...`}
-                  className="w-full min-w-0 pl-9 pr-14 py-2 rounded-xl border border-slate-300 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#E85A28]/30 focus:border-[#E85A28]"
+                  className="w-full min-w-0 pl-9 pr-14 py-2 rounded-xl border border-slate-300 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#003566]/30 focus:border-[#003566]"
                 />
                 {(clienteId || busquedaCliente) && (
                   <button
@@ -1280,6 +1286,42 @@ export default function PaginaNuevaVentaPOS() {
             )}
           </div>
 
+          {/* Selector obligatorio de Origen de Venta (Pasillo vs Lead) */}
+          <div className="p-3.5 rounded-xl bg-[#EDF3FA]/70 border border-[#003566]/20 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <label className="text-xs font-black text-[#003566] uppercase tracking-wide">
+                Origen de venta *
+              </label>
+              <span className="text-[11px] font-medium text-slate-600">
+                Define el % de comisión sobre Precio Promo USD
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setOrigenVenta("PASILLO")}
+                className={`px-3.5 py-2.5 rounded-xl text-xs font-bold border transition-all text-left cursor-pointer ${
+                  origenVenta === "PASILLO"
+                    ? "bg-[#003566] text-white border-[#003566] shadow-xs"
+                    : "bg-white text-[#000814] border-slate-200 hover:border-[#003566]/50"
+                }`}
+              >
+                Pasillo (Tienda)
+              </button>
+              <button
+                type="button"
+                onClick={() => setOrigenVenta("LEAD")}
+                className={`px-3.5 py-2.5 rounded-xl text-xs font-bold border transition-all text-left cursor-pointer ${
+                  origenVenta === "LEAD"
+                    ? "bg-[#003566] text-white border-[#003566] shadow-xs"
+                    : "bg-white text-[#000814] border-slate-200 hover:border-[#003566]/50"
+                }`}
+              >
+                Lead (Redes / WhatsApp)
+              </button>
+            </div>
+          </div>
+
           {/* Selectores de Asesor y Técnico */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
             <div className="min-w-0">
@@ -1295,7 +1337,9 @@ export default function PaginaNuevaVentaPOS() {
                 {asesoresDisponibles.map((u) => (
                   <option key={u.id} value={u.id}>
                     {u.nombre} (
-                    {u.es_lider || u.rol === "LIDER"
+                    {u.es_encargado || u.rol === "ENCARGADO_TIENDA"
+                      ? "ENCARGADO DE TIENDA"
+                      : u.es_lider || u.rol === "LIDER"
                       ? "LÍDER · Multi-tienda"
                       : u.rol}
                     )
@@ -1367,7 +1411,7 @@ export default function PaginaNuevaVentaPOS() {
                     setMenuEquiposAbierto(true);
                   }}
                   placeholder={`Buscar por serial o modelo (${equiposListos.length} en sucursal)...`}
-                  className="w-full min-w-0 pl-9 pr-16 py-2 rounded-xl border border-slate-300 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#E85A28]/30 focus:border-[#E85A28]"
+                  className="w-full min-w-0 pl-9 pr-16 py-2 rounded-xl border border-slate-300 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#003566]/30 focus:border-[#003566]"
                 />
                 {(busquedaEquipo || equipoSel) && (
                   <button
@@ -1438,7 +1482,7 @@ export default function PaginaNuevaVentaPOS() {
                       <button
                         type="button"
                         onClick={() => agregarEquipoPorObj(eq)}
-                        className="shrink-0 px-2.5 py-1.5 rounded-lg bg-[#E85A28] hover:bg-[#C9461A] text-white text-[11px] font-bold cursor-pointer"
+                        className="shrink-0 px-2.5 py-1.5 rounded-lg bg-[#003566] hover:bg-[#C9461A] text-white text-[11px] font-bold cursor-pointer"
                       >
                         + Añadir
                       </button>
@@ -1467,7 +1511,7 @@ export default function PaginaNuevaVentaPOS() {
                     setMenuSkuAbierto(true);
                   }}
                   placeholder="Buscar repuesto o accesorio por SKU, descripción o categoría..."
-                  className="w-full min-w-0 pl-9 pr-14 py-2 rounded-xl border border-slate-300 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#E85A28]/30 focus:border-[#E85A28]"
+                  className="w-full min-w-0 pl-9 pr-14 py-2 rounded-xl border border-slate-300 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#003566]/30 focus:border-[#003566]"
                 />
                 {(busquedaSku || articuloSel) && (
                   <button
@@ -1553,7 +1597,7 @@ export default function PaginaNuevaVentaPOS() {
                           setBusquedaSku("");
                           setMenuSkuAbierto(false);
                         }}
-                        className="shrink-0 px-2.5 py-1 rounded-lg bg-[#E85A28] text-white text-[11px] font-bold cursor-pointer"
+                        className="shrink-0 px-2.5 py-1 rounded-lg bg-[#003566] text-white text-[11px] font-bold cursor-pointer"
                       >
                         + Añadir
                       </button>
@@ -1897,7 +1941,7 @@ export default function PaginaNuevaVentaPOS() {
                   },
                 ])
               }
-              className="inline-flex items-center gap-1 text-xs font-bold text-[#E85A28] cursor-pointer shrink-0"
+              className="inline-flex items-center gap-1 text-xs font-bold text-[#003566] cursor-pointer shrink-0"
             >
               <Plus className="w-3.5 h-3.5" />
               Añadir pago
@@ -2143,7 +2187,7 @@ export default function PaginaNuevaVentaPOS() {
           <button
             type="submit"
             disabled={guardando || carrito.length === 0 || ventaCreada !== null}
-            className="w-full py-3 rounded-xl bg-[#E85A28] hover:bg-[#C9461A] disabled:opacity-50 disabled:cursor-not-allowed text-white font-black text-sm cursor-pointer transition-colors"
+            className="w-full py-3 rounded-xl bg-[#003566] hover:bg-[#C9461A] disabled:opacity-50 disabled:cursor-not-allowed text-white font-black text-sm cursor-pointer transition-colors"
           >
             {guardando
               ? "Registrando venta..."
@@ -2166,34 +2210,34 @@ export default function PaginaNuevaVentaPOS() {
           <section
             ref={panelPostVentaRef}
             aria-label="Acciones post-venta"
-            className="bg-white/80 backdrop-blur-md border-2 border-[#E85A28]/50 shadow-[0_12px_36px_rgb(232,90,40,0.08)] rounded-2xl p-5 sm:p-6 space-y-5"
+            className="bg-white/80 backdrop-blur-md border-2 border-[#003566]/50 shadow-[0_12px_36px_rgb(232,90,40,0.08)] rounded-2xl p-5 sm:p-6 space-y-5"
           >
             {/* Encabezado de confirmación */}
             <div className="flex flex-wrap items-start justify-between gap-4 border-b border-neutral-200/80 pb-4">
               <div className="flex items-start gap-3">
-                <div className="w-11 h-11 rounded-2xl bg-[#FDF0EB] border border-[#E85A28]/30 flex items-center justify-center shrink-0">
-                  <CheckCircle2 className="w-6 h-6 text-[#E85A28]" />
+                <div className="w-11 h-11 rounded-2xl bg-[#EDF3FA] border border-[#003566]/30 flex items-center justify-center shrink-0">
+                  <CheckCircle2 className="w-6 h-6 text-[#003566]" />
                 </div>
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="inline-flex items-center px-3 py-1 rounded-full bg-[#E85A28] text-white text-xs font-black tracking-wide">
+                    <span className="inline-flex items-center px-3 py-1 rounded-full bg-[#003566] text-white text-xs font-black tracking-wide">
                       Nota {ventaCreada.numero_venta}
                     </span>
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold">
                       {ventaCreada.estado}
                     </span>
                   </div>
-                  <h3 className="text-lg font-black text-[#191818] mt-1">
+                  <h3 className="text-lg font-black text-[#000814] mt-1">
                     ¡Venta registrada correctamente!
                   </h3>
                   <p className="text-xs text-neutral-600 mt-0.5">
-                    Cliente: <strong className="text-[#191818]">{ventaCreada.cliente}</strong>
+                    Cliente: <strong className="text-[#000814]">{ventaCreada.cliente}</strong>
                     {ventaCreada.cliente_rif ? ` (${ventaCreada.cliente_rif})` : ""} · Total Promo:{" "}
-                    <strong className="tabular-nums text-[#191818]">
+                    <strong className="tabular-nums text-[#000814]">
                       {formatearUsd(ventaCreada.total_promo_usd)}
                     </strong>{" "}
                     · Regular:{" "}
-                    <strong className="tabular-nums text-[#191818]">
+                    <strong className="tabular-nums text-[#000814]">
                       {formatearUsd(ventaCreada.total_regular_usd)}
                     </strong>
                   </p>
@@ -2204,7 +2248,7 @@ export default function PaginaNuevaVentaPOS() {
               <button
                 type="button"
                 onClick={iniciarNuevaVenta}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#191818] hover:bg-[#2E2D2D] text-white text-xs font-bold transition-colors cursor-pointer shrink-0"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#000814] hover:bg-[#2E2D2D] text-white text-xs font-bold transition-colors cursor-pointer shrink-0"
               >
                 <Plus className="w-4 h-4" />
                 + Nueva Venta
@@ -2223,7 +2267,7 @@ export default function PaginaNuevaVentaPOS() {
                     type="button"
                     disabled={abriendoPdf}
                     onClick={() => void abrirNotaParaImprimir(ventaCreada)}
-                    className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-[#E85A28] hover:bg-[#D14D1F] disabled:opacity-60 text-white text-sm font-black shadow-sm transition-colors cursor-pointer"
+                    className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-[#003566] hover:bg-[#001D3D] disabled:opacity-60 text-white text-sm font-black shadow-sm transition-colors cursor-pointer"
                   >
                     <Printer className="w-4 h-4" />
                     {abriendoPdf ? "Abriendo PDF..." : "Imprimir Nota"}
@@ -2236,9 +2280,9 @@ export default function PaginaNuevaVentaPOS() {
                         `Nota_${ventaCreada.numero_venta}.pdf`
                       )
                     }
-                    className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-neutral-300 bg-white/90 hover:bg-neutral-50 text-[#191818] text-xs font-bold transition-colors cursor-pointer"
+                    className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-neutral-300 bg-white/90 hover:bg-neutral-50 text-[#000814] text-xs font-bold transition-colors cursor-pointer"
                   >
-                    <FileDown className="w-4 h-4 text-[#E85A28]" />
+                    <FileDown className="w-4 h-4 text-[#003566]" />
                     Descargar PDF ({ventaCreada.numero_venta})
                   </button>
                 </div>
@@ -2281,7 +2325,7 @@ export default function PaginaNuevaVentaPOS() {
                   </div>
                 </div>
 
-                <div className="max-h-56 overflow-y-auto rounded-xl border border-neutral-200/90 bg-neutral-50/90 p-3.5 text-xs font-mono text-[#191818] whitespace-pre-wrap leading-relaxed select-all">
+                <div className="max-h-56 overflow-y-auto rounded-xl border border-neutral-200/90 bg-neutral-50/90 p-3.5 text-xs font-mono text-[#000814] whitespace-pre-wrap leading-relaxed select-all">
                   {mensajeWa}
                 </div>
               </div>
@@ -2325,7 +2369,7 @@ export default function PaginaNuevaVentaPOS() {
                   }}
                   className={`py-2 rounded-xl text-xs font-bold border cursor-pointer ${
                     cliTipoPersona === "NATURAL"
-                      ? "bg-[#E85A28] border-[#E85A28] text-white"
+                      ? "bg-[#003566] border-[#003566] text-white"
                       : "bg-white border-slate-300 text-slate-700"
                   }`}
                 >
@@ -2339,7 +2383,7 @@ export default function PaginaNuevaVentaPOS() {
                   }}
                   className={`py-2 rounded-xl text-xs font-bold border cursor-pointer ${
                     cliTipoPersona === "JURIDICO"
-                      ? "bg-[#E85A28] border-[#E85A28] text-white"
+                      ? "bg-[#003566] border-[#003566] text-white"
                       : "bg-white border-slate-300 text-slate-700"
                   }`}
                 >
@@ -2386,7 +2430,7 @@ export default function PaginaNuevaVentaPOS() {
                     placeholder={
                       cliTipoPersona === "NATURAL"
                         ? "Ej: 24567890"
-                        : "Ej: 506375184"
+                        : "Ej: 507937941"
                     }
                     className="flex-1 px-3 py-2 rounded-xl border border-slate-300 text-sm font-mono"
                   />

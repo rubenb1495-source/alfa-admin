@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
-import SplashTekio from "@/components/SplashTekio";
+import SplashAlfa from "@/components/SplashAlfa";
 import { ProveedorSesion } from "@/contexto/SesionContexto";
 import "./globals.css";
 
@@ -12,9 +12,9 @@ const plusJakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Sistema Administrativo · Alfa Importaciones",
+  title: "Sistema Administrativo · Alfa Digital Store",
   description:
-    "Sistema administrativo centralizado de Alfa Importaciones.",
+    "Sistema administrativo centralizado de Alfa Importaciones, C.A. (Alfa Digital Store).",
 };
 
 export default function DisenoRaiz({
@@ -24,8 +24,8 @@ export default function DisenoRaiz({
 }>) {
   return (
     <html lang="es" className={plusJakarta.variable}>
-      <body className="font-sans antialiased min-h-screen text-[#191818]">
-        <SplashTekio />
+      <body className="font-sans antialiased min-h-screen text-[#000814]">
+        <SplashAlfa />
         <ProveedorSesion>{children}</ProveedorSesion>
       </body>
     </html>

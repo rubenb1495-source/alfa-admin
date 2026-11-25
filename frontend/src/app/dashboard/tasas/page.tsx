@@ -177,7 +177,7 @@ export default function PaginaTasas() {
           <p className="text-xs font-bold uppercase text-slate-500">
             Recargo del día
           </p>
-          <p className="text-2xl font-black text-[#E85A28] mt-1">
+          <p className="text-2xl font-black text-[#003566] mt-1">
             {formatearPorcentaje(tasaHoy?.recargo_porcentaje)}
           </p>
         </div>
@@ -187,7 +187,7 @@ export default function PaginaTasas() {
       {puedeEditar && (
         <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-4">
           <div className="flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-[#E85A28]" />
+            <TrendingUp className="w-5 h-5 text-[#003566]" />
             <h3 className="text-base font-bold text-slate-900">
               Cargar o actualizar tasa de hoy ({tasaHoy?.fecha || "Hoy"})
             </h3>
@@ -259,7 +259,7 @@ export default function PaginaTasas() {
               <button
                 type="submit"
                 disabled={guardando}
-                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#E85A28] hover:bg-[#C9461A] text-white text-sm font-bold disabled:opacity-60 cursor-pointer"
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#003566] hover:bg-[#C9461A] text-white text-sm font-bold disabled:opacity-60 cursor-pointer"
               >
                 <Save className="w-4 h-4" />
                 {guardando ? "Guardando..." : "Guardar tasa hoy"}
@@ -285,7 +285,7 @@ export default function PaginaTasas() {
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
         <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
           <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide flex items-center gap-2">
-            <Calendar className="w-4 h-4 text-[#E85A28]" />
+            <Calendar className="w-4 h-4 text-[#003566]" />
             Historial inmutable de tasas ({total})
           </h3>
         </div>

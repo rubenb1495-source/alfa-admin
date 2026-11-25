@@ -848,7 +848,7 @@ def descargar_lista_precios_pdf(
         content=pdf_bytes,
         media_type="application/pdf",
         headers={
-            "Content-Disposition": f'inline; filename="lista-precios-tekio-{sufijo}-{datos["fecha_emision"]}.pdf"'
+            "Content-Disposition": f'inline; filename="lista-precios-alfa-{sufijo}-{datos["fecha_emision"]}.pdf"'
         },
     )
 

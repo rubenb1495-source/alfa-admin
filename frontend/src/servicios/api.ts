@@ -1,6 +1,6 @@
 import type { RolUsuario } from "@/tipos/dominio";
 
-const CLAVE_TOKEN = "tekio_admin_token";
+const CLAVE_TOKEN = "Alfa_admin_token";
 const URL_BASE_API =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, "") ||
   process.env.NEXT_PUBLIC_URL_API_PYTHON?.replace(/\/+$/, "") ||

@@ -34,7 +34,7 @@ export default function BuscadorTabla({
           value={valor}
           onChange={(e) => alCambiar(e.target.value)}
           placeholder={placeholder}
-          className="w-full min-w-0 pl-9 pr-8 py-2 rounded-xl border border-slate-300 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#E85A28]/30 focus:border-[#E85A28]"
+          className="w-full min-w-0 pl-9 pr-8 py-2 rounded-xl border border-slate-300 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#003566]/30 focus:border-[#003566]"
         />
         {valor && (
           <button

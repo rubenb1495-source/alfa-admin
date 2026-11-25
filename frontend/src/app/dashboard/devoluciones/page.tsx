@@ -98,7 +98,7 @@ export default function PaginaDevoluciones() {
         <button
           type="button"
           onClick={() => setModalNueva(true)}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#E85A28] hover:bg-[#C9461A] text-white text-sm font-bold cursor-pointer"
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#003566] hover:bg-[#C9461A] text-white text-sm font-bold cursor-pointer"
         >
           <Plus className="w-4 h-4" />
           Nueva Nota de Crédito
@@ -263,7 +263,7 @@ export default function PaginaDevoluciones() {
                 <button
                   type="submit"
                   disabled={guardando}
-                  className="px-4 py-2 rounded-xl bg-[#E85A28] text-white text-sm font-bold cursor-pointer"
+                  className="px-4 py-2 rounded-xl bg-[#003566] text-white text-sm font-bold cursor-pointer"
                 >
                   Emitir Nota de Crédito
                 </button>

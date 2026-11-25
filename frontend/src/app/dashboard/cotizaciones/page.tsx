@@ -298,8 +298,8 @@ export default function PaginaCotizaciones() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-black text-tekio-carbon flex items-center gap-2">
-          <ClipboardList className="w-6 h-6 text-tekio-naranja" />
+        <h2 className="text-2xl font-black text-alfa-marino flex items-center gap-2">
+          <ClipboardList className="w-6 h-6 text-alfa-azul" />
           Cotizaciones de Equipos
         </h2>
         <p className="text-sm text-neutral-500">
@@ -432,7 +432,7 @@ export default function PaginaCotizaciones() {
             <button
               type="button"
               onClick={agregarEquipo}
-              className="inline-flex items-center gap-1 rounded-xl bg-tekio-naranja hover:bg-tekio-naranja-hover text-white px-3.5 py-2 text-xs font-bold shrink-0"
+              className="inline-flex items-center gap-1 rounded-xl bg-alfa-azul hover:bg-alfa-azul-hover text-white px-3.5 py-2 text-xs font-bold shrink-0"
             >
               <Plus className="w-4 h-4" />
               Equipo
@@ -455,7 +455,7 @@ export default function PaginaCotizaciones() {
             <button
               type="button"
               onClick={agregarArticulo}
-              className="inline-flex items-center gap-1 rounded-xl border border-neutral-300 bg-white hover:bg-neutral-50 text-tekio-carbon px-3.5 py-2 text-xs font-bold shrink-0"
+              className="inline-flex items-center gap-1 rounded-xl border border-neutral-300 bg-white hover:bg-neutral-50 text-alfa-marino px-3.5 py-2 text-xs font-bold shrink-0"
             >
               <Plus className="w-4 h-4" />
               Ítem
@@ -472,7 +472,7 @@ export default function PaginaCotizaciones() {
                 className="p-3 flex flex-wrap items-center justify-between gap-3"
               >
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-tekio-carbon">
+                  <p className="text-sm font-semibold text-alfa-marino">
                     {l.descripcion}
                   </p>
                 </div>
@@ -523,7 +523,7 @@ export default function PaginaCotizaciones() {
                     }
                     className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold border ${
                       l.es_obsequio
-                        ? "bg-tekio-naranja-suave border-tekio-naranja text-tekio-naranja"
+                        ? "bg-alfa-azul-suave border-alfa-azul text-alfa-azul"
                         : "bg-white border-neutral-200 text-neutral-600"
                     }`}
                   >
@@ -560,7 +560,7 @@ export default function PaginaCotizaciones() {
                 Total{" "}
                 {modalidad === "DIVISAS" ? "Divisas (USD)" : "Regular (USD / Bs)"}
               </p>
-              <p className="text-lg font-black text-tekio-naranja">
+              <p className="text-lg font-black text-alfa-azul">
                 {formatearUsd(
                   modalidad === "DIVISAS"
                     ? totalesEstimados.promo
@@ -577,7 +577,7 @@ export default function PaginaCotizaciones() {
             <button
               type="submit"
               disabled={guardando}
-              className="inline-flex items-center gap-2 rounded-xl bg-tekio-naranja hover:bg-tekio-naranja-hover text-white px-5 py-2.5 text-sm font-bold transition-colors disabled:opacity-60"
+              className="inline-flex items-center gap-2 rounded-xl bg-alfa-azul hover:bg-alfa-azul-hover text-white px-5 py-2.5 text-sm font-bold transition-colors disabled:opacity-60"
             >
               {guardando ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -593,7 +593,7 @@ export default function PaginaCotizaciones() {
       {/* Historial de cotizaciones */}
       <div className="bg-white/75 backdrop-blur-md border border-white/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-2xl p-5 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h3 className="text-base font-bold text-tekio-carbon">
+          <h3 className="text-base font-bold text-alfa-marino">
             Historial de Cotizaciones ({filtradas.length})
           </h3>
           <div className="w-full sm:w-80">
@@ -634,7 +634,7 @@ export default function PaginaCotizaciones() {
                   return (
                     <tr key={c.id} className="hover:bg-white/60">
                       <td className="py-3 px-3">
-                        <p className="font-bold text-tekio-carbon">
+                        <p className="font-bold text-alfa-marino">
                           {c.numero_cotizacion}
                         </p>
                         <p className="text-xs text-neutral-500">
@@ -642,7 +642,7 @@ export default function PaginaCotizaciones() {
                         </p>
                       </td>
                       <td className="py-3 px-3">
-                        <p className="font-semibold text-tekio-carbon">
+                        <p className="font-semibold text-alfa-marino">
                           {c.cliente}
                         </p>
                         <p className="text-xs text-neutral-500">
@@ -664,7 +664,7 @@ export default function PaginaCotizaciones() {
                         </p>
                       </td>
                       <td className="py-3 px-3 text-right tabular-nums">
-                        <p className="font-bold text-tekio-carbon">
+                        <p className="font-bold text-alfa-marino">
                           {formatearUsd(totalUsd)}
                         </p>
                         {!esDivisas && c.total_regular_bs > 0 && (
@@ -678,9 +678,9 @@ export default function PaginaCotizaciones() {
                           <button
                             type="button"
                             onClick={() => void abrirPdf(c)}
-                            className="inline-flex items-center gap-1 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-50 px-2.5 py-1.5 text-xs font-semibold text-tekio-carbon"
+                            className="inline-flex items-center gap-1 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-50 px-2.5 py-1.5 text-xs font-semibold text-alfa-marino"
                           >
-                            <FileDown className="w-3.5 h-3.5 text-tekio-naranja" />
+                            <FileDown className="w-3.5 h-3.5 text-alfa-azul" />
                             PDF
                           </button>
                           <button
@@ -699,7 +699,7 @@ export default function PaginaCotizaciones() {
                             <>
                               <Link
                                 href={`/dashboard/ventas/nueva?cotizacion_id=${c.id}`}
-                                className="inline-flex items-center gap-1 rounded-lg bg-tekio-naranja hover:bg-tekio-naranja-hover text-white px-2.5 py-1.5 text-xs font-bold"
+                                className="inline-flex items-center gap-1 rounded-lg bg-alfa-azul hover:bg-alfa-azul-hover text-white px-2.5 py-1.5 text-xs font-bold"
                               >
                                 <ArrowRightCircle className="w-3.5 h-3.5" />
                                 Convertir a Venta

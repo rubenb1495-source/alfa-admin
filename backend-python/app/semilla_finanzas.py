@@ -25,7 +25,7 @@ RENOMBRES_INSTRUMENTOS: dict[str, str] = {
     "Bancamiga Pago Móvil": "Bancamiga (Bs)",
 }
 
-# Catálogo oficial exacto de 14 instrumentos financieros de Tekio Electronics
+# Catálogo oficial exacto de 14 instrumentos financieros de Alfa Digital Store
 INSTRUMENTOS_INICIALES = [
     # Divisas / Cripto (PROMO, liquida_en_bs=False)
     ("Efectivo divisas", MonedaInstrumento.USD.value, TipoPrecioInstrumento.PROMO.value, False, False),

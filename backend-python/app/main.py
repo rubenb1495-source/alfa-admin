@@ -56,6 +56,14 @@ def asegurar_columnas_compatibles() -> None:
                         "ADD COLUMN datos_entrega_json TEXT NOT NULL DEFAULT ''"
                     )
                 )
+        if "origen_venta" not in columnas_vta:
+            with motor.begin() as conexion:
+                conexion.execute(
+                    text(
+                        "ALTER TABLE ventas "
+                        "ADD COLUMN origen_venta VARCHAR(20) NOT NULL DEFAULT 'PASILLO'"
+                    )
+                )
 
 
 @asynccontextmanager
@@ -88,7 +96,7 @@ app.add_middleware(
 
 @app.get("/api/salud", tags=["Sistema"])
 def verificar_salud() -> dict[str, str]:
-    return {"estado": "activo", "servicio": "Tekio Electronics API - Fase 1"}
+    return {"estado": "activo", "servicio": "Alfa Importaciones API"}
 
 
 app.include_router(autenticacion.enrutador)

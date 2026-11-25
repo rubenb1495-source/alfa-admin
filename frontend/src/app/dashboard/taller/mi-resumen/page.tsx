@@ -56,7 +56,7 @@ export default function PaginaMiResumenTecnico() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-black text-slate-900 flex items-center gap-2">
-            <Award className="w-6 h-6 text-[#E85A28]" />
+            <Award className="w-6 h-6 text-[#003566]" />
             Mi Resumen Mensual de Taller
           </h2>
           <p className="text-sm text-slate-500">
@@ -128,7 +128,7 @@ export default function PaginaMiResumenTecnico() {
                 {formatearUsd(resumen.comision_asesor_usd)}
               </p>
             </div>
-            <div className="bg-gradient-to-br from-[#E85A28] to-[#C9461A] p-5 rounded-2xl text-white">
+            <div className="bg-gradient-to-br from-[#003566] to-[#C9461A] p-5 rounded-2xl text-white">
               <p className="text-xs font-bold uppercase text-orange-100">
                 Total del mes
               </p>

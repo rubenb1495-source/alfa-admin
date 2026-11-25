@@ -1,1 +1,1 @@
-# Paquete principal del backend FastAPI de Tekio Electronics
+# Paquete principal del backend FastAPI de Alfa Digital Store

@@ -25,11 +25,14 @@ export interface SimulacionVenta {
   estado: "CUADRADA" | "CON_SALDO";
 }
 
+export type OrigenVenta = "PASILLO" | "LEAD";
+
 export interface UsuarioOperativo {
   id: number;
   nombre: string;
   rol: string;
   es_lider?: boolean;
+  es_encargado?: boolean;
   sucursal_id: number | null;
 }
 
@@ -50,6 +53,7 @@ export interface VentaResumen {
   tecnico_id?: number | null;
   tecnico?: string | null;
   canal_visita: string;
+  origen_venta?: OrigenVenta;
   tipo_entrega: string;
   datos_entrega?: Record<string, string> | null;
   tasa_bcv_snapshot: number;
@@ -161,6 +165,12 @@ export interface ComisionPersona {
   usuario_id: number;
   nombre: string;
   rol: string;
+  ventas_pasillo_usd: number;
+  porcentaje_pasillo: number;
+  comision_pasillo_usd: number;
+  ventas_leads_usd: number;
+  porcentaje_leads: number;
+  comision_leads_usd: number;
   ventas_promo_usd: number;
   comision_ventas_1_usd: number;
   comision_lider_05_usd: number;

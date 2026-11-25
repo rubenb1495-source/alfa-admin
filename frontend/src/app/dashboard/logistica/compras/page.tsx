@@ -307,7 +307,7 @@ export default function PaginaCompras() {
 
         <div className="flex flex-wrap items-center gap-2">
           <label className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-300 hover:bg-slate-50 text-sm font-bold text-slate-800 cursor-pointer">
-            <Upload className="w-4 h-4 text-[#E85A28]" />
+            <Upload className="w-4 h-4 text-[#003566]" />
             <span>
               {validandoArchivo ? "Validando..." : "Importar Excel/CSV"}
             </span>
@@ -322,7 +322,7 @@ export default function PaginaCompras() {
           <button
             type="button"
             onClick={() => setModalNueva(true)}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#E85A28] hover:bg-[#C9461A] text-white text-sm font-bold cursor-pointer"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#003566] hover:bg-[#C9461A] text-white text-sm font-bold cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             Nueva compra
@@ -348,7 +348,7 @@ export default function PaginaCompras() {
         <div className="bg-white rounded-2xl border-2 border-slate-300 p-5 space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
-              <FileSpreadsheet className="w-5 h-5 text-[#E85A28]" />
+              <FileSpreadsheet className="w-5 h-5 text-[#003566]" />
               <div>
                 <h3 className="font-bold text-slate-900">
                   Previsualización: {validacion.nombre_archivo}
@@ -375,7 +375,7 @@ export default function PaginaCompras() {
                 type="button"
                 disabled={!validacion.puede_confirmar || guardando}
                 onClick={() => void confirmarCargaDesdeArchivo()}
-                className="px-4 py-2 rounded-xl bg-[#E85A28] hover:bg-[#C9461A] disabled:opacity-40 text-white text-xs font-bold cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-[#003566] hover:bg-[#C9461A] disabled:opacity-40 text-white text-xs font-bold cursor-pointer"
               >
                 {guardando ? "Procesando..." : "Confirmar carga"}
               </button>
@@ -617,7 +617,7 @@ export default function PaginaCompras() {
                         },
                       ])
                     }
-                    className="text-xs font-bold text-[#E85A28] cursor-pointer"
+                    className="text-xs font-bold text-[#003566] cursor-pointer"
                   >
                     + Añadir fila
                   </button>
@@ -732,7 +732,7 @@ export default function PaginaCompras() {
                 <button
                   type="submit"
                   disabled={guardando}
-                  className="px-4 py-2 rounded-xl bg-[#E85A28] hover:bg-[#C9461A] text-white text-sm font-bold disabled:opacity-60 cursor-pointer"
+                  className="px-4 py-2 rounded-xl bg-[#003566] hover:bg-[#C9461A] text-white text-sm font-bold disabled:opacity-60 cursor-pointer"
                 >
                   {guardando ? "Guardando..." : "Registrar compra"}
                 </button>

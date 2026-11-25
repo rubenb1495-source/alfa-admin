@@ -61,10 +61,16 @@ export function formatearWhatsAppVenta(venta: VentaResumen): string {
     ? ` · ${etiquetaDoc}: ${venta.cliente_rif}`
     : "";
 
+  const origenTxt =
+    (venta.origen_venta || "PASILLO").toUpperCase() === "LEAD"
+      ? "Lead (Redes / WhatsApp)"
+      : "Pasillo (Tienda)";
+
   const lineas: string[] = [
-    `🧾 *TEKIO ELECTRONICS · Nota ${venta.numero_venta}*`,
+    `🧾 *ALFA DIGITAL STORE · Nota ${venta.numero_venta}*`,
     `📅 Fecha: ${formatearFechaHora(venta.fecha, venta.creado_en)}`,
-    `🏪 Sucursal: ${venta.sucursal || "Tekio central"} · Entrega: ${venta.tipo_entrega} · Canal: ${venta.canal_visita}`,
+    `🏪 Sucursal: ${venta.sucursal || "Local T38"} · Entrega: ${venta.tipo_entrega} · Canal: ${venta.canal_visita}`,
+    `🏷️ Origen de venta: *${origenTxt}*`,
     `👤 Cliente: ${venta.cliente}${docTxt}${venta.cliente_telefono ? ` · Tel: ${venta.cliente_telefono}` : ""}`,
     ...(venta.cliente_direccion && venta.cliente_direccion.trim()
       ? [`📍 Dirección: ${venta.cliente_direccion.trim()}`]
@@ -227,7 +233,7 @@ export function formatearWhatsAppPago(
     "Sistema";
 
   const lineas: string[] = [
-    `🏦 *TEKIO ELECTRONICS · Movimiento Bancario*`,
+    `🏦 *ALFA DIGITAL STORE · Movimiento Bancario*`,
     `📌 Tipo: *${tipoMov}* · Documento: *${tipoDoc}*`,
     `📅 Fecha: ${pago.fecha}`,
     `💳 Instrumento / Banco: *${pago.instrumento || "Instrumento"}*`,
@@ -260,7 +266,7 @@ export function formatearWhatsAppPago(
  */
 export function formatearWhatsAppTraslado(traslado: TrasladoResumen): string {
   const lineas: string[] = [
-    `🚚 *TEKIO ELECTRONICS · Traslado ${traslado.numero_traslado}*`,
+    `🚚 *ALFA DIGITAL STORE · Traslado ${traslado.numero_traslado}*`,
     `📅 Fecha despacho: ${traslado.fecha_envio}${traslado.fecha_recepcion ? ` · Recepción: ${traslado.fecha_recepcion}` : ""}`,
     `📍 Ruta: *${traslado.origen || "Origen"}* ➔ *${traslado.destino || "Destino"}*`,
     `📌 Estado: *${traslado.estado}*`,
@@ -301,11 +307,11 @@ export function formatearWhatsAppDevolucion(
   dev: DevolucionGarantiaResumen
 ): string {
   const lineas: string[] = [
-    `🔄 *TEKIO ELECTRONICS · ${dev.numero_operacion}*`,
+    `🔄 *ALFA DIGITAL STORE · ${dev.numero_operacion}*`,
     `📋 Resolución: *${ETIQUETAS_DEVOLUCION[dev.tipo_resolucion] || dev.tipo_resolucion}*`,
     `📅 Fecha: ${dev.fecha} · Venta original: *${dev.numero_venta || "N/A"}*`,
     `👤 Cliente: ${dev.cliente}${dev.cliente_telefono ? ` · Tel: ${dev.cliente_telefono}` : ""}`,
-    `🏪 Sucursal: ${dev.sucursal || "Tekio central"} · Autorizado por: ${dev.autorizado_por || "Tekio"}`,
+    `🏪 Sucursal: ${dev.sucursal || "Local T38"} · Autorizado por: ${dev.autorizado_por || "Alfa"}`,
     "",
   ];
 
@@ -329,7 +335,7 @@ export function formatearWhatsAppDevolucion(
   }
 
   if (dev.tipo_resolucion === "CAMBIO_IGUAL" || dev.tipo_resolucion === "GARANTIA_COMPONENTE") {
-    lineas.push("💵 *Diferencia:* $0.00 (Cubierto por garantía Tekio)");
+    lineas.push("💵 *Diferencia:* $0.00 (Cubierto por garantía Alfa Digital Store)");
   } else if (dev.tipo_resolucion === "CAMBIO_UPGRADE") {
     lineas.push(
       `💵 *Diferencia abonada:* ${formatearUsd(Math.abs(dev.diferencia_usd))}${dev.instrumento ? ` · ${dev.instrumento}` : ""}${dev.referencia_pago ? ` · Ref: ${dev.referencia_pago}` : ""}`
@@ -361,7 +367,7 @@ export function formatearWhatsAppListaPrecios(
 ): string {
   const esRegular = lista.tipo_precio === "REGULAR";
   const lineas: string[] = [
-    `💻 *TEKIO ELECTRONICS · EQUIPOS DISPONIBLES*`,
+    `💻 *ALFA DIGITAL STORE · EQUIPOS DISPONIBLES*`,
     `📅 Fecha: ${lista.fecha_emision} · 🏪 ${lista.sucursal}`,
     ...(esRegular && lista.tasa_bcv && lista.tasa_bcv > 0
       ? [`💱 Tasa BCV ref.: ${formatearBs(lista.tasa_bcv)}`]
@@ -398,8 +404,8 @@ export function formatearWhatsAppListaPrecios(
 
   lineas.push(
     "",
-    "🛡️ _Todos nuestros equipos incluyen 180 días de garantía Tekio Electronics._",
-    "📲 WhatsApp: +58 424-4152658 · Valencia, Edo. Carabobo"
+    "🛡️ _Todos nuestros equipos incluyen 180 días de garantía ALFA DIGITAL STORE._",
+    "📲 WhatsApp: CC Free Market, Local T38 · Naguanagua, Valencia"
   );
   return lineas.join("\n");
 }
@@ -415,10 +421,10 @@ export function formatearWhatsAppCotizacion(cot: CotizacionResumen): string {
   const etiquetaDoc = esJuridico ? "RIF" : "Cédula de Identidad";
 
   const lineas: string[] = [
-    `📋 *TEKIO ELECTRONICS · COTIZACIÓN ${cot.numero_cotizacion}*`,
+    `📋 *ALFA DIGITAL STORE · COTIZACIÓN ${cot.numero_cotizacion}*`,
     `📅 Emisión: ${cot.fecha} · ⏳ Vigencia: ${cot.vigencia_horas}h`,
     `👤 Cliente: ${cot.cliente}${cot.cliente_rif ? ` · ${etiquetaDoc}: ${cot.cliente_rif}` : ""}`,
-    `🏪 Sucursal: ${cot.sucursal || "Tekio central"} · 🤝 Asesor: ${cot.asesor || "Tienda"}`,
+    `🏪 Sucursal: ${cot.sucursal || "Local T38"} · 🤝 Asesor: ${cot.asesor || "Tienda"}`,
     "",
     "📦 *Detalle cotizado:*",
   ];

@@ -88,7 +88,7 @@ export default function PaginaConciliacion() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-black text-slate-900 flex items-center gap-2">
-            <FileSpreadsheet className="w-6 h-6 text-[#E85A28]" />
+            <FileSpreadsheet className="w-6 h-6 text-[#003566]" />
             Conciliación Bancaria (CSV / Excel)
           </h2>
           <p className="text-sm text-slate-500">
@@ -109,7 +109,7 @@ export default function PaginaConciliacion() {
             ))}
           </select>
 
-          <label className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#E85A28] text-white text-sm font-bold cursor-pointer">
+          <label className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#003566] text-white text-sm font-bold cursor-pointer">
             <Upload className="w-4 h-4" />
             <span>{cargando ? "Procesando..." : "Importar Extracto"}</span>
             <input

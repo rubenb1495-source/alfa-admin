@@ -206,7 +206,7 @@ export default function PaginaPreparaciones() {
       {/* Formulario de preparación */}
       <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-4">
         <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-          <Wrench className="w-4 h-4 text-[#E85A28]" />
+          <Wrench className="w-4 h-4 text-[#003566]" />
           Registrar preparación de equipo
         </h3>
 
@@ -311,7 +311,7 @@ export default function PaginaPreparaciones() {
                     { articulo_id: "", cantidad: "1" },
                   ])
                 }
-                className="inline-flex items-center gap-1 text-xs font-bold text-[#E85A28] cursor-pointer"
+                className="inline-flex items-center gap-1 text-xs font-bold text-[#003566] cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
                 Agregar componente
@@ -427,7 +427,7 @@ export default function PaginaPreparaciones() {
             <button
               type="submit"
               disabled={guardando}
-              className="px-5 py-2.5 rounded-xl bg-[#E85A28] hover:bg-[#C9461A] text-white text-sm font-bold disabled:opacity-60 cursor-pointer"
+              className="px-5 py-2.5 rounded-xl bg-[#003566] hover:bg-[#C9461A] text-white text-sm font-bold disabled:opacity-60 cursor-pointer"
             >
               {guardando ? "Guardando..." : "Registrar preparación"}
             </button>

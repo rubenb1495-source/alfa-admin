@@ -2,13 +2,13 @@
 
 import React, { useEffect, useState } from "react";
 
-const CLAVE_SESION_SPLASH = "tekio_splash_visto";
+const CLAVE_SESION_SPLASH = "alfa_splash_visto";
 
 /**
- * Animación breve (~1.3s) del isotipo de Tekio al abrir la aplicación
+ * Animación breve (~1.3s) del isotipo de Alfa Digital Store al abrir la aplicación
  * (una sola vez por sesión, respeta prefers-reduced-motion y no bloquea la carga).
  */
-export default function SplashTekio() {
+export default function SplashAlfa() {
   const [visible, setVisible] = useState(false);
   const [saliendo, setSaliendo] = useState(false);
 
@@ -44,22 +44,22 @@ export default function SplashTekio() {
   return (
     <div
       aria-hidden="true"
-      className={`fixed inset-0 z-[100] flex flex-col items-center justify-center bg-[#F6F6F6]/90 backdrop-blur-md transition-opacity duration-350 ${
+      className={`fixed inset-0 z-[100] flex flex-col items-center justify-center bg-[#F7F9FC]/92 backdrop-blur-md transition-opacity duration-350 ${
         saliendo ? "opacity-0 pointer-events-none" : "opacity-100"
       }`}
     >
       <div className="relative flex items-center justify-center">
-        <div className="animacion-splash-halo absolute w-28 h-28 rounded-full bg-[#E85A28]/25 blur-xl" />
+        <div className="animacion-splash-halo absolute w-28 h-28 rounded-full bg-[#003566]/20 blur-xl" />
         <img
-          src="/brand/tekio-isotipo.png"
-          alt="Tekio Electronics"
+          src="/brand/alfa-isotipo.png"
+          alt="Alfa Digital Store"
           width={76}
           height={76}
           className="animacion-splash-isotipo relative w-[76px] h-[76px] object-contain"
         />
       </div>
-      <p className="mt-4 text-[11px] font-bold uppercase tracking-[0.26em] text-[#191818]/70">
-        tekio electronics
+      <p className="mt-4 text-[11px] font-bold uppercase tracking-[0.26em] text-[#001D3D]/75">
+        alfa digital store
       </p>
     </div>
   );

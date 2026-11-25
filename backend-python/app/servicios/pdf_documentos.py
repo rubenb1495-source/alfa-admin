@@ -14,12 +14,12 @@ from app.modelos_operaciones import Cotizacion, DevolucionGarantia, ModalidadCot
 from app.utils.pdf_branding import dibujar_marca_de_agua
 
 
-RUTA_LOGO_PDF = Path(__file__).resolve().parent.parent.parent / "assets" / "tekio-logo-horizontal.png"
+RUTA_LOGO_PDF = Path(__file__).resolve().parent.parent.parent / "assets" / "alfa-logo-horizontal.png"
 
 ETIQUETAS_RESOLUCION: dict[str, str] = {
     TipoResolucionDevolucion.CAMBIO_IGUAL.value: "Cambio por Equipo Igual (Garantía / Reemplazo)",
     TipoResolucionDevolucion.GARANTIA_COMPONENTE.value: "Garantía de Componente / Taller",
-    TipoResolucionDevolucion.CAMBIO_UPGRADE.value: "Cambio con Upgrade (Diferencia a Favor de Tekio)",
+    TipoResolucionDevolucion.CAMBIO_UPGRADE.value: "Cambio con Upgrade (Diferencia a Favor de Alfa)",
     TipoResolucionDevolucion.CAMBIO_DOWNGRADE.value: "Cambio con Downgrade (Diferencia a Favor del Cliente)",
     TipoResolucionDevolucion.REEMBOLSO_TOTAL.value: "Reembolso Total / Devolución de Venta",
 }
@@ -72,8 +72,8 @@ def _dibujar_encabezado_corporativo(
 ) -> float:
     dibujar_marca_de_agua(pdf)
 
-    # Franja superior sutil en Naranja Tekio (#E85A28)
-    pdf.setFillColorRGB(0.91, 0.35, 0.16)
+    # Franja superior sutil en Azul Alfa (#003566)
+    pdf.setFillColorRGB(0.0, 0.208, 0.40)
     pdf.rect(0, alto - 0.08 * inch, ancho, 0.08 * inch, fill=1, stroke=0)
 
     if RUTA_LOGO_PDF.exists():
@@ -87,31 +87,31 @@ def _dibujar_encabezado_corporativo(
             anchor="sw",
             mask="auto",
         )
-        pdf.setFillColorRGB(0.098, 0.094, 0.094)
+        pdf.setFillColorRGB(0.0, 0.031, 0.078)
         pdf.setFont("Helvetica-Bold", 8.5)
-        pdf.drawString(0.50 * inch, alto - 0.70 * inch, "TEKIO ELECTRONICS 2024, C.A. · RIF: J-50637518-4")
+        pdf.drawString(0.50 * inch, alto - 0.70 * inch, "ALFA IMPORTACIONES, C.A. · RIF: J-50793794-1")
         pdf.setFillColorRGB(0.38, 0.38, 0.38)
         pdf.setFont("Helvetica", 7.8)
         pdf.drawString(
             0.50 * inch,
             alto - 0.83 * inch,
-            "Somos tu solución · Valencia, Edo. Carabobo · WhatsApp: +58 424-4152658",
+            "Alfa Digital Store · CC Free Market, Local T38, Naguanagua, Valencia",
         )
     else:
-        pdf.setFillColorRGB(0.098, 0.094, 0.094)
+        pdf.setFillColorRGB(0.0, 0.031, 0.078)
         pdf.setFont("Helvetica-Bold", 14.5)
-        pdf.drawString(0.50 * inch, alto - 0.42 * inch, "TEKIO ELECTRONICS 2024, C.A.")
+        pdf.drawString(0.50 * inch, alto - 0.42 * inch, "ALFA IMPORTACIONES, C.A.")
         pdf.setFont("Helvetica-Bold", 8.5)
-        pdf.drawString(0.50 * inch, alto - 0.60 * inch, "RIF: J-50637518-4 · Valencia, Edo. Carabobo, Venezuela")
+        pdf.drawString(0.50 * inch, alto - 0.60 * inch, "RIF: J-50793794-1 · CC Free Market, Local T38, Naguanagua, Valencia")
         pdf.setFillColorRGB(0.38, 0.38, 0.38)
         pdf.setFont("Helvetica", 8)
-        pdf.drawString(0.50 * inch, alto - 0.76 * inch, "Somos tu solución · WhatsApp: +58 424-4152658")
+        pdf.drawString(0.50 * inch, alto - 0.76 * inch, "Alfa Digital Store · Naguanagua, Valencia, Edo. Carabobo")
 
     sufijo_pag = f" (Pág. {pagina})" if pagina > 1 else ""
-    pdf.setFillColorRGB(0.91, 0.35, 0.16)
+    pdf.setFillColorRGB(0.0, 0.208, 0.40)
     pdf.setFont("Helvetica-Bold", 11.5)
     pdf.drawRightString(ancho - 0.50 * inch, alto - 0.38 * inch, f"{titulo_doc}{sufijo_pag}")
-    pdf.setFillColorRGB(0.098, 0.094, 0.094)
+    pdf.setFillColorRGB(0.0, 0.031, 0.078)
     pdf.setFont("Helvetica-Bold", 10)
     pdf.drawRightString(ancho - 0.50 * inch, alto - 0.55 * inch, numero_doc)
     pdf.setFont("Helvetica", 8.3)
@@ -125,7 +125,7 @@ def _dibujar_encabezado_corporativo(
     pdf.setLineWidth(0.8)
     pdf.line(0.50 * inch, alto - 0.93 * inch, ancho - 0.50 * inch, alto - 0.93 * inch)
 
-    pdf.setFillColorRGB(0.098, 0.094, 0.094)
+    pdf.setFillColorRGB(0.0, 0.031, 0.078)
     return alto - 1.15 * inch
 
 
@@ -143,7 +143,7 @@ def generar_pdf_devolucion_garantia(dev: DevolucionGarantia) -> bytes:
     cliente_nombre, etiqueta_doc, valor_doc, cliente_tel, _ = _datos_cliente_tercero(
         venta.cliente if venta else None
     )
-    sucursal_nombre = venta.sucursal.nombre if venta and venta.sucursal else "Tekio Electronics"
+    sucursal_nombre = venta.sucursal.nombre if venta and venta.sucursal else "Alfa Digital Store"
 
     y = _dibujar_encabezado_corporativo(
         pdf,
@@ -158,7 +158,7 @@ def generar_pdf_devolucion_garantia(dev: DevolucionGarantia) -> bytes:
     # Datos de la operación y del cliente
     pdf.setFillColorRGB(0.953, 0.957, 0.965)  # #F3F4F6
     pdf.roundRect(0.50 * inch, y - 0.82 * inch, ancho - 1.0 * inch, 0.88 * inch, 6, fill=1, stroke=0)
-    pdf.setFillColorRGB(0.098, 0.094, 0.094)
+    pdf.setFillColorRGB(0.0, 0.031, 0.078)
     pdf.setFont("Helvetica-Bold", 9)
     pdf.drawString(0.62 * inch, y - 0.14 * inch, f"Cliente: {cliente_nombre}")
     pdf.setFont("Helvetica", 8.5)
@@ -167,14 +167,14 @@ def generar_pdf_devolucion_garantia(dev: DevolucionGarantia) -> bytes:
     pdf.drawString(
         0.62 * inch,
         y - 0.70 * inch,
-        f"Autorizado por: {dev.autorizado_por.nombre if dev.autorizado_por else 'Operador Tekio'}",
+        f"Autorizado por: {dev.autorizado_por.nombre if dev.autorizado_por else 'Operador Alfa'}",
     )
     y -= 1.08 * inch
 
     # Tipo de resolución destacado
     etiqueta_res = ETIQUETAS_RESOLUCION.get(dev.tipo_resolucion, dev.tipo_resolucion)
-    pdf.setFillColorRGB(0.992, 0.941, 0.922)  # #FDF0EB
-    pdf.setStrokeColorRGB(0.91, 0.35, 0.16)
+    pdf.setFillColorRGB(0.929, 0.953, 0.980)  # #EDF3FA
+    pdf.setStrokeColorRGB(0.0, 0.208, 0.40)
     pdf.setLineWidth(0.7)
     pdf.roundRect(0.50 * inch, y - 0.30 * inch, ancho - 1.0 * inch, 0.36 * inch, 5, fill=1, stroke=1)
     pdf.setFillColorRGB(0.75, 0.25, 0.08)
@@ -183,7 +183,7 @@ def generar_pdf_devolucion_garantia(dev: DevolucionGarantia) -> bytes:
     y -= 0.58 * inch
 
     # Detalle de equipos / componentes
-    pdf.setFillColorRGB(0.098, 0.094, 0.094)
+    pdf.setFillColorRGB(0.0, 0.031, 0.078)
     pdf.setFont("Helvetica-Bold", 9.5)
     pdf.drawString(0.50 * inch, y, "Detalle de la Operación")
     y -= 0.22 * inch
@@ -214,7 +214,7 @@ def generar_pdf_devolucion_garantia(dev: DevolucionGarantia) -> bytes:
         filas.append(
             (
                 "Componente / Repuesto cubierto",
-                f"{dev.articulo_repuesto.descripcion} (Sin cargo para el cliente — Cubierto por garantía Tekio)",
+                f"{dev.articulo_repuesto.descripcion} (Sin cargo para el cliente — Cubierto por garantía Alfa Digital Store)",
             )
         )
 
@@ -244,7 +244,7 @@ def generar_pdf_devolucion_garantia(dev: DevolucionGarantia) -> bytes:
         pdf.setFillColorRGB(0.35, 0.35, 0.35)
         pdf.setFont("Helvetica-Bold", 8.5)
         pdf.drawString(0.55 * inch, y, f"{clave}:")
-        pdf.setFillColorRGB(0.098, 0.094, 0.094)
+        pdf.setFillColorRGB(0.0, 0.031, 0.078)
         pdf.setFont("Helvetica", 8.5)
         lineas_val = _envolver_texto(valor, 72)
         for idx, linea in enumerate(lineas_val):
@@ -252,7 +252,7 @@ def generar_pdf_devolucion_garantia(dev: DevolucionGarantia) -> bytes:
         y -= max(0.24 * inch, len(lineas_val) * 0.16 * inch + 0.08 * inch)
 
     y -= 0.12 * inch
-    pdf.setFillColorRGB(0.098, 0.094, 0.094)
+    pdf.setFillColorRGB(0.0, 0.031, 0.078)
     pdf.setFont("Helvetica-Bold", 9)
     pdf.drawString(0.50 * inch, y, "Motivo / Observaciones:")
     y -= 0.18 * inch
@@ -266,7 +266,7 @@ def generar_pdf_devolucion_garantia(dev: DevolucionGarantia) -> bytes:
     pdf.setFillColorRGB(0.35, 0.35, 0.35)
     pdf.setFont("Helvetica-Oblique", 7.8)
     for linea in _envolver_texto(
-        "Nota: En casos de cambio de equipo o garantía de componente, la cobertura de garantía de 180 días continúa vigente según las políticas oficiales de TEKIO ELECTRONICS 2024, C.A. (RIF: J-50637518-4).",
+        "Nota: En casos de cambio de equipo o garantía de componente, la cobertura de garantía de 180 días continúa vigente según las políticas oficiales de ALFA IMPORTACIONES, C.A. (RIF: J-50793794-1).",
         108,
     ):
         pdf.drawString(0.50 * inch, y, linea)
@@ -278,9 +278,9 @@ def generar_pdf_devolucion_garantia(dev: DevolucionGarantia) -> bytes:
     pdf.setLineWidth(0.7)
     pdf.line(0.85 * inch, y_firma, 3.45 * inch, y_firma)
     pdf.line(ancho - 3.45 * inch, y_firma, ancho - 0.85 * inch, y_firma)
-    pdf.setFillColorRGB(0.098, 0.094, 0.094)
+    pdf.setFillColorRGB(0.0, 0.031, 0.078)
     pdf.setFont("Helvetica-Bold", 8.5)
-    pdf.drawCentredString(2.15 * inch, y_firma - 0.16 * inch, "Autorizado por Tekio Electronics")
+    pdf.drawCentredString(2.15 * inch, y_firma - 0.16 * inch, "Autorizado por Alfa Digital Store")
     pdf.drawCentredString(ancho - 2.15 * inch, y_firma - 0.16 * inch, "Recibido conforme (Cliente)")
     pdf.setFont("Helvetica", 7.8)
     pdf.setFillColorRGB(0.4, 0.4, 0.4)
@@ -328,11 +328,11 @@ def generar_pdf_lista_precios(
         # Encabezado de tabla claro (#F3F4F6)
         pdf.setFillColorRGB(0.953, 0.957, 0.965)
         pdf.rect(0.50 * inch, y_inicio - 0.24 * inch, ancho - 1.0 * inch, 0.28 * inch, fill=1, stroke=0)
-        pdf.setStrokeColorRGB(0.91, 0.35, 0.16)
+        pdf.setStrokeColorRGB(0.0, 0.208, 0.40)
         pdf.setLineWidth(1.0)
         pdf.line(0.50 * inch, y_inicio - 0.24 * inch, ancho - 0.50 * inch, y_inicio - 0.24 * inch)
 
-        pdf.setFillColorRGB(0.098, 0.094, 0.094)
+        pdf.setFillColorRGB(0.0, 0.031, 0.078)
         pdf.setFont("Helvetica-Bold", 8.4)
         pdf.drawString(0.58 * inch, y_inicio - 0.14 * inch, "Modelo y Características")
         pdf.drawCentredString(5.55 * inch, y_inicio - 0.14 * inch, "Disponibles")
@@ -365,7 +365,7 @@ def generar_pdf_lista_precios(
                 pdf.drawString(
                     0.50 * inch,
                     0.48 * inch,
-                    "Disponibilidad sujeta a inventario al momento de la compra · Garantía de 180 días Tekio Electronics.",
+                    "Disponibilidad sujeta a inventario al momento de la compra · Garantía de 180 días Alfa Digital Store.",
                 )
                 pdf.showPage()
                 pagina += 1
@@ -375,7 +375,7 @@ def generar_pdf_lista_precios(
                 pdf.setFillColorRGB(0.985, 0.985, 0.985)
                 pdf.rect(0.50 * inch, y - alto_fila + 0.16 * inch, ancho - 1.0 * inch, alto_fila, fill=1, stroke=0)
 
-            pdf.setFillColorRGB(0.098, 0.094, 0.094)
+            pdf.setFillColorRGB(0.0, 0.031, 0.078)
             pdf.setFont("Helvetica-Bold", 8.6)
             cursor_y = y
             for linea in lineas_modelo:
@@ -396,11 +396,11 @@ def generar_pdf_lista_precios(
             precio_usd = Decimal(str(item.get("precio_usd") or 0))
             precio_bs = item.get("precio_bs")
 
-            pdf.setFillColorRGB(0.098, 0.094, 0.094)
+            pdf.setFillColorRGB(0.0, 0.031, 0.078)
             pdf.setFont("Helvetica-Bold", 9.0)
             pdf.drawCentredString(5.55 * inch, y, str(disponibles))
 
-            pdf.setFillColorRGB(0.91, 0.35, 0.16)
+            pdf.setFillColorRGB(0.0, 0.208, 0.40)
             pdf.setFont("Helvetica-Bold", 9.2)
             pdf.drawRightString(ancho - 0.56 * inch, y, f"${precio_usd:,.2f}")
 
@@ -426,7 +426,7 @@ def generar_pdf_lista_precios(
     pdf.drawString(
         0.50 * inch,
         0.41 * inch,
-        "Todos nuestros equipos incluyen 180 días de garantía Tekio Electronics · WhatsApp: +58 424-4152658",
+        "Todos nuestros equipos incluyen 180 días de garantía Alfa Digital Store · CC Free Market, Local T38",
     )
 
     pdf.save()
@@ -445,8 +445,8 @@ def generar_pdf_cotizacion(cot: Cotizacion) -> bytes:
 
     cliente_nombre, etiqueta_doc, valor_doc, cliente_tel, cliente_dir = _datos_cliente_tercero(cot.cliente)
     fecha_vence = cot.fecha + timedelta(hours=cot.vigencia_horas)
-    sucursal_nombre = cot.sucursal.nombre if cot.sucursal else "Tekio Electronics"
-    asesor_nombre = cot.asesor.nombre if cot.asesor else "Tienda Tekio"
+    sucursal_nombre = cot.sucursal.nombre if cot.sucursal else "Alfa Digital Store"
+    asesor_nombre = cot.asesor.nombre if cot.asesor else "Tienda Alfa"
 
     y = _dibujar_encabezado_corporativo(
         pdf,
@@ -461,7 +461,7 @@ def generar_pdf_cotizacion(cot: Cotizacion) -> bytes:
     # Datos del cliente y de la cotización
     pdf.setFillColorRGB(0.953, 0.957, 0.965)
     pdf.roundRect(0.50 * inch, y - 0.86 * inch, ancho - 1.0 * inch, 0.92 * inch, 6, fill=1, stroke=0)
-    pdf.setFillColorRGB(0.098, 0.094, 0.094)
+    pdf.setFillColorRGB(0.0, 0.031, 0.078)
     pdf.setFont("Helvetica-Bold", 9)
     pdf.drawString(0.62 * inch, y - 0.14 * inch, f"Cliente: {cliente_nombre}")
     pdf.setFont("Helvetica", 8.4)
@@ -488,7 +488,7 @@ def generar_pdf_cotizacion(cot: Cotizacion) -> bytes:
         else ("Financiamiento Cashea (Precio Regular)" if es_cashea else "Bolívares / Pago Mixto (Precio Regular)")
     )
     pdf.setFont("Helvetica-Bold", 8.6)
-    pdf.setFillColorRGB(0.91, 0.35, 0.16)
+    pdf.setFillColorRGB(0.0, 0.208, 0.40)
     pdf.drawString(0.50 * inch, y, f"Modalidad cotizada: {etiqueta_mod}")
     if not es_divisas and cot.tasa_bcv_snapshot > 0:
         pdf.setFillColorRGB(0.35, 0.35, 0.35)
@@ -499,11 +499,11 @@ def generar_pdf_cotizacion(cot: Cotizacion) -> bytes:
     # Encabezado de tabla
     pdf.setFillColorRGB(0.953, 0.957, 0.965)
     pdf.rect(0.50 * inch, y - 0.22 * inch, ancho - 1.0 * inch, 0.26 * inch, fill=1, stroke=0)
-    pdf.setStrokeColorRGB(0.91, 0.35, 0.16)
+    pdf.setStrokeColorRGB(0.0, 0.208, 0.40)
     pdf.setLineWidth(1.0)
     pdf.line(0.50 * inch, y - 0.22 * inch, ancho - 0.50 * inch, y - 0.22 * inch)
 
-    pdf.setFillColorRGB(0.098, 0.094, 0.094)
+    pdf.setFillColorRGB(0.0, 0.031, 0.078)
     pdf.setFont("Helvetica-Bold", 8.3)
     pdf.drawString(0.58 * inch, y - 0.13 * inch, "Descripción")
     pdf.drawCentredString(4.95 * inch, y - 0.13 * inch, "Cant.")
@@ -527,7 +527,7 @@ def generar_pdf_cotizacion(cot: Cotizacion) -> bytes:
         lineas_desc = _envolver_texto(desc_completa, 58)
         alto_fila = max(0.28 * inch, len(lineas_desc) * 0.15 * inch + 0.10 * inch)
 
-        pdf.setFillColorRGB(0.098, 0.094, 0.094)
+        pdf.setFillColorRGB(0.0, 0.031, 0.078)
         pdf.setFont("Helvetica", 8.4)
         for l_idx, linea in enumerate(lineas_desc):
             pdf.drawString(0.58 * inch, y - (l_idx * 0.15 * inch), linea)
@@ -553,10 +553,10 @@ def generar_pdf_cotizacion(cot: Cotizacion) -> bytes:
     pdf.setLineWidth(0.7)
     pdf.roundRect(ancho - 3.65 * inch, y - alto_caja_tot + 0.18 * inch, 3.15 * inch, alto_caja_tot, 6, fill=1, stroke=1)
 
-    pdf.setFillColorRGB(0.098, 0.094, 0.094)
+    pdf.setFillColorRGB(0.0, 0.031, 0.078)
     pdf.setFont("Helvetica-Bold", 10.5)
     pdf.drawString(ancho - 3.50 * inch, y - 0.06 * inch, "Monto Total:")
-    pdf.setFillColorRGB(0.91, 0.35, 0.16)
+    pdf.setFillColorRGB(0.0, 0.208, 0.40)
     pdf.drawRightString(ancho - 0.62 * inch, y - 0.06 * inch, f"${total_mostrar_usd:,.2f} USD")
 
     if not es_divisas and total_bs > 0:
@@ -584,7 +584,7 @@ def generar_pdf_cotizacion(cot: Cotizacion) -> bytes:
     y -= alto_caja_tot + 0.16 * inch
 
     if cot.nota:
-        pdf.setFillColorRGB(0.098, 0.094, 0.094)
+        pdf.setFillColorRGB(0.0, 0.031, 0.078)
         pdf.setFont("Helvetica-Bold", 8.5)
         pdf.drawString(0.50 * inch, y, "Notas:")
         y -= 0.16 * inch
@@ -595,10 +595,10 @@ def generar_pdf_cotizacion(cot: Cotizacion) -> bytes:
 
     # Aviso legal obligatorio al pie
     pdf.setFillColorRGB(0.992, 0.941, 0.922)
-    pdf.setStrokeColorRGB(0.91, 0.35, 0.16)
+    pdf.setStrokeColorRGB(0.0, 0.208, 0.40)
     pdf.setLineWidth(0.6)
     pdf.roundRect(0.50 * inch, 0.52 * inch, ancho - 1.0 * inch, 0.54 * inch, 5, fill=1, stroke=1)
-    pdf.setFillColorRGB(0.098, 0.094, 0.094)
+    pdf.setFillColorRGB(0.0, 0.031, 0.078)
     pdf.setFont("Helvetica-Bold", 8.0)
     pdf.drawCentredString(
         ancho / 2,

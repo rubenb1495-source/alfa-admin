@@ -6,7 +6,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from app.modelos_finanzas import EstadoReingresoNC
+from app.modelos_finanzas import EstadoReingresoNC, OrigenVenta
 
 
 class ItemVentaEntrada(BaseModel):
@@ -41,6 +41,7 @@ class VentaCrearEntrada(BaseModel):
     asesor_id: int | None = None
     tecnico_id: int | None = None
     canal_visita: str = Field(default="Tienda", max_length=60)
+    origen_venta: OrigenVenta = OrigenVenta.PASILLO
     entrega: str = Field(default="Tienda", max_length=60)
     datos_entrega: dict[str, Any] | None = None
     origen_equipo: str = Field(default="Propio", max_length=60)

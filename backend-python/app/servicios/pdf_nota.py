@@ -18,14 +18,14 @@ from app.modelos_finanzas import MonedaInstrumento, TipoPrecioInstrumento, Venta
 from app.utils.pdf_branding import dibujar_marca_de_agua
 
 
-RUTA_LOGO_PDF = Path(__file__).resolve().parent.parent.parent / "assets" / "tekio-logo-horizontal.png"
+RUTA_LOGO_PDF = Path(__file__).resolve().parent.parent.parent / "assets" / "alfa-logo-horizontal.png"
 
 ESTILO_GARANTIA_JUSTIFICADO = ParagraphStyle(
-    name="GarantiaTekioJustificado",
+    name="GarantiaAlfaJustificado",
     fontName="Helvetica",
     fontSize=6.7,
     leading=8.3,
-    textColor=colors.HexColor("#191818"),
+    textColor=colors.HexColor("#000814"),
     alignment=TA_JUSTIFY,
     spaceAfter=1.8,
 )
@@ -85,11 +85,11 @@ def _obtener_datos_cliente(venta: Venta) -> tuple[str, str, str, str, str]:
 
 
 def _dibujar_encabezado(pdf: canvas.Canvas, ancho: float, alto: float, venta: Venta, pagina: int = 1) -> float:
-    # Marca de agua Tekio (~7% opacidad) centrada detrás del contenido de cada página
+    # Marca de agua Alfa (~7% opacidad) centrada detrás del contenido de cada página
     dibujar_marca_de_agua(pdf)
 
-    # Franja superior sutil en Naranja Tekio (#E85A28)
-    pdf.setFillColorRGB(0.91, 0.35, 0.16)
+    # Franja superior sutil en Azul Alfa (#003566)
+    pdf.setFillColorRGB(0.0, 0.208, 0.40)
     pdf.rect(0, alto - 0.08 * inch, ancho, 0.08 * inch, fill=1, stroke=0)
 
     # Imagotipo oficial PNG a la izquierda respetando proporción y zona de respeto
@@ -104,28 +104,28 @@ def _dibujar_encabezado(pdf: canvas.Canvas, ancho: float, alto: float, venta: Ve
             anchor="sw",
             mask="auto",
         )
-        pdf.setFillColorRGB(0.098, 0.094, 0.094)  # #191818
+        pdf.setFillColorRGB(0.0, 0.031, 0.078)  # #000814
         pdf.setFont("Helvetica-Bold", 8.5)
-        pdf.drawString(0.50 * inch, alto - 0.70 * inch, "TEKIO ELECTRONICS 2024, C.A. · RIF: J-50637518-4")
+        pdf.drawString(0.50 * inch, alto - 0.70 * inch, "ALFA IMPORTACIONES, C.A. · RIF: J-50793794-1")
         pdf.setFillColorRGB(0.38, 0.38, 0.38)
         pdf.setFont("Helvetica", 7.8)
-        pdf.drawString(0.50 * inch, alto - 0.83 * inch, "Somos tu solución · Valencia, Edo. Carabobo · WhatsApp: +58 424-4152658")
+        pdf.drawString(0.50 * inch, alto - 0.83 * inch, "Alfa Digital Store · CC Free Market, Local T38, Naguanagua, Valencia")
     else:
-        pdf.setFillColorRGB(0.098, 0.094, 0.094)
+        pdf.setFillColorRGB(0.0, 0.031, 0.078)
         pdf.setFont("Helvetica-Bold", 14.5)
-        pdf.drawString(0.50 * inch, alto - 0.42 * inch, "TEKIO ELECTRONICS 2024, C.A.")
+        pdf.drawString(0.50 * inch, alto - 0.42 * inch, "ALFA IMPORTACIONES, C.A.")
         pdf.setFont("Helvetica-Bold", 8.5)
-        pdf.drawString(0.50 * inch, alto - 0.60 * inch, "RIF: J-50637518-4 · Valencia, Edo. Carabobo, Venezuela")
+        pdf.drawString(0.50 * inch, alto - 0.60 * inch, "RIF: J-50793794-1 · CC Free Market, Local T38, Naguanagua, Valencia")
         pdf.setFillColorRGB(0.38, 0.38, 0.38)
         pdf.setFont("Helvetica", 8)
-        pdf.drawString(0.50 * inch, alto - 0.76 * inch, "Somos tu solución · WhatsApp: +58 424-4152658")
+        pdf.drawString(0.50 * inch, alto - 0.76 * inch, "Alfa Digital Store · Naguanagua, Valencia, Edo. Carabobo")
 
     # Bloque derecho: Nota de Entrega
     sufijo_pag = f" (Pág. {pagina})" if pagina > 1 else ""
-    pdf.setFillColorRGB(0.91, 0.35, 0.16)  # #E85A28
+    pdf.setFillColorRGB(0.0, 0.208, 0.40)  # #003566
     pdf.setFont("Helvetica-Bold", 12)
     pdf.drawRightString(ancho - 0.50 * inch, alto - 0.38 * inch, f"NOTA DE ENTREGA{sufijo_pag}")
-    pdf.setFillColorRGB(0.098, 0.094, 0.094)  # #191818
+    pdf.setFillColorRGB(0.0, 0.031, 0.078)  # #000814
     pdf.setFont("Helvetica-Bold", 10.5)
     pdf.drawRightString(ancho - 0.50 * inch, alto - 0.56 * inch, f"Nro: {venta.numero_venta}")
     pdf.setFont("Helvetica", 8.5)
@@ -136,7 +136,7 @@ def _dibujar_encabezado(pdf: canvas.Canvas, ancho: float, alto: float, venta: Ve
     pdf.setLineWidth(0.8)
     pdf.line(0.50 * inch, alto - 0.93 * inch, ancho - 0.50 * inch, alto - 0.93 * inch)
 
-    pdf.setFillColorRGB(0.098, 0.094, 0.094)
+    pdf.setFillColorRGB(0.0, 0.031, 0.078)
     return alto - 1.15 * inch
 
 
@@ -193,11 +193,11 @@ def _dibujar_bloque_entrega(
     pdf.rect(0.50 * inch, y_bottom, ancho - 1.00 * inch, alto_caja, fill=1, stroke=1)
 
     y_cursor = y - 12
-    pdf.setFillColorRGB(0.91, 0.35, 0.16)
+    pdf.setFillColorRGB(0.0, 0.208, 0.40)
     pdf.setFont("Helvetica-Bold", 8)
     pdf.drawString(0.62 * inch, y_cursor, titulo)
     y_cursor -= 11
-    pdf.setFillColorRGB(0.098, 0.094, 0.094)
+    pdf.setFillColorRGB(0.0, 0.031, 0.078)
     pdf.setFont("Helvetica", 7.8)
     for linea in lineas_texto:
         pdf.drawString(0.62 * inch, y_cursor, linea)
@@ -206,7 +206,7 @@ def _dibujar_bloque_entrega(
 
 
 def generar_pdf_nota_entrega(venta: Venta) -> bytes:
-    """Genera el PDF tamaño carta de la Nota de Entrega oficial de TEKIO ELECTRONICS 2024, C.A."""
+    """Genera el PDF tamaño carta de la Nota de Entrega oficial de ALFA IMPORTACIONES, C.A."""
     buffer = io.BytesIO()
     pdf = canvas.Canvas(buffer, pagesize=letter)
     ancho, alto = letter
@@ -215,7 +215,7 @@ def generar_pdf_nota_entrega(venta: Venta) -> bytes:
     es_regular = _es_venta_regular(venta)
     tasa_bcv = float(venta.tasa_bcv_snapshot or Decimal("0"))
     cli_nombre, cli_etiqueta_doc, cli_doc, cli_tel, cli_dir = _obtener_datos_cliente(venta)
-    sucursal_nombre = venta.sucursal.nombre if venta.sucursal else "Tekio central"
+    sucursal_nombre = venta.sucursal.nombre if venta.sucursal else "Local T38"
     asesor_nombre = venta.asesor.nombre if venta.asesor else "Tienda"
     tecnico_nombre = venta.tecnico.nombre if venta.tecnico else None
 
@@ -243,15 +243,15 @@ def generar_pdf_nota_entrega(venta: Venta) -> bytes:
         f"Asesor: {asesor_nombre}" + (f" · Técnico: {tecnico_nombre}" if tecnico_nombre else ""),
     )
 
-    # Tabla de artículos con encabezado claro (#F3F4F6) + acento inferior #E85A28
+    # Tabla de artículos con encabezado claro (#F3F4F6) + acento inferior #003566
     y -= 19
     pdf.setFillColorRGB(0.953, 0.957, 0.965)  # #F3F4F6
     pdf.rect(0.50 * inch, y - 4, ancho_util, 18, fill=1, stroke=0)
-    pdf.setStrokeColorRGB(0.91, 0.35, 0.16)  # #E85A28
+    pdf.setStrokeColorRGB(0.0, 0.208, 0.40)  # #003566
     pdf.setLineWidth(1.0)
     pdf.line(0.50 * inch, y - 4, ancho - 0.50 * inch, y - 4)
 
-    pdf.setFillColorRGB(0.098, 0.094, 0.094)  # #191818
+    pdf.setFillColorRGB(0.0, 0.031, 0.078)  # #000814
     pdf.setFont("Helvetica-Bold", 8.3)
     pdf.drawString(0.60 * inch, y + 2, "Cant.")
     pdf.drawString(1.02 * inch, y + 2, "Descripción / Serial")
@@ -271,7 +271,7 @@ def generar_pdf_nota_entrega(venta: Venta) -> bytes:
             pdf.setFillColorRGB(0.975, 0.975, 0.975)
             pdf.rect(0.50 * inch, y - 3.5, ancho_util, 13.5, fill=1, stroke=0)
 
-        pdf.setFillColorRGB(0.098, 0.094, 0.094)
+        pdf.setFillColorRGB(0.0, 0.031, 0.078)
         serial_txt = f" [Serial: {det.equipo.serial}]" if det.equipo else ""
         precio_unit = float(det.precio_regular_usd if es_regular else det.precio_promo_usd)
         subtotal = precio_unit * int(det.cantidad)
@@ -296,7 +296,7 @@ def generar_pdf_nota_entrega(venta: Venta) -> bytes:
             for linea in _envolver_texto(f"Trabajo realizado: {desc_srv}", 78):
                 pdf.drawString(1.12 * inch, y, linea)
                 y -= 9.5
-            pdf.setFillColorRGB(0.098, 0.094, 0.094)
+            pdf.setFillColorRGB(0.0, 0.031, 0.078)
             pdf.setFont("Helvetica", 8.2)
 
     # Monto Total (solo USD si Promo; USD y Bs si Regular)
@@ -306,7 +306,7 @@ def generar_pdf_nota_entrega(venta: Venta) -> bytes:
     pdf.line(0.50 * inch, y, ancho - 0.50 * inch, y)
     y -= 15
     pdf.setFont("Helvetica-Bold", 10)
-    pdf.setFillColorRGB(0.098, 0.094, 0.094)
+    pdf.setFillColorRGB(0.0, 0.031, 0.078)
     monto_total_usd = float(venta.total_regular_usd if es_regular else venta.total_promo_usd)
     if es_regular and tasa_bcv > 0:
         monto_total_bs = monto_total_usd * tasa_bcv
@@ -390,9 +390,9 @@ def generar_pdf_nota_entrega(venta: Venta) -> bytes:
 
     # Título de Políticas y Condiciones de Garantía
     y_pie -= 8
-    pdf.setFillColorRGB(0.91, 0.35, 0.16)  # #E85A28
+    pdf.setFillColorRGB(0.0, 0.208, 0.40)  # #003566
     pdf.setFont("Helvetica-Bold", 8.2)
-    pdf.drawString(0.50 * inch, y_pie, "POLÍTICA Y CONDICIONES DE GARANTÍA — TEKIO ELECTRONICS 2024, C.A.")
+    pdf.drawString(0.50 * inch, y_pie, "POLÍTICA Y CONDICIONES DE GARANTÍA — ALFA IMPORTACIONES, C.A.")
     y_pie -= 4
 
     # Párrafos justificados (TA_JUSTIFY)
@@ -410,11 +410,11 @@ def generar_pdf_nota_entrega(venta: Venta) -> bytes:
 
     pdf.setFillColorRGB(0.953, 0.957, 0.965)  # #F3F4F6
     pdf.rect(x_izq, y_pie - 12, ancho_util, 13.5, fill=1, stroke=0)
-    pdf.setStrokeColorRGB(0.91, 0.35, 0.16)  # #E85A28
+    pdf.setStrokeColorRGB(0.0, 0.208, 0.40)  # #003566
     pdf.setLineWidth(0.9)
     pdf.line(x_izq, y_pie - 12, x_izq + ancho_util, y_pie - 12)
 
-    pdf.setFillColorRGB(0.098, 0.094, 0.094)
+    pdf.setFillColorRGB(0.0, 0.031, 0.078)
     pdf.setFont("Helvetica-Bold", 7.6)
     pdf.drawString(x_izq + 6, y_pie - 8, "PRUEBA DE FUNCIONALIDAD DEL EQUIPO")
     pdf.setFillColorRGB(0.42, 0.45, 0.49)
@@ -439,7 +439,7 @@ def generar_pdf_nota_entrega(venta: Venta) -> bytes:
         if idx_f % 2 == 1:
             pdf.setFillColorRGB(0.975, 0.975, 0.975)
             pdf.rect(x_izq, y_pie, ancho_util, alto_fila, fill=1, stroke=0)
-        pdf.setFillColorRGB(0.098, 0.094, 0.094)
+        pdf.setFillColorRGB(0.0, 0.031, 0.078)
         pdf.rect(x_izq, y_pie, mitad, alto_fila, fill=0, stroke=1)
         pdf.rect(x_der, y_pie, mitad, alto_fila, fill=0, stroke=1)
         pdf.drawString(x_izq + 5, y_pie + 3.2, izq_lbl)
@@ -499,8 +499,8 @@ def generar_pdf_nota_entrega(venta: Venta) -> bytes:
     pdf.line(0.85 * inch, y_firma, 3.35 * inch, y_firma)
     pdf.line(ancho - 3.35 * inch, y_firma, ancho - 0.85 * inch, y_firma)
     pdf.setFont("Helvetica-Bold", 7.9)
-    pdf.setFillColorRGB(0.098, 0.094, 0.094)
-    pdf.drawCentredString(2.10 * inch, y_firma - 10, "Entregado por (Tekio Electronics)")
+    pdf.setFillColorRGB(0.0, 0.031, 0.078)
+    pdf.drawCentredString(2.10 * inch, y_firma - 10, "Entregado por (Alfa Digital Store)")
     pdf.drawCentredString(ancho - 2.10 * inch, y_firma - 10, "Firma del Cliente")
 
     pdf.showPage()

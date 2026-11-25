@@ -19,6 +19,7 @@ const ROLES_DISPONIBLES: RolUsuario[] = [
   "ADMINISTRACION",
   "LOGISTICA",
   "LIDER",
+  "ENCARGADO_TIENDA",
   "ASESORA",
   "TECNICO",
 ];
@@ -192,7 +193,7 @@ export default function PaginaUsuarios() {
             setErrorModal(null);
             setModalCrear(true);
           }}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#E85A28] hover:bg-[#C9461A] text-white text-sm font-bold cursor-pointer"
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#003566] hover:bg-[#C9461A] text-white text-sm font-bold cursor-pointer"
         >
           <Plus className="w-4 h-4" />
           Nuevo usuario
@@ -464,7 +465,7 @@ export default function PaginaUsuarios() {
                 <button
                   type="submit"
                   disabled={guardando}
-                  className="px-4 py-2 rounded-xl bg-[#E85A28] hover:bg-[#C9461A] text-white text-sm font-bold disabled:opacity-60 cursor-pointer"
+                  className="px-4 py-2 rounded-xl bg-[#003566] hover:bg-[#C9461A] text-white text-sm font-bold disabled:opacity-60 cursor-pointer"
                 >
                   {guardando ? "Guardando..." : "Crear usuario"}
                 </button>
@@ -516,7 +517,7 @@ export default function PaginaUsuarios() {
                 <button
                   type="submit"
                   disabled={guardando}
-                  className="px-4 py-2 rounded-xl bg-[#E85A28] hover:bg-[#C9461A] text-white text-sm font-bold disabled:opacity-60 cursor-pointer"
+                  className="px-4 py-2 rounded-xl bg-[#003566] hover:bg-[#C9461A] text-white text-sm font-bold disabled:opacity-60 cursor-pointer"
                 >
                   {guardando ? "Actualizando..." : "Confirmar"}
                 </button>

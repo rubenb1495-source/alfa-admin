@@ -2,7 +2,7 @@
 
 import React from "react";
 
-interface LogoTekioProps {
+interface LogoAlfaProps {
   variante?: "horizontal" | "vertical" | "isotipo";
   tema?: "oscuro" | "claro" | "mono-blanco";
   tamano?: "sm" | "md" | "lg";
@@ -10,16 +10,15 @@ interface LogoTekioProps {
 }
 
 /**
- * Componente oficial del imagotipo de Tekio Electronics (Manual de Identidad 2024).
- * Usa los PNG oficiales en /public/brand/ respetando proporción y zona de respeto,
- * sin sombras, trazos ni inclinaciones.
+ * Componente oficial del imagotipo de Alfa Digital Store (ALFA IMPORTACIONES, C.A.).
+ * Usa los PNG oficiales en /public/brand/ respetando proporción y zona de respeto.
  */
-export default function LogoTekio({
+export default function LogoAlfa({
   variante = "horizontal",
-  tema = "oscuro",
+  tema = "claro",
   tamano = "md",
   className = "",
-}: LogoTekioProps) {
+}: LogoAlfaProps) {
   if (variante === "isotipo") {
     const dim = tamano === "sm" ? 28 : tamano === "lg" ? 56 : 36;
     return (
@@ -27,8 +26,8 @@ export default function LogoTekio({
         className={`inline-flex items-center justify-center p-1 select-none ${className}`}
       >
         <img
-          src="/brand/tekio-isotipo.png"
-          alt="Tekio Electronics"
+          src="/brand/alfa-isotipo.png"
+          alt="Alfa Digital Store"
           width={dim}
           height={dim}
           className="object-contain shrink-0"
@@ -40,21 +39,21 @@ export default function LogoTekio({
 
   const rutaHorizontal =
     tema === "claro"
-      ? "/brand/tekio-logo-horizontal.png"
-      : "/brand/tekio-logo-horizontal-blanco.png";
+      ? "/brand/alfa-logo-horizontal.png"
+      : "/brand/alfa-logo-horizontal-blanco.png";
 
   const altura =
     variante === "vertical"
       ? tamano === "lg"
-        ? 52
+        ? 56
         : tamano === "sm"
-        ? 28
-        : 40
+        ? 30
+        : 42
       : tamano === "lg"
-      ? 48
+      ? 54
       : tamano === "sm"
-      ? 26
-      : 34;
+      ? 30
+      : 38;
 
   return (
     <div
@@ -62,7 +61,7 @@ export default function LogoTekio({
     >
       <img
         src={rutaHorizontal}
-        alt="Tekio Electronics"
+        alt="Alfa Digital Store"
         className="object-contain w-auto max-w-full"
         style={{ height: altura }}
       />

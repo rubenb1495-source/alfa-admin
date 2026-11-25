@@ -20,7 +20,7 @@ def normalizar_url_base_datos(url: str) -> str:
 
 
 class Configuracion(BaseSettings):
-    """Configuración centralizada del backend Tekio Electronics (local y Vercel)."""
+    """Configuración centralizada del backend Alfa Importaciones (local y Vercel)."""
 
     model_config = SettingsConfigDict(
         env_file=(str(DIRECTORIO_BASE / ".env"), str(DIRECTORIO_BASE.parent / ".env")),
