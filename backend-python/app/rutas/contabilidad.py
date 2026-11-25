@@ -468,6 +468,15 @@ def obtener_balance_general(
         else:
             inv_prep_usd += costo_e
 
+    # Sumar Lotes en Tránsito (sin serializar aún) a 1.1.04
+    from app.modelos_logistica import LoteTransito
+
+    lotes_trn_usd = sum(
+        (Decimal(lt.total_en_transito_usd or 0) for lt in bd.query(LoteTransito).filter(LoteTransito.estado == "EN_TRANSITO").all()),
+        Decimal("0"),
+    )
+    inv_prep_usd += lotes_trn_usd
+
     # 1.1.05 Inventario Componentes
     movs_c = (
         bd.query(MovimientoInventario.articulo_id, func.coalesce(func.sum(MovimientoInventario.cantidad), 0))

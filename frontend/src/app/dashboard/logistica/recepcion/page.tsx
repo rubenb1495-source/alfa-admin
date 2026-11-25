@@ -9,6 +9,7 @@ import {
   X,
 } from "lucide-react";
 import { ErrorApi, fechaHoyCaracas, formatearUsd, solicitarApi } from "@/servicios/api";
+import PanelLotesTransito from "@/components/PanelLotesTransito";
 import type {
   GuiaResumen,
   ResultadoRecepcionGuia,
@@ -16,6 +17,7 @@ import type {
 } from "@/tipos/logistica";
 
 export default function PaginaRecepcion() {
+  const [modoRecepcion, setModoRecepcion] = useState<"lotes" | "guias">("lotes");
   const [guias, setGuias] = useState<GuiaResumen[]>([]);
   const [verificadores, setVerificadores] = useState<Verificador[]>([]);
   const [cargando, setCargando] = useState(true);
@@ -124,18 +126,48 @@ export default function PaginaRecepcion() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-black text-slate-900">
-          Recepción Física por Serial (Doble Verificación)
-        </h2>
-        <p className="text-sm text-slate-500">
-          Escanea los seriales con lector de código de barras (Enter para
-          agregar), valida con una segunda persona y prorratea el flete
-          automáticamente.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-black text-slate-900">
+            Inventario en Tránsito y Recepción en Almacén
+          </h2>
+          <p className="text-sm text-slate-500">
+            Registra lotes en tránsito sin seriales y realiza la recepción flexible
+            en almacén con escaneo real y prorrateo automático de flete/aduana.
+          </p>
+        </div>
+
+        <div className="inline-flex rounded-xl border border-slate-200 bg-slate-100 p-1 self-start">
+          <button
+            type="button"
+            onClick={() => setModoRecepcion("lotes")}
+            className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+              modoRecepcion === "lotes"
+                ? "bg-[#001D3D] text-white shadow-sm"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            Lotes en Tránsito (Sin Seriales)
+          </button>
+          <button
+            type="button"
+            onClick={() => setModoRecepcion("guias")}
+            className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+              modoRecepcion === "guias"
+                ? "bg-[#001D3D] text-white shadow-sm"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            Recepción por Guías (Legado)
+          </button>
+        </div>
       </div>
 
-      {error && (
+      {modoRecepcion === "lotes" ? (
+        <PanelLotesTransito />
+      ) : (
+        <div className="space-y-6">
+          {error && (
         <div className="flex items-center gap-2.5 p-4 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700">
           <AlertCircle className="w-4 h-4 shrink-0" />
           <span>{error}</span>
@@ -329,7 +361,9 @@ export default function PaginaRecepcion() {
             </div>
           </form>
         )}
-      </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

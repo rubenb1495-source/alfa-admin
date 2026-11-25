@@ -328,3 +328,54 @@ class HistorialEstadoEquipo(Base):
 
     equipo = relationship("Equipo")
     usuario = relationship("Usuario")
+
+
+class LoteTransito(Base):
+    __tablename__ = "lotes_transito"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    codigo: Mapped[str] = mapped_column(String(40), unique=True, index=True, nullable=False)
+    proveedor_nombre: Mapped[str] = mapped_column(String(160), nullable=False)
+    almacen_destino_id: Mapped[int] = mapped_column(ForeignKey("sucursales.id"), index=True, nullable=False)
+    fecha_compra: Mapped[date] = mapped_column(Date, nullable=False)
+    fecha_estimada_llegada: Mapped[date | None] = mapped_column(Date, nullable=True)
+    trackings: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    costo_mercancia_estimado_usd: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"), nullable=False)
+    costo_flete_estimado_usd: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"), nullable=False)
+    costo_aduana_otros_usd: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"), nullable=False)
+    total_en_transito_usd: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"), nullable=False)
+    estado: Mapped[str] = mapped_column(String(25), default="EN_TRANSITO", nullable=False, index=True)
+    observaciones: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    creado_por_id: Mapped[int | None] = mapped_column(ForeignKey("usuarios.id"), nullable=True)
+    recibido_por_id: Mapped[int | None] = mapped_column(ForeignKey("usuarios.id"), nullable=True)
+    fecha_recepcion: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    creado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    almacen_destino = relationship("Sucursal")
+    creado_por = relationship("Usuario", foreign_keys=[creado_por_id])
+    recibido_por = relationship("Usuario", foreign_keys=[recibido_por_id])
+    items = relationship("LoteTransitoItem", back_populates="lote", cascade="all, delete-orphan")
+
+
+class LoteTransitoItem(Base):
+    __tablename__ = "lotes_transito_items"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    lote_id: Mapped[int] = mapped_column(ForeignKey("lotes_transito.id"), index=True, nullable=False)
+    tipo_item: Mapped[str] = mapped_column(String(20), default="EQUIPO", nullable=False)  # EQUIPO | COMPONENTE | ACCESORIO
+    articulo_id: Mapped[int | None] = mapped_column(ForeignKey("catalogo_articulos.id"), nullable=True)
+    sku: Mapped[str] = mapped_column(String(80), default="", nullable=False)
+    descripcion_esperada: Mapped[str] = mapped_column(String(255), nullable=False)
+    especificaciones_esperadas: Mapped[str] = mapped_column(String(255), default="", nullable=False)
+    cantidad_esperada: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    costo_unitario_estimado_usd: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0"), nullable=False)
+    precio_promo_usd: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0"), nullable=False)
+
+    # Valores reales capturados en Recepción de Almacén
+    cantidad_recibida: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    cantidad_danada_faltante: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    descripcion_real: Mapped[str] = mapped_column(String(255), default="", nullable=False)
+    observacion_recepcion: Mapped[str] = mapped_column(Text, default="", nullable=False)
+
+    lote = relationship("LoteTransito", back_populates="items")
+    articulo = relationship("CatalogoArticulo")
