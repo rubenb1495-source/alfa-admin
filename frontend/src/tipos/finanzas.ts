@@ -189,11 +189,15 @@ export interface ReporteComisiones {
   comisiones: ComisionPersona[];
 }
 
+export type EstadoComision = "PENDIENTE" | "PAGADA" | "ANULADA";
+
 export interface ResumenGeneralComisiones {
   total_ventas: number;
   volumen_promo_usd: number;
   pasillo_usd: number;
   lead_usd: number;
+  pendiente_usd: number;
+  pagado_usd: number;
   total_comisiones_usd: number;
 }
 
@@ -212,6 +216,8 @@ export interface ComisionPorPersonaReporte {
   cantidad_lead: number;
   base_lead_usd: number;
   comision_lead_usd: number;
+  pendiente_usd: number;
+  pagado_usd: number;
   total_ventas: number;
   total_comision_usd: number;
 }
@@ -225,6 +231,8 @@ export interface DetalleVentaComision {
   cliente: string;
   producto: string;
   origen: "PASILLO" | "LEAD" | string;
+  estado_comision: EstadoComision | string;
+  liquidacion_id: number | null;
   base_promo_usd: number;
   porcentaje_aplicado: number;
   comision_usd: number;
@@ -233,10 +241,51 @@ export interface DetalleVentaComision {
 export interface ReporteComisionesAvanzado {
   fecha_inicio: string;
   fecha_fin: string;
+  estado_comision: string;
   tasa_bcv_referencia: number | null;
   resumen_general: ResumenGeneralComisiones;
   por_persona: ComisionPorPersonaReporte[];
   detalle_ventas: DetalleVentaComision[];
+}
+
+export interface LiquidacionVentaItem {
+  venta_id: number;
+  fecha: string;
+  numero_venta: string;
+  cliente: string;
+  producto: string;
+  origen: string;
+  base_promo_usd: number;
+  porcentaje_aplicado: number;
+  comision_usd: number;
+}
+
+export interface LiquidacionComisionResumen {
+  id: number;
+  codigo: string;
+  personal_id: number;
+  personal_nombre: string;
+  personal_rol: string;
+  personal_telefono: string;
+  personal_modalidad: string;
+  fecha_inicio: string;
+  fecha_fin: string;
+  cantidad_ventas: number;
+  cantidad_pasillo: number;
+  cantidad_lead: number;
+  monto_pasillo_usd: number;
+  monto_lead_usd: number;
+  monto_total_usd: number;
+  metodo_pago: string;
+  tasa_bcv_aplicada: number | null;
+  monto_bs: number | null;
+  referencia: string;
+  observaciones: string;
+  estado: "PAGADA" | "ANULADA";
+  motivo_anulacion: string;
+  pagado_por: string | null;
+  created_at: string | null;
+  ventas?: LiquidacionVentaItem[];
 }
 
 export interface TableroFinanciero {

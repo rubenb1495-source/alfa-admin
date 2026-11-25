@@ -64,6 +64,22 @@ def asegurar_columnas_compatibles() -> None:
                         "ADD COLUMN origen_venta VARCHAR(20) NOT NULL DEFAULT 'PASILLO'"
                     )
                 )
+        if "estado_comision" not in columnas_vta:
+            with motor.begin() as conexion:
+                conexion.execute(
+                    text(
+                        "ALTER TABLE ventas "
+                        "ADD COLUMN estado_comision VARCHAR(20) NOT NULL DEFAULT 'PENDIENTE'"
+                    )
+                )
+        if "liquidacion_id" not in columnas_vta:
+            with motor.begin() as conexion:
+                conexion.execute(
+                    text(
+                        "ALTER TABLE ventas "
+                        "ADD COLUMN liquidacion_id INTEGER NULL"
+                    )
+                )
     if inspector.has_table("tasas_diarias"):
         columnas_tasas = {col["name"] for col in inspector.get_columns("tasas_diarias")}
         if "recargo_confirmado" not in columnas_tasas:

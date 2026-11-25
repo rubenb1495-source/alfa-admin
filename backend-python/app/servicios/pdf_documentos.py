@@ -615,3 +615,148 @@ def generar_pdf_cotizacion(cot: Cotizacion) -> bytes:
 
     pdf.save()
     return buffer.getvalue()
+
+
+def generar_pdf_liquidacion_comision(liq: Any, detalles_ventas: list[dict[str, Any]]) -> bytes:
+    """Genera el comprobante PDF oficial de liquidación quincenal de comisiones Alfa Digital Store."""
+    buffer = io.BytesIO()
+    pdf = canvas.Canvas(buffer, pagesize=letter)
+    ancho, alto = letter
+
+    fecha_emision = liq.created_at.strftime("%Y-%m-%d") if getattr(liq, "created_at", None) else date.today().isoformat()
+    estado_lbl = f"Estado: {liq.estado}"
+    y = _dibujar_encabezado_corporativo(
+        pdf,
+        ancho,
+        alto,
+        titulo_doc="COMPROBANTE DE LIQUIDACIÓN",
+        numero_doc=liq.codigo,
+        fecha_texto=f"Emisión: {fecha_emision}",
+        subtitulo_der=estado_lbl,
+        pagina=1,
+    )
+
+    y -= 0.10 * inch
+    pdf.setFillColorRGB(0.929, 0.953, 0.980)  # #EDF3FA
+    pdf.setStrokeColorRGB(0.0, 0.208, 0.40)  # #003566
+    pdf.setLineWidth(0.7)
+    pdf.roundRect(0.50 * inch, y - 1.12 * inch, ancho - 1.00 * inch, 1.12 * inch, 6, fill=1, stroke=1)
+
+    nombre_col = liq.personal.nombre if liq.personal else f"Personal #{liq.personal_id}"
+    rol_col = liq.personal.rol if liq.personal else ""
+    tel_col = getattr(liq.personal, "telefono", "") if liq.personal else ""
+    pagado_por = liq.pagado_por.nombre if liq.pagado_por else "Administración"
+
+    pdf.setFillColorRGB(0.0, 0.031, 0.078)
+    pdf.setFont("Helvetica-Bold", 9.5)
+    pdf.drawString(0.65 * inch, y - 0.24 * inch, f"Colaborador: {nombre_col} ({rol_col})")
+    pdf.setFont("Helvetica", 8.5)
+    pdf.drawString(
+        0.65 * inch,
+        y - 0.44 * inch,
+        f"Período liquidado: {liq.fecha_inicio.isoformat()} al {liq.fecha_fin.isoformat()}"
+        + (f"  ·  Teléfono: {tel_col}" if tel_col else ""),
+    )
+    pdf.drawString(
+        0.65 * inch,
+        y - 0.64 * inch,
+        f"Método de pago: {liq.metodo_pago}"
+        + (f"  ·  Referencia: {liq.referencia}" if liq.referencia else ""),
+    )
+    pdf.drawString(
+        0.65 * inch,
+        y - 0.84 * inch,
+        f"Pasillo: {liq.cantidad_pasillo} venta(s) (${float(liq.monto_pasillo_usd):.2f})  ·  "
+        f"Lead: {liq.cantidad_lead} venta(s) (${float(liq.monto_lead_usd):.2f})",
+    )
+    pdf.drawString(0.65 * inch, y - 1.02 * inch, f"Registrado por: {pagado_por}")
+
+    pdf.setFillColorRGB(0.0, 0.208, 0.40)
+    pdf.setFont("Helvetica-Bold", 9)
+    pdf.drawRightString(ancho - 0.65 * inch, y - 0.28 * inch, "TOTAL PAGADO")
+    pdf.setFont("Helvetica-Bold", 15)
+    pdf.drawRightString(ancho - 0.65 * inch, y - 0.56 * inch, f"${float(liq.monto_total_usd):,.2f} USD")
+    if liq.monto_bs is not None and liq.tasa_bcv_aplicada is not None:
+        pdf.setFillColorRGB(0.25, 0.25, 0.25)
+        pdf.setFont("Helvetica", 8)
+        pdf.drawRightString(
+            ancho - 0.65 * inch,
+            y - 0.78 * inch,
+            f"Bs. {float(liq.monto_bs):,.2f} (BCV {float(liq.tasa_bcv_aplicada):.2f})",
+        )
+
+    y -= 1.38 * inch
+
+    pdf.setFillColorRGB(0.0, 0.208, 0.40)
+    pdf.setFont("Helvetica-Bold", 9)
+    pdf.drawString(0.50 * inch, y, f"DETALLE DE VENTAS LIQUIDADAS ({len(detalles_ventas)})")
+    y -= 0.18 * inch
+
+    pdf.setFillColorRGB(0.929, 0.953, 0.980)
+    pdf.rect(0.50 * inch, y - 0.20 * inch, ancho - 1.00 * inch, 0.22 * inch, fill=1, stroke=0)
+    pdf.setFillColorRGB(0.0, 0.031, 0.078)
+    pdf.setFont("Helvetica-Bold", 7.8)
+    pdf.drawString(0.56 * inch, y - 0.14 * inch, "FECHA")
+    pdf.drawString(1.30 * inch, y - 0.14 * inch, "NOTA")
+    pdf.drawString(2.05 * inch, y - 0.14 * inch, "PRODUCTO / EQUIPO")
+    pdf.drawString(5.10 * inch, y - 0.14 * inch, "ORIGEN")
+    pdf.drawRightString(6.45 * inch, y - 0.14 * inch, "PROMO USD")
+    pdf.drawRightString(7.05 * inch, y - 0.14 * inch, "%")
+    pdf.drawRightString(ancho - 0.56 * inch, y - 0.14 * inch, "COMISIÓN")
+    y -= 0.28 * inch
+
+    pdf.setFont("Helvetica", 7.6)
+    pagina = 1
+    for item in detalles_ventas:
+        if y < 1.35 * inch:
+            pdf.showPage()
+            pagina += 1
+            y = _dibujar_encabezado_corporativo(
+                pdf,
+                ancho,
+                alto,
+                titulo_doc="COMPROBANTE DE LIQUIDACIÓN",
+                numero_doc=liq.codigo,
+                fecha_texto=f"Emisión: {fecha_emision}",
+                subtitulo_der=estado_lbl,
+                pagina=pagina,
+            ) - 0.25 * inch
+            pdf.setFont("Helvetica", 7.6)
+
+        pdf.setFillColorRGB(0.0, 0.031, 0.078)
+        pdf.drawString(0.56 * inch, y, str(item["fecha"]))
+        pdf.drawString(1.30 * inch, y, str(item["numero_venta"]))
+        prod = str(item["producto"])
+        if len(prod) > 46:
+            prod = prod[:45] + "…"
+        pdf.drawString(2.05 * inch, y, prod)
+        pdf.drawString(5.10 * inch, y, "Lead" if item["origen"] == "LEAD" else "Pasillo")
+        pdf.drawRightString(6.45 * inch, y, f"${float(item['base_promo_usd']):,.2f}")
+        pdf.drawRightString(7.05 * inch, y, f"{item['porcentaje_aplicado']}%")
+        pdf.setFont("Helvetica-Bold", 7.6)
+        pdf.drawRightString(ancho - 0.56 * inch, y, f"${float(item['comision_usd']):,.2f}")
+        pdf.setFont("Helvetica", 7.6)
+
+        pdf.setStrokeColorRGB(0.90, 0.92, 0.94)
+        pdf.setLineWidth(0.4)
+        pdf.line(0.50 * inch, y - 4, ancho - 0.50 * inch, y - 4)
+        y -= 0.22 * inch
+
+    if liq.observaciones:
+        y -= 0.12 * inch
+        pdf.setFont("Helvetica-Bold", 8)
+        pdf.drawString(0.50 * inch, y, f"Observaciones: {liq.observaciones[:120]}")
+
+    y_firma = max(0.75 * inch, y - 0.75 * inch)
+    pdf.setStrokeColorRGB(0.55, 0.58, 0.62)
+    pdf.setLineWidth(0.7)
+    pdf.line(0.90 * inch, y_firma, 3.40 * inch, y_firma)
+    pdf.line(ancho - 3.40 * inch, y_firma, ancho - 0.90 * inch, y_firma)
+    pdf.setFillColorRGB(0.0, 0.031, 0.078)
+    pdf.setFont("Helvetica-Bold", 8)
+    pdf.drawCentredString(2.15 * inch, y_firma - 12, "Autorizado por Administración (Alfa)")
+    pdf.drawCentredString(ancho - 2.15 * inch, y_firma - 12, f"Recibí conforme ({nombre_col})")
+
+    pdf.showPage()
+    pdf.save()
+    return buffer.getvalue()

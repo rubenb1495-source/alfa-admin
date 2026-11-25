@@ -2,6 +2,7 @@ import { formatearBs, formatearUsd } from "@/servicios/api";
 import type {
   ComisionPorPersonaReporte,
   DetalleVentaComision,
+  LiquidacionComisionResumen,
   PagoBandeja,
   VentaResumen,
 } from "@/tipos/finanzas";
@@ -553,5 +554,43 @@ export function formatearWhatsAppComisionPersona(
   }
 
   lineas.push("", "✅ _ALFA IMPORTACIONES, C.A. · RIF J-50793794-1_");
+  return lineas.join("\n");
+}
+
+/**
+ * 8. Comprobante oficial de Liquidación de Comisiones pagada para WhatsApp.
+ */
+export function formatearWhatsAppLiquidacion(
+  liq: LiquidacionComisionResumen
+): string {
+  const lineas: string[] = [
+    `✅ *ALFA DIGITAL STORE · Comprobante de Pago de Comisiones*`,
+    `🧾 Código: *${liq.codigo}*`,
+    `👤 Colaborador: *${liq.personal_nombre}*`,
+    `📅 Período liquidado: *${liq.fecha_inicio}* al *${liq.fecha_fin}*`,
+    "",
+    `💼 *Resumen (${liq.cantidad_ventas} venta(s)):*`,
+    `• Pasillo: ${liq.cantidad_pasillo} venta(s) → ${formatearUsd(liq.monto_pasillo_usd)}`,
+    `• Lead: ${liq.cantidad_lead} venta(s) → ${formatearUsd(liq.monto_lead_usd)}`,
+    "",
+    `💵 *TOTAL PAGADO:* *${formatearUsd(liq.monto_total_usd)} USD*`,
+  ];
+
+  if (liq.monto_bs && liq.tasa_bcv_aplicada) {
+    lineas.push(
+      `💱 *Pagado en Bs:* *${formatearBs(liq.monto_bs)}* (Tasa BCV: ${formatearBs(liq.tasa_bcv_aplicada)})`
+    );
+  }
+
+  lineas.push(
+    `💳 Método de pago: *${liq.metodo_pago}*` +
+      (liq.referencia ? ` · Ref: *${liq.referencia}*` : "")
+  );
+
+  if (liq.observaciones) {
+    lineas.push(`📝 Nota: ${liq.observaciones}`);
+  }
+
+  lineas.push("", "🏢 _ALFA IMPORTACIONES, C.A. · RIF J-50793794-1_");
   return lineas.join("\n");
 }

@@ -5,8 +5,8 @@ from datetime import date, datetime
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Any
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
-from sqlalchemy import extract
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile, status
+from sqlalchemy import extract, func
 from sqlalchemy.orm import Session, joinedload
 
 from app.base_datos import obtener_bd
@@ -15,17 +15,22 @@ from app.esquemas_finanzas import (
     CasheaLiquidarEntrada,
     CierreMensualEntrada,
     CruceManualEntrada,
+    LiquidacionAnularEntrada,
+    LiquidacionCrearEntrada,
     PagoConfirmarEntrada,
 )
 from app.modelos import RolUsuario, TasaDiaria, TipoArticulo, Usuario
 from app.modelos_finanzas import (
     CierreMensual,
     CuentaPorCobrar,
+    EstadoComision,
     EstadoCuentaPorCobrar,
+    EstadoLiquidacionComision,
     EstadoVenta,
     EstadoVerificacionPago,
     ExtractoBancario,
     InstrumentoFinanciero,
+    LiquidacionComision,
     MonedaInstrumento,
     OrigenVenta,
     Pago,
@@ -35,6 +40,7 @@ from app.modelos_finanzas import (
     Venta,
     VentaDetalle,
 )
+from app.servicios.pdf_documentos import generar_pdf_liquidacion_comision
 from app.modelos_taller import (
     CasoPostventa,
     EstadoCasoPostventa,
@@ -796,12 +802,13 @@ def obtener_reporte_comisiones_avanzado(
     personal_id: int | None = Query(default=None),
     rol: str | None = Query(default=None),
     origen: str | None = Query(default=None),
+    estado_comision: str | None = Query(default="TODOS"),
     sucursal_id: int | None = Query(default=None),
     _usuario: Usuario = Depends(requerir_roles(*ROLES_ADMINISTRATIVOS)),
     bd: Session = Depends(obtener_bd),
 ) -> dict[str, Any]:
     """
-    Reporte avanzado de comisiones Alfa por rango de fechas, asesor/encargado (con o sin acceso) y origen.
+    Reporte avanzado de comisiones Alfa por rango de fechas, asesor/encargado (con o sin acceso), origen y estado.
     Calcula estrictamente sobre Precio Promo USD excluyendo ventas ANULADA / DEVUELTA y Tienda (asesor_id=None).
     """
     hoy = obtener_fecha_hoy()
@@ -818,6 +825,13 @@ def obtener_reporte_comisiones_avanzado(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="El filtro origen debe ser PASILLO o LEAD.",
+        )
+
+    estado_com_norm = (estado_comision or "TODOS").strip().upper()
+    if estado_com_norm not in ("TODOS", EstadoComision.PENDIENTE.value, EstadoComision.PAGADA.value):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El filtro estado_comision debe ser TODOS, PENDIENTE o PAGADA.",
         )
 
     rol_norm = rol.strip().upper() if rol and rol.strip() else None
@@ -854,6 +868,8 @@ def obtener_reporte_comisiones_avanzado(
         consulta_ventas = consulta_ventas.filter(Venta.sucursal_id == sucursal_id)
     if origen_norm is not None:
         consulta_ventas = consulta_ventas.filter(Venta.origen_venta == origen_norm)
+    if estado_com_norm in (EstadoComision.PENDIENTE.value, EstadoComision.PAGADA.value):
+        consulta_ventas = consulta_ventas.filter(Venta.estado_comision == estado_com_norm)
 
     ventas = consulta_ventas.order_by(Venta.fecha.desc(), Venta.id.desc()).all()
 
@@ -878,6 +894,8 @@ def obtener_reporte_comisiones_avanzado(
                 "cantidad_lead": 0,
                 "base_lead_usd": Decimal("0"),
                 "comision_lead_usd": Decimal("0"),
+                "pendiente_usd": Decimal("0"),
+                "pagado_usd": Decimal("0"),
                 "total_ventas": 0,
                 "total_comision_usd": Decimal("0"),
             }
@@ -909,6 +927,7 @@ def obtener_reporte_comisiones_avanzado(
             continue
 
         origen_vta = (getattr(v, "origen_venta", OrigenVenta.PASILLO.value) or OrigenVenta.PASILLO.value).upper()
+        estado_com_vta = (getattr(v, "estado_comision", EstadoComision.PENDIENTE.value) or EstadoComision.PENDIENTE.value).upper()
         es_lead = origen_vta == OrigenVenta.LEAD.value
         es_enc = u.rol in (RolUsuario.ENCARGADO_TIENDA.value, RolUsuario.LIDER.value)
         pct = 8 if es_lead else (5 if es_enc else 1)
@@ -926,6 +945,11 @@ def obtener_reporte_comisiones_avanzado(
             acc["cantidad_pasillo"] += 1
             acc["base_pasillo_usd"] += base_promo
             acc["comision_pasillo_usd"] += comision
+
+        if estado_com_vta == EstadoComision.PAGADA.value:
+            acc["pagado_usd"] += comision
+        else:
+            acc["pendiente_usd"] += comision
         acc["total_comision_usd"] += comision
 
         detalle_ventas.append(
@@ -938,67 +962,17 @@ def obtener_reporte_comisiones_avanzado(
                 "cliente": v.cliente.nombre if v.cliente else "Cliente general",
                 "producto": productos_txt,
                 "origen": origen_vta,
+                "estado_comision": estado_com_vta,
+                "liquidacion_id": getattr(v, "liquidacion_id", None),
                 "base_promo_usd": redondear_usd(base_promo),
                 "porcentaje_aplicado": pct,
                 "comision_usd": redondear_usd(comision),
             }
         )
 
-    # Ajustes por cambios Upgrade (+) y Downgrade (-) dentro del rango
-    from app.modelos_operaciones import DevolucionGarantia, TipoResolucionDevolucion
-
-    ajustes_dev = (
-        bd.query(DevolucionGarantia)
-        .options(joinedload(DevolucionGarantia.venta))
-        .filter(
-            DevolucionGarantia.tipo_resolucion.in_(
-                [
-                    TipoResolucionDevolucion.CAMBIO_UPGRADE.value,
-                    TipoResolucionDevolucion.CAMBIO_DOWNGRADE.value,
-                ]
-            ),
-            DevolucionGarantia.fecha >= f_inicio,
-            DevolucionGarantia.fecha <= f_fin,
-        )
-        .all()
-    )
-    for dev in ajustes_dev:
-        vta = dev.venta
-        if vta is None or vta.asesor_id is None or vta.asesor_id not in usuarios_map:
-            continue
-        if vta.estado in (EstadoVenta.ANULADA.value, EstadoVenta.DEVUELTA.value):
-            continue
-        if personal_id is not None and vta.asesor_id != personal_id:
-            continue
-        if sucursal_id is not None and vta.sucursal_id != sucursal_id:
-            continue
-        u = usuarios_map[vta.asesor_id]
-        if not _coincide_rol(u.rol):
-            continue
-        origen_dev = (getattr(vta, "origen_venta", OrigenVenta.PASILLO.value) or OrigenVenta.PASILLO.value).upper()
-        if origen_norm is not None and origen_dev != origen_norm:
-            continue
-
-        dif = dev.diferencia_promo_usd or Decimal("0")
-        if dif == 0:
-            continue
-        es_lead = origen_dev == OrigenVenta.LEAD.value
-        es_enc = u.rol in (RolUsuario.ENCARGADO_TIENDA.value, RolUsuario.LIDER.value)
-        pct = 8 if es_lead else (5 if es_enc else 1)
-        com_dif = (dif * Decimal(pct) / Decimal("100")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-
-        acc = _asegurar_persona(u)
-        if es_lead:
-            acc["base_lead_usd"] = max(Decimal("0"), acc["base_lead_usd"] + dif)
-            acc["comision_lead_usd"] = max(Decimal("0"), acc["comision_lead_usd"] + com_dif)
-        else:
-            acc["base_pasillo_usd"] = max(Decimal("0"), acc["base_pasillo_usd"] + dif)
-            acc["comision_pasillo_usd"] = max(Decimal("0"), acc["comision_pasillo_usd"] + com_dif)
-        acc["total_comision_usd"] = acc["comision_pasillo_usd"] + acc["comision_lead_usd"]
-
     por_persona_lista = sorted(
         acumulado.values(),
-        key=lambda x: (-float(x["total_comision_usd"]), x["nombre"]),
+        key=lambda x: (-float(x["pendiente_usd"]), -float(x["total_comision_usd"]), x["nombre"]),
     )
     por_persona_serializado = [
         {
@@ -1016,6 +990,8 @@ def obtener_reporte_comisiones_avanzado(
             "cantidad_lead": p["cantidad_lead"],
             "base_lead_usd": redondear_usd(p["base_lead_usd"]),
             "comision_lead_usd": redondear_usd(p["comision_lead_usd"]),
+            "pendiente_usd": redondear_usd(p["pendiente_usd"]),
+            "pagado_usd": redondear_usd(p["pagado_usd"]),
             "total_ventas": p["total_ventas"],
             "total_comision_usd": redondear_usd(p["total_comision_usd"]),
         }
@@ -1029,6 +1005,8 @@ def obtener_reporte_comisiones_avanzado(
     )
     pasillo_gen = sum((p["comision_pasillo_usd"] for p in por_persona_lista), Decimal("0"))
     lead_gen = sum((p["comision_lead_usd"] for p in por_persona_lista), Decimal("0"))
+    pendiente_gen = sum((p["pendiente_usd"] for p in por_persona_lista), Decimal("0"))
+    pagado_gen = sum((p["pagado_usd"] for p in por_persona_lista), Decimal("0"))
     total_com_gen = pasillo_gen + lead_gen
 
     ultima_tasa = bd.query(TasaDiaria).order_by(TasaDiaria.fecha.desc()).first()
@@ -1037,14 +1015,340 @@ def obtener_reporte_comisiones_avanzado(
     return {
         "fecha_inicio": f_inicio.isoformat(),
         "fecha_fin": f_fin.isoformat(),
+        "estado_comision": estado_com_norm,
         "tasa_bcv_referencia": tasa_bcv_ref,
         "resumen_general": {
             "total_ventas": total_ventas_gen,
             "volumen_promo_usd": redondear_usd(vol_promo_gen),
             "pasillo_usd": redondear_usd(pasillo_gen),
             "lead_usd": redondear_usd(lead_gen),
+            "pendiente_usd": redondear_usd(pendiente_gen),
+            "pagado_usd": redondear_usd(pagado_gen),
             "total_comisiones_usd": redondear_usd(total_com_gen),
         },
         "por_persona": por_persona_serializado,
         "detalle_ventas": detalle_ventas,
     }
+
+
+def _calcular_comision_venta_individual(venta: Venta, usuario: Usuario) -> tuple[Decimal, str, int, Decimal, str]:
+    """Devuelve (base_promo_usd, origen, porcentaje, comision_usd, descripcion_producto)."""
+    if not venta.detalles:
+        base_promo = venta.total_promo_usd
+        productos_txt = "Venta general"
+    else:
+        base_promo = Decimal("0")
+        nombres: list[str] = []
+        for det in venta.detalles:
+            es_serv = det.articulo is not None and det.articulo.tipo == TipoArticulo.SERVICIO.value
+            if not es_serv:
+                base_promo += det.precio_promo_usd * Decimal(det.cantidad)
+                desc = det.descripcion or (det.articulo.descripcion if det.articulo else "Producto")
+                nombres.append(f"{det.cantidad}x {desc}" if det.cantidad > 1 else desc)
+        productos_txt = ", ".join(nombres) if nombres else "Servicio Técnico"
+
+    origen_vta = (getattr(venta, "origen_venta", OrigenVenta.PASILLO.value) or OrigenVenta.PASILLO.value).upper()
+    es_lead = origen_vta == OrigenVenta.LEAD.value
+    es_enc = usuario.rol in (RolUsuario.ENCARGADO_TIENDA.value, RolUsuario.LIDER.value)
+    pct = 8 if es_lead else (5 if es_enc else 1)
+    comision = (base_promo * Decimal(pct) / Decimal("100")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    return base_promo, origen_vta, pct, comision, productos_txt
+
+
+def _serializar_liquidacion(liq: LiquidacionComision, incluir_ventas: bool = False) -> dict[str, Any]:
+    personal = liq.personal
+    datos: dict[str, Any] = {
+        "id": liq.id,
+        "codigo": liq.codigo,
+        "personal_id": liq.personal_id,
+        "personal_nombre": personal.nombre if personal else f"Personal #{liq.personal_id}",
+        "personal_rol": personal.rol if personal else "",
+        "personal_telefono": getattr(personal, "telefono", "") if personal else "",
+        "personal_modalidad": getattr(personal, "modalidad", "PRESENCIAL") if personal else "PRESENCIAL",
+        "fecha_inicio": liq.fecha_inicio.isoformat(),
+        "fecha_fin": liq.fecha_fin.isoformat(),
+        "cantidad_ventas": liq.cantidad_ventas,
+        "cantidad_pasillo": liq.cantidad_pasillo,
+        "cantidad_lead": liq.cantidad_lead,
+        "monto_pasillo_usd": redondear_usd(liq.monto_pasillo_usd),
+        "monto_lead_usd": redondear_usd(liq.monto_lead_usd),
+        "monto_total_usd": redondear_usd(liq.monto_total_usd),
+        "metodo_pago": liq.metodo_pago,
+        "tasa_bcv_aplicada": float(liq.tasa_bcv_aplicada) if liq.tasa_bcv_aplicada is not None else None,
+        "monto_bs": redondear_usd(liq.monto_bs) if liq.monto_bs is not None else None,
+        "referencia": liq.referencia,
+        "observaciones": liq.observaciones,
+        "estado": liq.estado,
+        "motivo_anulacion": liq.motivo_anulacion,
+        "pagado_por": liq.pagado_por.nombre if liq.pagado_por else None,
+        "created_at": liq.created_at.isoformat() if liq.created_at else None,
+    }
+    if incluir_ventas and personal is not None:
+        ventas_det: list[dict[str, Any]] = []
+        for v in liq.ventas:
+            base_promo, origen_vta, pct, comision, prod_txt = _calcular_comision_venta_individual(v, personal)
+            ventas_det.append(
+                {
+                    "venta_id": v.id,
+                    "fecha": v.fecha.isoformat(),
+                    "numero_venta": v.numero_venta,
+                    "cliente": v.cliente.nombre if v.cliente else "Cliente general",
+                    "producto": prod_txt,
+                    "origen": origen_vta,
+                    "base_promo_usd": redondear_usd(base_promo),
+                    "porcentaje_aplicado": pct,
+                    "comision_usd": redondear_usd(comision),
+                }
+            )
+        datos["ventas"] = ventas_det
+    return datos
+
+
+def _generar_codigo_liquidacion(bd: Session, anio: int) -> str:
+    prefijo = f"LIQ-{anio}-"
+    cantidad = (
+        bd.query(func.count(LiquidacionComision.id))
+        .filter(LiquidacionComision.codigo.like(f"{prefijo}%"))
+        .scalar()
+        or 0
+    )
+    secuencia = int(cantidad) + 1
+    while True:
+        candidato = f"{prefijo}{secuencia:04d}"
+        if not bd.query(LiquidacionComision.id).filter(LiquidacionComision.codigo == candidato).first():
+            return candidato
+        secuencia += 1
+
+
+@enrutador_comisiones.post("/liquidaciones", status_code=status.HTTP_201_CREATED)
+def crear_liquidacion_comisiones(
+    datos: LiquidacionCrearEntrada,
+    usuario_actual: Usuario = Depends(requerir_roles(*ROLES_ADMINISTRATIVOS)),
+    bd: Session = Depends(obtener_bd),
+) -> dict[str, Any]:
+    """Registra una liquidación quincenal en una transacción atómica, evitando cualquier doble pago (409)."""
+    personal = bd.query(Usuario).filter(Usuario.id == datos.personal_id).first()
+    if personal is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Colaborador no encontrado.")
+
+    ids_unicos = list(dict.fromkeys(datos.venta_ids))
+    ventas = (
+        bd.query(Venta)
+        .options(
+            joinedload(Venta.cliente),
+            joinedload(Venta.detalles).joinedload(VentaDetalle.articulo),
+        )
+        .filter(Venta.id.in_(ids_unicos))
+        .all()
+    )
+    if len(ventas) != len(ids_unicos):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Una o más ventas seleccionadas no existen.",
+        )
+
+    cantidad_pasillo = 0
+    cantidad_lead = 0
+    monto_pasillo = Decimal("0")
+    monto_lead = Decimal("0")
+
+    for v in ventas:
+        if v.asesor_id != personal.id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"La venta {v.numero_venta} no pertenece a {personal.nombre}.",
+            )
+        if v.estado in (EstadoVenta.ANULADA.value, EstadoVenta.DEVUELTA.value):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"La venta {v.numero_venta} está {v.estado} y no puede liquidarse.",
+            )
+        estado_com = (getattr(v, "estado_comision", EstadoComision.PENDIENTE.value) or EstadoComision.PENDIENTE.value).upper()
+        if estado_com == EstadoComision.PAGADA.value or getattr(v, "liquidacion_id", None) is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"La venta {v.numero_venta} ya fue liquidada anteriormente (doble pago bloqueado).",
+            )
+
+        base_promo, origen_vta, _pct, comision, _prod = _calcular_comision_venta_individual(v, personal)
+        if base_promo <= 0:
+            continue
+        if origen_vta == OrigenVenta.LEAD.value:
+            cantidad_lead += 1
+            monto_lead += comision
+        else:
+            cantidad_pasillo += 1
+            monto_pasillo += comision
+
+    monto_total = monto_pasillo + monto_lead
+    if monto_total <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Las ventas seleccionadas no generan comisión pendiente mayor a $0.00.",
+        )
+
+    tasa_bcv = datos.tasa_bcv_aplicada
+    monto_bs = (
+        (monto_total * tasa_bcv).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        if tasa_bcv is not None
+        else None
+    )
+
+    hoy = obtener_fecha_hoy()
+    codigo = _generar_codigo_liquidacion(bd, hoy.year)
+
+    liq = LiquidacionComision(
+        codigo=codigo,
+        personal_id=personal.id,
+        fecha_inicio=datos.fecha_inicio,
+        fecha_fin=datos.fecha_fin,
+        cantidad_ventas=cantidad_pasillo + cantidad_lead,
+        cantidad_pasillo=cantidad_pasillo,
+        cantidad_lead=cantidad_lead,
+        monto_pasillo_usd=monto_pasillo,
+        monto_lead_usd=monto_lead,
+        monto_total_usd=monto_total,
+        metodo_pago=datos.metodo_pago.strip().upper(),
+        tasa_bcv_aplicada=tasa_bcv,
+        monto_bs=monto_bs,
+        referencia=datos.referencia.strip(),
+        observaciones=datos.observaciones.strip(),
+        estado=EstadoLiquidacionComision.PAGADA.value,
+        pagado_por_id=usuario_actual.id,
+    )
+    bd.add(liq)
+    bd.flush()
+
+    for v in ventas:
+        v.estado_comision = EstadoComision.PAGADA.value
+        v.liquidacion_id = liq.id
+
+    bd.commit()
+
+    liq_completa = (
+        bd.query(LiquidacionComision)
+        .options(
+            joinedload(LiquidacionComision.personal),
+            joinedload(LiquidacionComision.pagado_por),
+            joinedload(LiquidacionComision.ventas).joinedload(Venta.cliente),
+            joinedload(LiquidacionComision.ventas).joinedload(Venta.detalles).joinedload(VentaDetalle.articulo),
+        )
+        .filter(LiquidacionComision.id == liq.id)
+        .first()
+    )
+    return _serializar_liquidacion(liq_completa, incluir_ventas=True)
+
+
+@enrutador_comisiones.get("/liquidaciones")
+def listar_liquidaciones_comisiones(
+    personal_id: int | None = Query(default=None),
+    fecha_inicio: date | None = Query(default=None),
+    fecha_fin: date | None = Query(default=None),
+    estado: str | None = Query(default=None),
+    _usuario: Usuario = Depends(requerir_roles(*ROLES_ADMINISTRATIVOS)),
+    bd: Session = Depends(obtener_bd),
+) -> list[dict[str, Any]]:
+    consulta = bd.query(LiquidacionComision).options(
+        joinedload(LiquidacionComision.personal),
+        joinedload(LiquidacionComision.pagado_por),
+    )
+    if personal_id is not None:
+        consulta = consulta.filter(LiquidacionComision.personal_id == personal_id)
+    if fecha_inicio is not None:
+        consulta = consulta.filter(LiquidacionComision.fecha_fin >= fecha_inicio)
+    if fecha_fin is not None:
+        consulta = consulta.filter(LiquidacionComision.fecha_inicio <= fecha_fin)
+    if estado and estado.strip():
+        consulta = consulta.filter(LiquidacionComision.estado == estado.strip().upper())
+
+    filas = consulta.order_by(LiquidacionComision.id.desc()).limit(200).all()
+    return [_serializar_liquidacion(f, incluir_ventas=False) for f in filas]
+
+
+@enrutador_comisiones.get("/liquidaciones/{liq_id}")
+def obtener_liquidacion_detalle(
+    liq_id: int,
+    _usuario: Usuario = Depends(requerir_roles(*ROLES_ADMINISTRATIVOS)),
+    bd: Session = Depends(obtener_bd),
+) -> dict[str, Any]:
+    liq = (
+        bd.query(LiquidacionComision)
+        .options(
+            joinedload(LiquidacionComision.personal),
+            joinedload(LiquidacionComision.pagado_por),
+            joinedload(LiquidacionComision.ventas).joinedload(Venta.cliente),
+            joinedload(LiquidacionComision.ventas).joinedload(Venta.detalles).joinedload(VentaDetalle.articulo),
+        )
+        .filter(LiquidacionComision.id == liq_id)
+        .first()
+    )
+    if liq is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Liquidación no encontrada.")
+    return _serializar_liquidacion(liq, incluir_ventas=True)
+
+
+@enrutador_comisiones.post("/liquidaciones/{liq_id}/anular")
+def anular_liquidacion_comision(
+    liq_id: int,
+    datos: LiquidacionAnularEntrada,
+    _usuario: Usuario = Depends(requerir_roles(*ROLES_ADMINISTRATIVOS)),
+    bd: Session = Depends(obtener_bd),
+) -> dict[str, Any]:
+    """Anula una liquidación y devuelve todas sus ventas asociadas a estado_comision = PENDIENTE."""
+    liq = (
+        bd.query(LiquidacionComision)
+        .options(
+            joinedload(LiquidacionComision.personal),
+            joinedload(LiquidacionComision.pagado_por),
+            joinedload(LiquidacionComision.ventas),
+        )
+        .filter(LiquidacionComision.id == liq_id)
+        .first()
+    )
+    if liq is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Liquidación no encontrada.")
+    if liq.estado == EstadoLiquidacionComision.ANULADA.value:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Esta liquidación ya fue anulada.",
+        )
+
+    ventas_asociadas = bd.query(Venta).filter(Venta.liquidacion_id == liq.id).all()
+    for v in ventas_asociadas:
+        v.estado_comision = EstadoComision.PENDIENTE.value
+        v.liquidacion_id = None
+
+    liq.estado = EstadoLiquidacionComision.ANULADA.value
+    liq.motivo_anulacion = datos.motivo.strip()
+    bd.commit()
+    bd.refresh(liq)
+    return _serializar_liquidacion(liq, incluir_ventas=False)
+
+
+@enrutador_comisiones.get("/liquidaciones/{liq_id}/pdf")
+def descargar_pdf_liquidacion(
+    liq_id: int,
+    _usuario: Usuario = Depends(requerir_roles(*ROLES_ADMINISTRATIVOS)),
+    bd: Session = Depends(obtener_bd),
+) -> Response:
+    liq = (
+        bd.query(LiquidacionComision)
+        .options(
+            joinedload(LiquidacionComision.personal),
+            joinedload(LiquidacionComision.pagado_por),
+            joinedload(LiquidacionComision.ventas).joinedload(Venta.cliente),
+            joinedload(LiquidacionComision.ventas).joinedload(Venta.detalles).joinedload(VentaDetalle.articulo),
+        )
+        .filter(LiquidacionComision.id == liq_id)
+        .first()
+    )
+    if liq is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Liquidación no encontrada.")
+
+    serializada = _serializar_liquidacion(liq, incluir_ventas=True)
+    pdf_bytes = generar_pdf_liquidacion_comision(liq, serializada.get("ventas", []))
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="{liq.codigo}.pdf"'},
+    )

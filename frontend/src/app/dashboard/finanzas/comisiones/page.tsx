@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
+  Ban,
   BarChart3,
   Building2,
   Calendar,
@@ -11,22 +12,36 @@ import {
   ChevronDown,
   ChevronRight,
   Copy,
+  Eye,
+  FileDown,
   Globe,
+  History,
   Lock,
   MessageCircle,
   Phone,
   Search,
+  Wallet,
+  X,
 } from "lucide-react";
+import ModalLiquidacionComision from "@/components/ModalLiquidacionComision";
 import { usarSesion } from "@/contexto/SesionContexto";
 import {
   construirUrlWhatsApp,
   copiarTextoPortapapeles,
   formatearWhatsAppComisionPersona,
+  formatearWhatsAppLiquidacion,
 } from "@/lib/whatsapp";
-import { ErrorApi, formatearUsd, solicitarApi } from "@/servicios/api";
+import {
+  descargarPdfApi,
+  ErrorApi,
+  formatearBs,
+  formatearUsd,
+  solicitarApi,
+} from "@/servicios/api";
 import type {
   ComisionPorPersonaReporte,
   DetalleVentaComision,
+  LiquidacionComisionResumen,
   ReporteComisionesAvanzado,
   UsuarioOperativo,
 } from "@/tipos/finanzas";
@@ -52,6 +67,8 @@ export default function PaginaComisionesYCierre() {
   const { usuario, tasaHoy } = usarSesion();
   const esDireccion = usuario?.rol === "DIRECCION";
 
+  const [pestana, setPestana] = useState<"reporte" | "historial">("reporte");
+
   const rangoInicial = useMemo(() => obtenerRangoQuincenaActual(), []);
   const [fechaInicio, setFechaInicio] = useState(rangoInicial.inicio);
   const [fechaFin, setFechaFin] = useState(rangoInicial.fin);
@@ -59,6 +76,9 @@ export default function PaginaComisionesYCierre() {
   const [personalId, setPersonalId] = useState<string>("");
   const [busquedaPersonal, setBusquedaPersonal] = useState<string>("");
   const [origenFiltro, setOrigenFiltro] = useState<string>("");
+  const [estadoComisionFiltro, setEstadoComisionFiltro] = useState<
+    "PENDIENTE" | "PAGADA" | "TODOS"
+  >("PENDIENTE");
 
   const [personalLista, setPersonalLista] = useState<UsuarioOperativo[]>([]);
   const [reporte, setReporte] = useState<ReporteComisionesAvanzado | null>(
@@ -66,6 +86,24 @@ export default function PaginaComisionesYCierre() {
   );
   const [expandidos, setExpandidos] = useState<Record<number, boolean>>({});
   const [copiadoId, setCopiadoId] = useState<number | null>(null);
+
+  // Modal Liquidar Comisiones
+  const [personaALiquidar, setPersonaALiquidar] =
+    useState<ComisionPorPersonaReporte | null>(null);
+
+  // Historial de Liquidaciones
+  const [liquidaciones, setLiquidaciones] = useState<
+    LiquidacionComisionResumen[]
+  >([]);
+  const [cargandoHistorial, setCargandoHistorial] = useState(false);
+  const [busquedaLiq, setBusquedaLiq] = useState("");
+  const [liqDetalle, setLiqDetalle] =
+    useState<LiquidacionComisionResumen | null>(null);
+  const [liqAnular, setLiqAnular] = useState<LiquidacionComisionResumen | null>(
+    null
+  );
+  const [motivoAnulacion, setMotivoAnulacion] = useState("");
+  const [anulando, setAnulando] = useState(false);
 
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -91,12 +129,12 @@ export default function PaginaComisionesYCierre() {
       if (fechaFin) params.set("fecha_fin", fechaFin);
       if (personalId) params.set("personal_id", personalId);
       if (origenFiltro) params.set("origen", origenFiltro);
+      params.set("estado_comision", estadoComisionFiltro);
 
       const resp = await solicitarApi<ReporteComisionesAvanzado>(
         `/api/comisiones/reporte?${params.toString()}`
       );
       setReporte(resp);
-      // Si se filtra por una persona específica, expandir automáticamente su detalle
       if (personalId && resp.por_persona.length === 1) {
         setExpandidos({ [resp.por_persona[0].personal_id]: true });
       }
@@ -109,11 +147,36 @@ export default function PaginaComisionesYCierre() {
     } finally {
       setCargando(false);
     }
-  }, [fechaInicio, fechaFin, personalId, origenFiltro]);
+  }, [fechaInicio, fechaFin, personalId, origenFiltro, estadoComisionFiltro]);
+
+  const cargarHistorialLiquidaciones = useCallback(async () => {
+    setCargandoHistorial(true);
+    try {
+      const params = new URLSearchParams();
+      if (fechaInicio) params.set("fecha_inicio", fechaInicio);
+      if (fechaFin) params.set("fecha_fin", fechaFin);
+      if (personalId) params.set("personal_id", personalId);
+      const qs = params.toString() ? `?${params.toString()}` : "";
+      const res = await solicitarApi<LiquidacionComisionResumen[]>(
+        `/api/comisiones/liquidaciones${qs}`
+      );
+      setLiquidaciones(res);
+    } catch {
+      setLiquidaciones([]);
+    } finally {
+      setCargandoHistorial(false);
+    }
+  }, [fechaInicio, fechaFin, personalId]);
 
   useEffect(() => {
     void cargarReporte();
   }, [cargarReporte]);
+
+  useEffect(() => {
+    if (pestana === "historial") {
+      void cargarHistorialLiquidaciones();
+    }
+  }, [pestana, cargarHistorialLiquidaciones]);
 
   const aplicarAtajo = (tipo: "hoy" | "semana" | "quincena" | "mes") => {
     const hoy = new Date();
@@ -121,7 +184,7 @@ export default function PaginaComisionesYCierre() {
     if (tipo === "hoy") {
       ini = new Date(hoy);
     } else if (tipo === "semana") {
-      const diaSemana = hoy.getDay(); // 0=Dom, 1=Lun
+      const diaSemana = hoy.getDay();
       const diffLunes = diaSemana === 0 ? 6 : diaSemana - 1;
       ini.setDate(hoy.getDate() - diffLunes);
     } else if (tipo === "quincena") {
@@ -157,6 +220,16 @@ export default function PaginaComisionesYCierre() {
     return mapa;
   }, [reporte]);
 
+  const liquidacionesFiltradas = useMemo(() => {
+    const q = busquedaLiq.trim().toLowerCase();
+    if (!q) return liquidaciones;
+    return liquidaciones.filter((l) =>
+      `${l.codigo} ${l.personal_nombre} ${l.metodo_pago} ${l.referencia}`
+        .toLowerCase()
+        .includes(q)
+    );
+  }, [liquidaciones, busquedaLiq]);
+
   const tasaBcvEfectiva =
     tasaHoy?.tasa_bcv ?? reporte?.tasa_bcv_referencia ?? null;
 
@@ -169,8 +242,11 @@ export default function PaginaComisionesYCierre() {
       reporte?.fecha_fin || fechaFin,
       tasaBcvEfectiva
     );
-    const url = construirUrlWhatsApp(mensaje, persona.telefono);
-    window.open(url, "_blank", "noopener,noreferrer");
+    window.open(
+      construirUrlWhatsApp(mensaje, persona.telefono),
+      "_blank",
+      "noopener,noreferrer"
+    );
   };
 
   const copiarResumenPersona = async (persona: ComisionPorPersonaReporte) => {
@@ -186,6 +262,54 @@ export default function PaginaComisionesYCierre() {
     if (ok) {
       setCopiadoId(persona.personal_id);
       setTimeout(() => setCopiadoId(null), 2200);
+    }
+  };
+
+  const verDetalleLiquidacion = async (liqId: number) => {
+    try {
+      const det = await solicitarApi<LiquidacionComisionResumen>(
+        `/api/comisiones/liquidaciones/${liqId}`
+      );
+      setLiqDetalle(det);
+    } catch (err) {
+      setError(
+        err instanceof ErrorApi
+          ? err.message
+          : "No se pudo cargar el detalle de la liquidación."
+      );
+    }
+  };
+
+  const manejarAnularLiquidacion = async (
+    e: React.FormEvent<HTMLFormElement>
+  ) => {
+    e.preventDefault();
+    if (!liqAnular) return;
+    setAnulando(true);
+    setError(null);
+    setExito(null);
+    try {
+      await solicitarApi(
+        `/api/comisiones/liquidaciones/${liqAnular.id}/anular`,
+        {
+          method: "POST",
+          body: JSON.stringify({ motivo: motivoAnulacion.trim() }),
+        }
+      );
+      setExito(
+        `Liquidación ${liqAnular.codigo} anulada. Todas sus ventas volvieron a estado PENDIENTE.`
+      );
+      setLiqAnular(null);
+      setMotivoAnulacion("");
+      await Promise.all([cargarHistorialLiquidaciones(), cargarReporte()]);
+    } catch (err) {
+      setError(
+        err instanceof ErrorApi
+          ? err.message
+          : "No se pudo anular la liquidación."
+      );
+    } finally {
+      setAnulando(false);
     }
   };
 
@@ -208,10 +332,12 @@ export default function PaginaComisionesYCierre() {
     }
   };
 
-  const personaSeleccionadaUnica =
-    personalId && reporte?.por_persona.length === 1
-      ? reporte.por_persona[0]
-      : null;
+  const ventasPendientesModal = useMemo(() => {
+    if (!personaALiquidar) return [];
+    return (detallesPorPersona[personaALiquidar.personal_id] ?? []).filter(
+      (v) => v.estado_comision === "PENDIENTE"
+    );
+  }, [personaALiquidar, detallesPorPersona]);
 
   return (
     <div className="space-y-6">
@@ -220,7 +346,7 @@ export default function PaginaComisionesYCierre() {
         <div>
           <h2 className="text-2xl font-black text-[#000814] flex items-center gap-2">
             <BarChart3 className="w-6 h-6 text-[#003566]" />
-            Reporte de Comisiones y Liquidación
+            Comisiones y Liquidaciones Quincenales
           </h2>
           <p className="text-sm text-slate-500">
             Cálculo SIEMPRE sobre Precio Promo USD (Asesor: 1% Pasillo / 8% Lead
@@ -228,16 +354,45 @@ export default function PaginaComisionesYCierre() {
           </p>
         </div>
 
-        {esDireccion && (
-          <button
-            type="button"
-            onClick={() => setModalCierre(true)}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#000814] hover:bg-[#001D3D] text-white text-xs font-bold cursor-pointer"
-          >
-            <Lock className="w-3.5 h-3.5" />
-            Cerrar mes
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          <div className="inline-flex rounded-xl bg-slate-100 p-1 border border-slate-200">
+            <button
+              type="button"
+              onClick={() => setPestana("reporte")}
+              className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                pestana === "reporte"
+                  ? "bg-[#003566] text-white shadow-xs"
+                  : "text-slate-600 hover:text-[#000814]"
+              }`}
+            >
+              <Wallet className="w-3.5 h-3.5" />
+              Reporte de Comisiones
+            </button>
+            <button
+              type="button"
+              onClick={() => setPestana("historial")}
+              className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                pestana === "historial"
+                  ? "bg-[#003566] text-white shadow-xs"
+                  : "text-slate-600 hover:text-[#000814]"
+              }`}
+            >
+              <History className="w-3.5 h-3.5" />
+              Historial de Liquidaciones
+            </button>
+          </div>
+
+          {esDireccion && (
+            <button
+              type="button"
+              onClick={() => setModalCierre(true)}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#000814] hover:bg-[#001D3D] text-white text-xs font-bold cursor-pointer"
+            >
+              <Lock className="w-3.5 h-3.5" />
+              Cerrar mes
+            </button>
+          )}
+        </div>
       </div>
 
       {error && (
@@ -253,9 +408,8 @@ export default function PaginaComisionesYCierre() {
         </div>
       )}
 
-      {/* Barra de filtros avanzados */}
+      {/* Barra de filtros compartida */}
       <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3.5">
-        {/* Atajos de rango rápido */}
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="text-xs font-bold text-slate-500 mr-1 inline-flex items-center gap-1">
@@ -285,13 +439,36 @@ export default function PaginaComisionesYCierre() {
             ))}
           </div>
 
-          <span className="text-xs text-slate-500 font-medium">
-            Período activo: <strong className="text-[#000814]">{fechaInicio}</strong> al{" "}
-            <strong className="text-[#000814]">{fechaFin}</strong>
-          </span>
+          {pestana === "reporte" && (
+            <div className="inline-flex items-center gap-1 rounded-xl bg-slate-100 p-1 border border-slate-200">
+              {(
+                [
+                  ["PENDIENTE", "Pendientes"],
+                  ["PAGADA", "Pagadas"],
+                  ["TODOS", "Todas"],
+                ] as const
+              ).map(([est, lbl]) => (
+                <button
+                  key={est}
+                  type="button"
+                  onClick={() => setEstadoComisionFiltro(est)}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                    estadoComisionFiltro === est
+                      ? est === "PENDIENTE"
+                        ? "bg-amber-500 text-white"
+                        : est === "PAGADA"
+                        ? "bg-emerald-600 text-white"
+                        : "bg-[#003566] text-white"
+                      : "text-slate-600 hover:text-[#000814]"
+                  }`}
+                >
+                  {lbl}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Inputs de Fecha, Asesor (con buscador) y Origen */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
           <div>
             <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">
@@ -328,7 +505,7 @@ export default function PaginaComisionesYCierre() {
               Asesor / Encargado (Presencial y Online)
             </label>
             <div className="flex gap-2">
-              <div className="relative w-36 shrink-0 hidden sm:block">
+              <div className="relative w-32 shrink-0 hidden sm:block">
                 <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
@@ -360,355 +537,580 @@ export default function PaginaComisionesYCierre() {
             </div>
           </div>
 
-          <div>
-            <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">
-              Origen de venta
-            </label>
-            <select
-              value={origenFiltro}
-              onChange={(e) => setOrigenFiltro(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-semibold bg-white text-[#000814]"
-            >
-              <option value="">Todos los orígenes</option>
-              <option value="PASILLO">Solo Pasillo (Tienda)</option>
-              <option value="LEAD">Solo Lead (Redes / WhatsApp)</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      {/* 5 Tarjetas KPI */}
-      {reporte && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 border-t-2 border-t-[#000814]">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-              Total Ventas
-            </p>
-            <p className="text-xl font-black text-[#000814] mt-1 cifra-tabular">
-              {reporte.resumen_general.total_ventas}
-            </p>
-          </div>
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 border-t-2 border-t-[#003566]">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-              Base Comisionable (Promo)
-            </p>
-            <p className="text-xl font-black text-[#000814] mt-1 cifra-tabular">
-              {formatearUsd(reporte.resumen_general.volumen_promo_usd)}
-            </p>
-          </div>
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 border-t-2 border-t-slate-500">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-              Comisiones Pasillo
-            </p>
-            <p className="text-xl font-black text-slate-800 mt-1 cifra-tabular">
-              {formatearUsd(reporte.resumen_general.pasillo_usd)}
-            </p>
-          </div>
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 border-t-2 border-t-sky-600">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-              Comisiones Lead
-            </p>
-            <p className="text-xl font-black text-[#003566] mt-1 cifra-tabular">
-              {formatearUsd(reporte.resumen_general.lead_usd)}
-            </p>
-          </div>
-          <div className="bg-gradient-to-br from-[#EDF3FA] to-white p-4 rounded-2xl border border-[#003566]/30 shadow-xs">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-[#003566]">
-              Total a Pagar (USD)
-            </p>
-            <p className="text-xl font-black text-emerald-700 mt-1 cifra-tabular">
-              {formatearUsd(reporte.resumen_general.total_comisiones_usd)}
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Acción rápida WhatsApp cuando hay un asesor específico seleccionado */}
-      {personaSeleccionadaUnica && (
-        <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 rounded-2xl bg-[#EDF3FA]/80 border border-[#003566]/25">
-          <div>
-            <p className="text-sm font-black text-[#000814]">
-              Liquidación lista para {personaSeleccionadaUnica.nombre}
-            </p>
-            <p className="text-xs text-slate-600">
-              {personaSeleccionadaUnica.total_ventas} venta(s) · Total a pagar:{" "}
-              <strong className="text-emerald-700">
-                {formatearUsd(personaSeleccionadaUnica.total_comision_usd)}
-              </strong>
-              {personaSeleccionadaUnica.telefono
-                ? ` · Tel: ${personaSeleccionadaUnica.telefono}`
-                : " · Sin teléfono registrado (elegir contacto en WhatsApp)"}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => abrirWhatsAppPersona(personaSeleccionadaUnica)}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs cursor-pointer"
-            >
-              <MessageCircle className="w-4 h-4" />
-              Enviar por WhatsApp
-            </button>
-            <button
-              type="button"
-              onClick={() => void copiarResumenPersona(personaSeleccionadaUnica)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-slate-300 hover:border-[#003566] text-[#003566] text-xs font-bold cursor-pointer"
-            >
-              {copiadoId === personaSeleccionadaUnica.personal_id ? (
-                <Check className="w-3.5 h-3.5 text-emerald-600" />
-              ) : (
-                <Copy className="w-3.5 h-3.5" />
-              )}
-              {copiadoId === personaSeleccionadaUnica.personal_id
-                ? "¡Copiado!"
-                : "Copiar resumen"}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Tabla agrupada por Asesor / Encargado con detalle desplegable */}
-      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-        <div className="px-5 py-3.5 border-b border-slate-200 flex items-center justify-between gap-3">
-          <span className="font-bold text-sm text-[#000814]">
-            Desglose por Asesor / Encargado (haz clic en una fila para ver las
-            ventas)
-          </span>
-          <span className="text-xs text-slate-500">
-            {reporte?.por_persona.length ?? 0} colaborador(es)
-          </span>
-        </div>
-
-        {cargando ? (
-          <div className="p-6 space-y-3">
-            {[1, 2, 3].map((i) => (
-              <div
-                key={i}
-                className="h-12 rounded-xl bg-slate-100 animate-pulse"
+          {pestana === "reporte" ? (
+            <div>
+              <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">
+                Origen de venta
+              </label>
+              <select
+                value={origenFiltro}
+                onChange={(e) => setOrigenFiltro(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-semibold bg-white text-[#000814]"
+              >
+                <option value="">Todos los orígenes</option>
+                <option value="PASILLO">Solo Pasillo (Tienda)</option>
+                <option value="LEAD">Solo Lead (Redes / WhatsApp)</option>
+              </select>
+            </div>
+          ) : (
+            <div>
+              <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">
+                Buscar liquidación
+              </label>
+              <input
+                type="text"
+                value={busquedaLiq}
+                onChange={(e) => setBusquedaLiq(e.target.value)}
+                placeholder="LIQ-..., asesor o ref..."
+                className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs bg-white"
               />
-            ))}
-          </div>
-        ) : !reporte || reporte.por_persona.length === 0 ? (
-          <p className="p-10 text-center text-sm text-slate-500">
-            No hay ventas comisionables en el rango y filtros seleccionados.
-          </p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
-              <thead className="bg-slate-50 border-b border-slate-200 text-xs uppercase text-slate-500">
-                <tr>
-                  <th className="px-3 py-3 w-8" />
-                  <th className="px-4 py-3">Colaborador</th>
-                  <th className="px-4 py-3">Rol / Modalidad</th>
-                  <th className="px-4 py-3 text-right">Ventas Pasillo</th>
-                  <th className="px-4 py-3 text-right">Ventas Lead</th>
-                  <th className="px-4 py-3 text-right">Total a Pagar</th>
-                  <th className="px-4 py-3 text-right">WhatsApp / Resumen</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {reporte.por_persona.map((p) => {
-                  const abierto = Boolean(expandidos[p.personal_id]);
-                  const detalles = detallesPorPersona[p.personal_id] ?? [];
-                  return (
-                    <React.Fragment key={p.personal_id}>
-                      <tr
-                        onClick={() =>
-                          setExpandidos((prev) => ({
-                            ...prev,
-                            [p.personal_id]: !prev[p.personal_id],
-                          }))
-                        }
-                        className="hover:bg-[#EDF3FA]/50 cursor-pointer"
-                      >
-                        <td className="px-3 py-3 text-slate-400">
-                          {abierto ? (
-                            <ChevronDown className="w-4 h-4 text-[#003566]" />
-                          ) : (
-                            <ChevronRight className="w-4 h-4" />
-                          )}
-                        </td>
-                        <td className="px-4 py-3">
-                          <p className="font-bold text-[#000814]">{p.nombre}</p>
-                          <p className="text-[11px] text-slate-500 flex items-center gap-1.5">
-                            <span>{p.total_ventas} venta(s)</span>
-                            {p.telefono && (
-                              <span className="inline-flex items-center gap-0.5">
-                                · <Phone className="w-2.5 h-2.5" /> {p.telefono}
-                              </span>
-                            )}
-                          </p>
-                        </td>
-                        <td className="px-4 py-3 text-xs space-y-1">
-                          <div>
-                            <span
-                              className={`inline-block px-2 py-0.5 rounded-md font-bold text-[11px] ${
-                                p.es_encargado
-                                  ? "bg-[#EDF3FA] text-[#003566]"
-                                  : "bg-slate-100 text-slate-700"
-                              }`}
-                            >
-                              {p.es_encargado
-                                ? "Encargado (5% / 8%)"
-                                : p.rol === "ASESORA"
-                                ? "Asesor (1% / 8%)"
-                                : p.rol}
-                            </span>
-                          </div>
-                          <span className="inline-flex items-center gap-1 text-[11px] text-slate-500">
-                            {p.modalidad === "ONLINE" ? (
-                              <>
-                                <Globe className="w-3 h-3 text-sky-600" /> Online
-                              </>
-                            ) : (
-                              <>
-                                <Building2 className="w-3 h-3 text-slate-400" />{" "}
-                                Presencial
-                              </>
-                            )}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <p className="font-semibold text-slate-800">
-                            {p.cantidad_pasillo} ·{" "}
-                            {formatearUsd(p.base_pasillo_usd)}
-                          </p>
-                          <p className="text-[11px] text-[#003566] font-bold">
-                            {p.porcentaje_pasillo}% →{" "}
-                            {formatearUsd(p.comision_pasillo_usd)}
-                          </p>
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <p className="font-semibold text-slate-800">
-                            {p.cantidad_lead} · {formatearUsd(p.base_lead_usd)}
-                          </p>
-                          <p className="text-[11px] text-[#003566] font-bold">
-                            {p.porcentaje_lead}% →{" "}
-                            {formatearUsd(p.comision_lead_usd)}
-                          </p>
-                        </td>
-                        <td className="px-4 py-3 text-right font-black text-emerald-700 text-base">
-                          {formatearUsd(p.total_comision_usd)}
-                        </td>
-                        <td
-                          className="px-4 py-3 text-right whitespace-nowrap space-x-1.5"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <button
-                            type="button"
-                            onClick={() => abrirWhatsAppPersona(p)}
-                            title={
-                              p.telefono
-                                ? `Enviar resumen a ${p.telefono}`
-                                : "Abrir WhatsApp para elegir contacto"
-                            }
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold cursor-pointer"
-                          >
-                            <MessageCircle className="w-3.5 h-3.5" />
-                            WhatsApp
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => void copiarResumenPersona(p)}
-                            title="Copiar resumen al portapapeles"
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:border-[#003566] text-[#003566] text-xs font-bold cursor-pointer"
-                          >
-                            {copiadoId === p.personal_id ? (
-                              <Check className="w-3.5 h-3.5 text-emerald-600" />
-                            ) : (
-                              <Copy className="w-3.5 h-3.5" />
-                            )}
-                            {copiadoId === p.personal_id ? "Copiado" : "Copiar"}
-                          </button>
-                        </td>
-                      </tr>
-
-                      {/* Detalle desplegable de ventas */}
-                      {abierto && (
-                        <tr className="bg-slate-50/80">
-                          <td colSpan={7} className="px-6 py-4">
-                            {detalles.length === 0 ? (
-                              <p className="text-xs text-slate-500">
-                                Sin notas individuales (ajustes por cambios de
-                                garantía/upgrade).
-                              </p>
-                            ) : (
-                              <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
-                                <table className="w-full text-xs text-left">
-                                  <thead className="bg-[#EDF3FA]/70 text-[11px] uppercase text-[#001D3D]">
-                                    <tr>
-                                      <th className="px-3 py-2">Fecha</th>
-                                      <th className="px-3 py-2">Nota</th>
-                                      <th className="px-3 py-2">Cliente</th>
-                                      <th className="px-3 py-2">
-                                        Equipo / Producto
-                                      </th>
-                                      <th className="px-3 py-2">Origen</th>
-                                      <th className="px-3 py-2 text-right">
-                                        Base Promo
-                                      </th>
-                                      <th className="px-3 py-2 text-right">
-                                        %
-                                      </th>
-                                      <th className="px-3 py-2 text-right">
-                                        Comisión
-                                      </th>
-                                    </tr>
-                                  </thead>
-                                  <tbody className="divide-y divide-slate-100">
-                                    {detalles.map((d) => (
-                                      <tr key={`${d.venta_id}-${d.numero_venta}`}>
-                                        <td className="px-3 py-2 font-medium text-slate-600 whitespace-nowrap">
-                                          {d.fecha}
-                                        </td>
-                                        <td className="px-3 py-2 font-mono font-bold text-[#000814]">
-                                          {d.numero_venta}
-                                        </td>
-                                        <td className="px-3 py-2 text-slate-700">
-                                          {d.cliente}
-                                        </td>
-                                        <td className="px-3 py-2 text-slate-700 max-w-xs truncate">
-                                          {d.producto}
-                                        </td>
-                                        <td className="px-3 py-2">
-                                          <span
-                                            className={`px-1.5 py-0.5 rounded-md font-bold text-[10px] ${
-                                              d.origen === "LEAD"
-                                                ? "bg-[#EDF3FA] text-[#003566]"
-                                                : "bg-slate-100 text-slate-600"
-                                            }`}
-                                          >
-                                            {d.origen === "LEAD"
-                                              ? "Lead"
-                                              : "Pasillo"}
-                                          </span>
-                                        </td>
-                                        <td className="px-3 py-2 text-right font-semibold text-slate-700">
-                                          {formatearUsd(d.base_promo_usd)}
-                                        </td>
-                                        <td className="px-3 py-2 text-right font-bold text-[#003566]">
-                                          {d.porcentaje_aplicado}%
-                                        </td>
-                                        <td className="px-3 py-2 text-right font-black text-emerald-700">
-                                          {formatearUsd(d.comision_usd)}
-                                        </td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                              </div>
-                            )}
-                          </td>
-                        </tr>
-                      )}
-                    </React.Fragment>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* PESTAÑA 1: REPORTE DE COMISIONES */}
+      {pestana === "reporte" && (
+        <>
+          {reporte && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+              <div className="bg-white p-4 rounded-2xl border border-slate-200 border-t-2 border-t-[#000814]">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  Ventas ({estadoComisionFiltro})
+                </p>
+                <p className="text-xl font-black text-[#000814] mt-1 cifra-tabular">
+                  {reporte.resumen_general.total_ventas}
+                </p>
+              </div>
+              <div className="bg-white p-4 rounded-2xl border border-slate-200 border-t-2 border-t-[#003566]">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  Base Promo USD
+                </p>
+                <p className="text-xl font-black text-[#000814] mt-1 cifra-tabular">
+                  {formatearUsd(reporte.resumen_general.volumen_promo_usd)}
+                </p>
+              </div>
+              <div className="bg-white p-4 rounded-2xl border border-slate-200 border-t-2 border-t-amber-500">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-amber-700">
+                  Pendiente por Pagar
+                </p>
+                <p className="text-xl font-black text-amber-700 mt-1 cifra-tabular">
+                  {formatearUsd(reporte.resumen_general.pendiente_usd)}
+                </p>
+              </div>
+              <div className="bg-white p-4 rounded-2xl border border-slate-200 border-t-2 border-t-emerald-600">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-700">
+                  Ya Pagado
+                </p>
+                <p className="text-xl font-black text-emerald-700 mt-1 cifra-tabular">
+                  {formatearUsd(reporte.resumen_general.pagado_usd)}
+                </p>
+              </div>
+              <div className="bg-gradient-to-br from-[#EDF3FA] to-white p-4 rounded-2xl border border-[#003566]/30 shadow-xs">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-[#003566]">
+                  Total Período (USD)
+                </p>
+                <p className="text-xl font-black text-[#000814] mt-1 cifra-tabular">
+                  {formatearUsd(reporte.resumen_general.total_comisiones_usd)}
+                </p>
+              </div>
+            </div>
+          )}
+
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+            <div className="px-5 py-3.5 border-b border-slate-200 flex items-center justify-between gap-3">
+              <span className="font-bold text-sm text-[#000814]">
+                Desglose por Asesor / Encargado (clic en una fila para ver las
+                ventas)
+              </span>
+              <span className="text-xs text-slate-500">
+                {reporte?.por_persona.length ?? 0} colaborador(es)
+              </span>
+            </div>
+
+            {cargando ? (
+              <div className="p-6 space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <div
+                    key={i}
+                    className="h-12 rounded-xl bg-slate-100 animate-pulse"
+                  />
+                ))}
+              </div>
+            ) : !reporte || reporte.por_persona.length === 0 ? (
+              <p className="p-10 text-center text-sm text-slate-500">
+                No hay comisiones{" "}
+                {estadoComisionFiltro === "PENDIENTE"
+                  ? "pendientes"
+                  : estadoComisionFiltro === "PAGADA"
+                  ? "pagadas"
+                  : ""}{" "}
+                en el rango seleccionado.
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-xs uppercase text-slate-500">
+                    <tr>
+                      <th className="px-3 py-3 w-8" />
+                      <th className="px-4 py-3">Colaborador</th>
+                      <th className="px-4 py-3 text-right">Pasillo / Lead</th>
+                      <th className="px-4 py-3 text-right">Pendiente USD</th>
+                      <th className="px-4 py-3 text-right">Pagado USD</th>
+                      <th className="px-4 py-3 text-right">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {reporte.por_persona.map((p) => {
+                      const abierto = Boolean(expandidos[p.personal_id]);
+                      const detalles = detallesPorPersona[p.personal_id] ?? [];
+                      return (
+                        <React.Fragment key={p.personal_id}>
+                          <tr
+                            onClick={() =>
+                              setExpandidos((prev) => ({
+                                ...prev,
+                                [p.personal_id]: !prev[p.personal_id],
+                              }))
+                            }
+                            className="hover:bg-[#EDF3FA]/50 cursor-pointer"
+                          >
+                            <td className="px-3 py-3 text-slate-400">
+                              {abierto ? (
+                                <ChevronDown className="w-4 h-4 text-[#003566]" />
+                              ) : (
+                                <ChevronRight className="w-4 h-4" />
+                              )}
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <p className="font-bold text-[#000814]">
+                                  {p.nombre}
+                                </p>
+                                <span
+                                  className={`px-1.5 py-0.5 rounded-md font-bold text-[10px] ${
+                                    p.es_encargado
+                                      ? "bg-[#EDF3FA] text-[#003566]"
+                                      : "bg-slate-100 text-slate-600"
+                                  }`}
+                                >
+                                  {p.es_encargado
+                                    ? "Encargado 5%/8%"
+                                    : "Asesor 1%/8%"}
+                                </span>
+                                {p.modalidad === "ONLINE" && (
+                                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-sky-50 text-sky-700 text-[10px] font-semibold">
+                                    <Globe className="w-2.5 h-2.5" /> Online
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-slate-500 mt-0.5">
+                                {p.total_ventas} venta(s)
+                                {p.telefono ? ` · ${p.telefono}` : ""}
+                              </p>
+                            </td>
+                            <td className="px-4 py-3 text-right text-xs">
+                              <p className="text-slate-700 font-semibold">
+                                P: {p.cantidad_pasillo} (
+                                {formatearUsd(p.comision_pasillo_usd)})
+                              </p>
+                              <p className="text-[#003566] font-semibold">
+                                L: {p.cantidad_lead} (
+                                {formatearUsd(p.comision_lead_usd)})
+                              </p>
+                            </td>
+                            <td className="px-4 py-3 text-right font-black text-amber-700 cifra-tabular">
+                              {formatearUsd(p.pendiente_usd)}
+                            </td>
+                            <td className="px-4 py-3 text-right font-bold text-emerald-700 cifra-tabular">
+                              {formatearUsd(p.pagado_usd)}
+                            </td>
+                            <td
+                              className="px-4 py-3 text-right whitespace-nowrap space-x-1.5"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {p.pendiente_usd > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => setPersonaALiquidar(p)}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#003566] hover:bg-[#001D3D] text-white text-xs font-bold cursor-pointer"
+                                >
+                                  <Wallet className="w-3.5 h-3.5" />
+                                  Liquidar
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => abrirWhatsAppPersona(p)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold cursor-pointer"
+                              >
+                                <MessageCircle className="w-3.5 h-3.5" />
+                                WhatsApp
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void copiarResumenPersona(p)}
+                                className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg border border-slate-200 bg-white hover:border-[#003566] text-[#003566] text-xs font-bold cursor-pointer"
+                              >
+                                {copiadoId === p.personal_id ? (
+                                  <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                ) : (
+                                  <Copy className="w-3.5 h-3.5" />
+                                )}
+                              </button>
+                            </td>
+                          </tr>
+
+                          {abierto && (
+                            <tr className="bg-slate-50/80">
+                              <td colSpan={6} className="px-6 py-4">
+                                <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+                                  <table className="w-full text-xs text-left">
+                                    <thead className="bg-[#EDF3FA]/70 text-[11px] uppercase text-[#001D3D]">
+                                      <tr>
+                                        <th className="px-3 py-2">Fecha</th>
+                                        <th className="px-3 py-2">Nota</th>
+                                        <th className="px-3 py-2">Producto</th>
+                                        <th className="px-3 py-2">Origen</th>
+                                        <th className="px-3 py-2">Estado</th>
+                                        <th className="px-3 py-2 text-right">
+                                          Promo USD
+                                        </th>
+                                        <th className="px-3 py-2 text-right">
+                                          Comisión
+                                        </th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                      {detalles.map((d) => (
+                                        <tr key={d.venta_id}>
+                                          <td className="px-3 py-2 text-slate-600 whitespace-nowrap">
+                                            {d.fecha}
+                                          </td>
+                                          <td className="px-3 py-2 font-mono font-bold text-[#000814]">
+                                            {d.numero_venta}
+                                          </td>
+                                          <td className="px-3 py-2 text-slate-700 max-w-xs truncate">
+                                            {d.producto}
+                                          </td>
+                                          <td className="px-3 py-2">
+                                            <span
+                                              className={`px-1.5 py-0.5 rounded-md font-bold text-[10px] ${
+                                                d.origen === "LEAD"
+                                                  ? "bg-[#EDF3FA] text-[#003566]"
+                                                  : "bg-slate-100 text-slate-600"
+                                              }`}
+                                            >
+                                              {d.origen === "LEAD"
+                                                ? `Lead ${d.porcentaje_aplicado}%`
+                                                : `Pasillo ${d.porcentaje_aplicado}%`}
+                                            </span>
+                                          </td>
+                                          <td className="px-3 py-2">
+                                            <span
+                                              className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
+                                                d.estado_comision === "PAGADA"
+                                                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                                  : "bg-amber-50 text-amber-800 border border-amber-200"
+                                              }`}
+                                            >
+                                              {d.estado_comision === "PAGADA"
+                                                ? "Pagada"
+                                                : "Pendiente"}
+                                            </span>
+                                          </td>
+                                          <td className="px-3 py-2 text-right font-semibold text-slate-700">
+                                            {formatearUsd(d.base_promo_usd)}
+                                          </td>
+                                          <td className="px-3 py-2 text-right font-black text-emerald-700">
+                                            {formatearUsd(d.comision_usd)}
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* PESTAÑA 2: HISTORIAL DE LIQUIDACIONES */}
+      {pestana === "historial" && (
+        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+          <div className="px-5 py-3.5 border-b border-slate-200 flex items-center justify-between">
+            <span className="font-bold text-sm text-[#000814]">
+              Historial de Liquidaciones Pagadas y Anuladas
+            </span>
+            <span className="text-xs text-slate-500">
+              {liquidacionesFiltradas.length} registro(s)
+            </span>
+          </div>
+
+          {cargandoHistorial ? (
+            <div className="p-6 space-y-3">
+              {[1, 2, 3].map((i) => (
+                <div
+                  key={i}
+                  className="h-12 rounded-xl bg-slate-100 animate-pulse"
+                />
+              ))}
+            </div>
+          ) : liquidacionesFiltradas.length === 0 ? (
+            <p className="p-10 text-center text-sm text-slate-500">
+              No hay liquidaciones registradas para este rango o filtro.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                <thead className="bg-slate-50 border-b border-slate-200 text-xs uppercase text-slate-500">
+                  <tr>
+                    <th className="px-4 py-3">Código</th>
+                    <th className="px-4 py-3">Colaborador / Período</th>
+                    <th className="px-4 py-3">Método / Ref.</th>
+                    <th className="px-4 py-3 text-right">Total Pagado</th>
+                    <th className="px-4 py-3">Estado</th>
+                    <th className="px-4 py-3 text-right">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {liquidacionesFiltradas.map((l) => (
+                    <tr key={l.id} className="hover:bg-[#EDF3FA]/40">
+                      <td className="px-4 py-3 font-mono font-black text-[#003566] text-xs">
+                        {l.codigo}
+                      </td>
+                      <td className="px-4 py-3 text-xs">
+                        <p className="font-bold text-[#000814]">
+                          {l.personal_nombre}
+                        </p>
+                        <p className="text-slate-500">
+                          {l.fecha_inicio} al {l.fecha_fin} · {l.cantidad_ventas}{" "}
+                          venta(s)
+                        </p>
+                      </td>
+                      <td className="px-4 py-3 text-xs">
+                        <p className="font-semibold text-slate-700">
+                          {l.metodo_pago}
+                        </p>
+                        <p className="text-slate-500">
+                          {l.referencia || "Sin referencia"}
+                        </p>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <p className="font-black text-emerald-700 cifra-tabular">
+                          {formatearUsd(l.monto_total_usd)}
+                        </p>
+                        {l.monto_bs && (
+                          <p className="text-[11px] text-slate-500">
+                            {formatearBs(l.monto_bs)}
+                          </p>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-xs">
+                        <span
+                          className={`px-2 py-0.5 rounded-full font-bold text-[11px] ${
+                            l.estado === "PAGADA"
+                              ? "bg-emerald-50 text-emerald-700"
+                              : "bg-red-50 text-red-700"
+                          }`}
+                        >
+                          {l.estado}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right whitespace-nowrap space-x-1">
+                        <button
+                          type="button"
+                          onClick={() => void verDetalleLiquidacion(l.id)}
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-slate-200 bg-white hover:border-[#003566] text-[#003566] text-xs font-bold cursor-pointer"
+                          title="Ver ventas incluidas"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void descargarPdfApi(
+                              `/api/comisiones/liquidaciones/${l.id}/pdf`,
+                              `${l.codigo}.pdf`
+                            )
+                          }
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-[#003566] text-white text-xs font-bold cursor-pointer"
+                          title="Descargar PDF"
+                        >
+                          <FileDown className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const msg = formatearWhatsAppLiquidacion(l);
+                            window.open(
+                              construirUrlWhatsApp(msg, l.personal_telefono),
+                              "_blank",
+                              "noopener,noreferrer"
+                            );
+                          }}
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-600 text-white text-xs font-bold cursor-pointer"
+                          title="Reenviar comprobante por WhatsApp"
+                        >
+                          <MessageCircle className="w-3.5 h-3.5" />
+                        </button>
+                        {l.estado === "PAGADA" && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setLiqAnular(l);
+                              setMotivoAnulacion("");
+                            }}
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-red-200 text-red-700 hover:bg-red-50 text-xs font-bold cursor-pointer"
+                            title="Anular liquidación"
+                          >
+                            <Ban className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Modal de Liquidación Quincenal */}
+      {personaALiquidar && (
+        <ModalLiquidacionComision
+          persona={personaALiquidar}
+          ventasPendientes={ventasPendientesModal}
+          fechaInicio={reporte?.fecha_inicio || fechaInicio}
+          fechaFin={reporte?.fecha_fin || fechaFin}
+          tasaBcvInicial={tasaBcvEfectiva}
+          alCerrar={() => setPersonaALiquidar(null)}
+          alLiquidarExito={() => {
+            void cargarReporte();
+            void cargarHistorialLiquidaciones();
+          }}
+        />
+      )}
+
+      {/* Modal Detalle de Liquidación */}
+      {liqDetalle && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-4 max-h-[88vh] overflow-y-auto">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-black text-[#000814]">
+                  {liqDetalle.codigo} — {liqDetalle.personal_nombre}
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Período {liqDetalle.fecha_inicio} al {liqDetalle.fecha_fin} ·{" "}
+                  {liqDetalle.metodo_pago}
+                  {liqDetalle.referencia ? ` · Ref: ${liqDetalle.referencia}` : ""}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setLiqDetalle(null)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-[#000814] cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 overflow-hidden">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-[#EDF3FA] text-[#001D3D] uppercase text-[11px]">
+                  <tr>
+                    <th className="px-3 py-2">Fecha</th>
+                    <th className="px-3 py-2">Nota</th>
+                    <th className="px-3 py-2">Producto</th>
+                    <th className="px-3 py-2">Origen</th>
+                    <th className="px-3 py-2 text-right">Comisión</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {(liqDetalle.ventas ?? []).map((v) => (
+                    <tr key={v.venta_id}>
+                      <td className="px-3 py-2">{v.fecha}</td>
+                      <td className="px-3 py-2 font-mono font-bold">
+                        {v.numero_venta}
+                      </td>
+                      <td className="px-3 py-2 max-w-xs truncate">
+                        {v.producto}
+                      </td>
+                      <td className="px-3 py-2">
+                        {v.origen} ({v.porcentaje_aplicado}%)
+                      </td>
+                      <td className="px-3 py-2 text-right font-bold text-emerald-700">
+                        {formatearUsd(v.comision_usd)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Anular Liquidación */}
+      {liqAnular && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <h3 className="text-lg font-black text-red-700">
+              Anular liquidación {liqAnular.codigo}
+            </h3>
+            <p className="text-xs text-slate-600">
+              Al anular esta liquidación de{" "}
+              <strong>{liqAnular.personal_nombre}</strong> (
+              {formatearUsd(liqAnular.monto_total_usd)}), todas sus ventas
+              asociadas volverán a estado <strong>PENDIENTE</strong> para poder
+              liquidarlas nuevamente.
+            </p>
+            <form onSubmit={manejarAnularLiquidacion} className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Motivo de anulación *
+                </label>
+                <input
+                  type="text"
+                  required
+                  minLength={3}
+                  value={motivoAnulacion}
+                  onChange={(e) => setMotivoAnulacion(e.target.value)}
+                  placeholder="Ej. Error en referencia / monto"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm"
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setLiqAnular(null)}
+                  className="px-4 py-2 rounded-xl border border-slate-300 text-xs font-bold cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={anulando}
+                  className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold cursor-pointer"
+                >
+                  {anulando ? "Anulando..." : "Confirmar anulación"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Modal de Cierre Mensual (Solo DIRECCION) */}
       {modalCierre && (
@@ -717,10 +1119,6 @@ export default function PaginaComisionesYCierre() {
             <h3 className="text-lg font-black text-[#000814]">
               Cerrar período mensual
             </h3>
-            <p className="text-xs text-slate-600">
-              Al cerrar el mes, se bloquean las ventas, anulaciones y pagos de
-              ese período para proteger la contabilidad.
-            </p>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -753,14 +1151,14 @@ export default function PaginaComisionesYCierre() {
               <button
                 type="button"
                 onClick={() => setModalCierre(false)}
-                className="px-4 py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-700 cursor-pointer"
+                className="px-4 py-2 rounded-xl border border-slate-300 text-xs font-bold cursor-pointer"
               >
                 Cancelar
               </button>
               <button
                 type="button"
                 onClick={() => void confirmarCierreMes()}
-                className="px-4 py-2 rounded-xl bg-[#003566] hover:bg-[#001D3D] text-white text-xs font-bold cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-[#003566] text-white text-xs font-bold cursor-pointer"
               >
                 Confirmar cierre
               </button>

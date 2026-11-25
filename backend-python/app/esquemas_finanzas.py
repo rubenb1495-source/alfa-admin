@@ -98,3 +98,18 @@ class CruceManualEntrada(BaseModel):
 class CierreMensualEntrada(BaseModel):
     anio: int = Field(ge=2020, le=2100)
     mes: int = Field(ge=1, le=12)
+
+
+class LiquidacionCrearEntrada(BaseModel):
+    personal_id: int
+    venta_ids: list[int] = Field(min_length=1)
+    fecha_inicio: date
+    fecha_fin: date
+    metodo_pago: str = Field(min_length=2, max_length=40)
+    tasa_bcv_aplicada: Decimal | None = Field(default=None, gt=0)
+    referencia: str = Field(default="", max_length=120)
+    observaciones: str = Field(default="", max_length=500)
+
+
+class LiquidacionAnularEntrada(BaseModel):
+    motivo: str = Field(min_length=3, max_length=500)

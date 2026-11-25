@@ -44,6 +44,17 @@ class OrigenVenta(str, Enum):
     LEAD = "LEAD"
 
 
+class EstadoComision(str, Enum):
+    PENDIENTE = "PENDIENTE"
+    PAGADA = "PAGADA"
+    ANULADA = "ANULADA"
+
+
+class EstadoLiquidacionComision(str, Enum):
+    PAGADA = "PAGADA"
+    ANULADA = "ANULADA"
+
+
 class TipoMovimientoPago(str, Enum):
     INGRESO = "INGRESO"
     EGRESO = "EGRESO"
@@ -121,6 +132,8 @@ class Venta(Base):
     es_factura: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     numero_control: Mapped[str] = mapped_column(String(60), default="", nullable=False)
     estado: Mapped[str] = mapped_column(String(20), default=EstadoVenta.CUADRADA.value, nullable=False, index=True)
+    estado_comision: Mapped[str] = mapped_column(String(20), default=EstadoComision.PENDIENTE.value, nullable=False, index=True)
+    liquidacion_id: Mapped[int | None] = mapped_column(ForeignKey("liquidaciones_comisiones.id"), nullable=True, index=True)
     motivo_anulacion: Mapped[str] = mapped_column(Text, default="", nullable=False)
     nota: Mapped[str] = mapped_column(Text, default="", nullable=False)
     creado_por_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), nullable=False)
@@ -249,3 +262,34 @@ class CierreMensual(Base):
     bloqueado: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     cerrado_por = relationship("Usuario")
+
+
+class LiquidacionComision(Base):
+    __tablename__ = "liquidaciones_comisiones"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    codigo: Mapped[str] = mapped_column(String(30), unique=True, index=True, nullable=False)
+    personal_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), index=True, nullable=False)
+    fecha_inicio: Mapped[date] = mapped_column(Date, nullable=False)
+    fecha_fin: Mapped[date] = mapped_column(Date, nullable=False)
+    cantidad_ventas: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    cantidad_pasillo: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    cantidad_lead: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    monto_pasillo_usd: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"), nullable=False)
+    monto_lead_usd: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"), nullable=False)
+    monto_total_usd: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"), nullable=False)
+    metodo_pago: Mapped[str] = mapped_column(String(40), nullable=False)
+    tasa_bcv_aplicada: Mapped[Decimal | None] = mapped_column(Numeric(14, 4), nullable=True)
+    monto_bs: Mapped[Decimal | None] = mapped_column(Numeric(16, 2), nullable=True)
+    referencia: Mapped[str] = mapped_column(String(120), default="", nullable=False)
+    observaciones: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    estado: Mapped[str] = mapped_column(
+        String(20), default=EstadoLiquidacionComision.PAGADA.value, nullable=False, index=True
+    )
+    motivo_anulacion: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    pagado_por_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    personal = relationship("Usuario", foreign_keys=[personal_id])
+    pagado_por = relationship("Usuario", foreign_keys=[pagado_por_id])
+    ventas = relationship("Venta", foreign_keys="Venta.liquidacion_id")
