@@ -27,6 +27,7 @@ from app.modelos_finanzas import (
     MovimientoTesoreria,
     Pago,
     Venta,
+    VentaCasheaFinanzas,
     VentaDetalle,
 )
 from app.modelos_logistica import (
@@ -346,6 +347,10 @@ def limpiar_datos_simulacion(bd: Session, prefijo: str = PREFIJO_SIM) -> dict[st
     if ventas_sim_ids:
         bd.query(Venta).filter(Venta.id.in_(ventas_sim_ids)).update(
             {Venta.liquidacion_id: None}, synchronize_session=False
+        )
+        _contar_y_borrar(
+            "ventas_cashea_finanzas",
+            bd.query(VentaCasheaFinanzas).filter(VentaCasheaFinanzas.venta_id.in_(ventas_sim_ids)),
         )
         _contar_y_borrar(
             "cuentas_por_cobrar",

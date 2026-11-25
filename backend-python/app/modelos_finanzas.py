@@ -265,6 +265,49 @@ class CuentaPorCobrar(Base):
     cliente = relationship("Tercero")
 
 
+class VentaCasheaFinanzas(Base):
+    __tablename__ = "ventas_cashea_finanzas"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    venta_id: Mapped[int] = mapped_column(ForeignKey("ventas.id"), unique=True, index=True, nullable=False)
+    cxc_id: Mapped[int | None] = mapped_column(ForeignKey("cuentas_por_cobrar.id"), nullable=True)
+    sucursal_id: Mapped[int] = mapped_column(ForeignKey("sucursales.id"), index=True, nullable=False)
+    cliente_id: Mapped[int | None] = mapped_column(ForeignKey("terceros.id"), nullable=True)
+    fecha_venta: Mapped[date] = mapped_column(Date, index=True, nullable=False)
+    numero_nota: Mapped[str] = mapped_column(String(40), index=True, nullable=False)
+
+    tasa_bcv_aplicada: Mapped[Decimal] = mapped_column(Numeric(14, 4), default=Decimal("0"), nullable=False)
+    tasa_usdt_aplicada: Mapped[Decimal] = mapped_column(Numeric(14, 4), default=Decimal("0"), nullable=False)
+
+    total_precio_regular_usd: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"), nullable=False)
+    total_precio_regular_usdt: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"), nullable=False)
+    total_precio_regular_bs: Mapped[Decimal] = mapped_column(Numeric(16, 2), default=Decimal("0"), nullable=False)
+    inicial_cobrada_usd: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"), nullable=False)
+    monto_financiado_usd: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"), nullable=False)
+
+    cashea_comision_venta_usd: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"), nullable=False)
+    cashea_comision_financiado_usd: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"), nullable=False)
+    cashea_iva_usd: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"), nullable=False)
+    cashea_islr_usd: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"), nullable=False)
+    cashea_total_cargos_usd: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"), nullable=False)
+    cashea_neto_por_cobrar_usd: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"), nullable=False)
+    cashea_neto_usdt: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"), nullable=False)
+    cashea_neto_bs: Mapped[Decimal] = mapped_column(Numeric(16, 2), default=Decimal("0"), nullable=False)
+
+    monto_cobrado_usd: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"), nullable=False)
+    estado: Mapped[str] = mapped_column(String(20), default="PENDIENTE", nullable=False, index=True)  # PENDIENTE | PARCIAL | COBRADO
+    fecha_cobro: Mapped[date | None] = mapped_column(Date, nullable=True)
+    instrumento_cobro_id: Mapped[int | None] = mapped_column(ForeignKey("instrumentos_financieros.id"), nullable=True)
+    pago_cobro_id: Mapped[int | None] = mapped_column(ForeignKey("pagos.id"), nullable=True)
+    referencia_cobro: Mapped[str] = mapped_column(String(120), default="", nullable=False)
+    creado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    venta = relationship("Venta")
+    sucursal = relationship("Sucursal")
+    cliente = relationship("Tercero")
+    instrumento_cobro = relationship("InstrumentoFinanciero")
+
+
 class CierreMensual(Base):
     __tablename__ = "cierres_mensuales"
     __table_args__ = (UniqueConstraint("anio", "mes", name="uq_cierre_anio_mes"),)

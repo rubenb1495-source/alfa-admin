@@ -954,21 +954,52 @@ def crear_venta(
         )
 
     if calc["total_cashea_usd"] > 0:
+        from app.modelos_finanzas import VentaCasheaFinanzas
+
         saldo_neto_cashea = (
             cashea_calc["cashea_neto_por_cobrar_usd"]
             if cashea_calc is not None
             else calc["total_cashea_usd"]
         )
-        bd.add(
-            CuentaPorCobrar(
-                venta_id=venta.id,
-                tipo=TipoCuentaPorCobrar.CASHEA.value,
-                cliente_id=datos.cliente_id,
-                monto_original_usd=calc["total_cashea_usd"],
-                saldo_pendiente_usd=saldo_neto_cashea,
-                estado=EstadoCuentaPorCobrar.PENDIENTE.value,
-            )
+        cxc_cashea = CuentaPorCobrar(
+            venta_id=venta.id,
+            tipo=TipoCuentaPorCobrar.CASHEA.value,
+            cliente_id=datos.cliente_id,
+            monto_original_usd=calc["total_cashea_usd"],
+            saldo_pendiente_usd=saldo_neto_cashea,
+            estado=EstadoCuentaPorCobrar.PENDIENTE.value,
         )
+        bd.add(cxc_cashea)
+        bd.flush()
+
+        if cashea_calc is not None:
+            bd.add(
+                VentaCasheaFinanzas(
+                    venta_id=venta.id,
+                    cxc_id=cxc_cashea.id,
+                    sucursal_id=datos.sucursal_id,
+                    cliente_id=datos.cliente_id,
+                    fecha_venta=fecha_op,
+                    numero_nota=numero_venta,
+                    tasa_bcv_aplicada=cashea_calc["tasa_bcv_aplicada"],
+                    tasa_usdt_aplicada=cashea_calc["tasa_usdt_aplicada"],
+                    total_precio_regular_usd=cashea_calc["total_precio_regular_usd"],
+                    total_precio_regular_usdt=cashea_calc["total_precio_regular_usdt"],
+                    total_precio_regular_bs=cashea_calc["total_precio_regular_bs"],
+                    inicial_cobrada_usd=cashea_calc["inicial_cobrada_usd"],
+                    monto_financiado_usd=cashea_calc["monto_financiado_usd"],
+                    cashea_comision_venta_usd=cashea_calc["cashea_comision_venta_usd"],
+                    cashea_comision_financiado_usd=cashea_calc["cashea_comision_financiado_usd"],
+                    cashea_iva_usd=cashea_calc["cashea_iva_usd"],
+                    cashea_islr_usd=cashea_calc["cashea_islr_usd"],
+                    cashea_total_cargos_usd=cashea_calc["cashea_total_cargos_usd"],
+                    cashea_neto_por_cobrar_usd=cashea_calc["cashea_neto_por_cobrar_usd"],
+                    cashea_neto_usdt=cashea_calc["cashea_neto_usdt"],
+                    cashea_neto_bs=cashea_calc["cashea_neto_bs"],
+                    monto_cobrado_usd=Decimal("0"),
+                    estado="PENDIENTE",
+                )
+            )
 
     if calc["estado"] == EstadoVenta.CON_SALDO.value and calc["falta_usd_promo"] > 0:
         bd.add(

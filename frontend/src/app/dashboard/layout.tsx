@@ -97,7 +97,11 @@ export default function DisenoDashboard({
     const esDir = usuario.rol === "DIRECTOR";
     const rutaRestringidaAdmin =
       (rutaActual.startsWith("/dashboard/finanzas") &&
-        !(esDir && rutaActual.startsWith("/dashboard/finanzas/tesoreria"))) ||
+        !(
+          esDir &&
+          (rutaActual.startsWith("/dashboard/finanzas/tesoreria") ||
+            rutaActual.startsWith("/dashboard/finanzas/cashea"))
+        )) ||
       rutaActual.startsWith("/dashboard/usuarios") ||
       (rutaActual.startsWith("/dashboard/direccion") && !esDir) ||
       (rutaActual.startsWith("/dashboard/administracion") && !esDir) ||
@@ -305,7 +309,7 @@ export default function DisenoDashboard({
           href: "/dashboard/finanzas/cashea",
           etiqueta: "Cashea",
           icono: <CreditCard className="w-4 h-4 shrink-0" />,
-          visible: esAdmin,
+          visible: esAdmin || esDirector,
         },
         {
           href: "/dashboard/finanzas/conciliacion",

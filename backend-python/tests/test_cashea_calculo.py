@@ -212,3 +212,68 @@ def test_venta_cashea_impacta_cxc_rentabilidad_y_contabilidad_cuadrada(entorno):
     cods = {d["cuenta_codigo"]: d["debe_usd"] for d in as_v["detalles"]}
     assert cods.get("8.1.01") == 19.2
     assert cods.get("9.1.01") == 2.16
+
+    # Verificar que aparezca automáticamente en Administración / Finanzas -> /api/finanzas/cashea
+    fin_c = client.get("/api/finanzas/cashea", headers=headers)
+    assert fin_c.status_code == 200, fin_c.text
+    fc_data = fin_c.json()
+    assert len(fc_data["items"]) == 1
+    it = fc_data["items"][0]
+    assert it["total_precio_regular_usd"] == 300.0
+    assert it["total_precio_regular_bs"] == 15750.0
+    assert it["total_precio_regular_usdt"] == 291.67
+    assert it["inicial_cobrada_usd"] == 120.0
+    assert it["monto_financiado_usd"] == 180.0
+    assert it["cashea_comision_venta_usd"] == 12.0
+    assert it["cashea_comision_financiado_usd"] == 7.2
+    assert it["cashea_iva_usd"] == 1.92
+    assert it["cashea_islr_usd"] == 0.24
+    assert it["cashea_total_cargos_usd"] == 21.36
+    assert it["cashea_neto_por_cobrar_usd"] == 158.64
+    assert it["estado"] == "PENDIENTE"
+    assert fc_data["resumen"]["neto_pendiente_usd"] == 158.64
+
+    # Exportar Excel (.xlsx)
+    xlsx = client.get("/api/finanzas/cashea/excel", headers=headers)
+    assert xlsx.status_code == 200
+    assert "spreadsheetml" in xlsx.headers["content-type"]
+
+    # Registrar cobro del depósito Cashea -> COBRADO + asiento cuadrado 1.1.01 vs 1.1.02
+    cob = client.post(
+        f"/api/finanzas/cashea/{it['id']}/registrar-cobro",
+        headers=headers,
+        json={
+            "instrumento_destino_id": inst_efe,
+            "referencia": "DEP-CASHEA-001",
+            "nota": "Liquidación recibida de Cashea",
+        },
+    )
+    assert cob.status_code == 200, cob.text
+    assert cob.json()["estado"] == "COBRADO"
+    assert cob.json()["monto_cobrado_usd"] == 158.64
+
+    as_cob = client.get("/api/contabilidad/asientos?origen_tipo=COBRO_CASHEA", headers=headers).json()
+    assert len(as_cob) == 1
+    assert as_cob[0]["total_debe_usd"] == as_cob[0]["total_haber_usd"] == 158.64
+
+    # Verificar RBAC: ENCARGADO recibe 403 Forbidden en /api/finanzas/cashea
+    from app.modelos import RolUsuario, Usuario
+    from app.seguridad import generar_hash_clave
+
+    bd2 = Sesion()
+    bd2.add(
+        Usuario(
+            nombre="Encargado Cashea Test",
+            usuario="Encargado Cashea Test",
+            correo="enc.cashea@alfadigitalstore.com",
+            clave_hash=generar_hash_clave("Encargado2026!"),
+            rol=RolUsuario.ENCARGADO_TIENDA.value,
+            sucursal_id=suc_id,
+            activo=True,
+        )
+    )
+    bd2.commit()
+    bd2.close()
+    r_enc = client.post("/api/auth/login", json={"usuario": "Encargado Cashea Test", "clave": "Encargado2026!"})
+    h_enc = {"Authorization": f"Bearer {r_enc.json()['token']}"}
+    assert client.get("/api/finanzas/cashea", headers=h_enc).status_code == 403
