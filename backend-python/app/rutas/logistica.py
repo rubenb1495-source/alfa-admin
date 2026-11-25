@@ -1283,6 +1283,8 @@ def listar_inventario_equipos(
     sucursal_id: int | None = Query(default=None),
     estado: str | None = Query(default=None),
     busqueda: str | None = Query(default=None),
+    q: str | None = Query(default=None),
+    solo_disponibles_traslado: bool = Query(default=False),
     usuario_actual: Usuario = Depends(obtener_usuario_actual),
     bd: Session = Depends(obtener_bd),
 ) -> list[dict[str, Any]]:
@@ -1297,18 +1299,28 @@ def listar_inventario_equipos(
     )
     if sucursal_id is not None:
         consulta = consulta.filter(Equipo.ubicacion_id == sucursal_id)
+    if solo_disponibles_traslado:
+        consulta = consulta.filter(
+            Equipo.estado.notin_(
+                [
+                    EstadoEquipo.VENDIDO.value,
+                    EstadoEquipo.EN_TRANSITO.value,
+                    EstadoEquipo.CEMENTERIO.value,
+                ]
+            )
+        )
     if estado and estado.strip():
         est_norm = estado.strip().upper()
         if est_norm == "DISPONIBLE":
             est_norm = EstadoEquipo.LISTO.value
         consulta = consulta.filter(Equipo.estado == est_norm)
-    if busqueda and busqueda.strip():
-        texto = busqueda.strip()
+    texto_busq = (busqueda or q or "").strip()
+    if texto_busq:
         consulta = consulta.filter(
             or_(
-                Equipo.serial.ilike(f"%{texto.upper()}%"),
-                Equipo.modelo.ilike(f"%{texto}%"),
-                Equipo.configuracion.ilike(f"%{texto}%"),
+                Equipo.serial.ilike(f"%{texto_busq.upper()}%"),
+                Equipo.modelo.ilike(f"%{texto_busq}%"),
+                Equipo.configuracion.ilike(f"%{texto_busq}%"),
             )
         )
 
@@ -1320,6 +1332,8 @@ def listar_inventario_equipos(
 def consultar_kardex_componentes(
     sucursal_id: int | None = Query(default=None),
     articulo_id: int | None = Query(default=None),
+    q: str | None = Query(default=None),
+    solo_con_stock: bool = Query(default=False),
     usuario_actual: Usuario = Depends(obtener_usuario_actual),
     bd: Session = Depends(obtener_bd),
 ) -> dict[str, Any]:
@@ -1345,9 +1359,16 @@ def consultar_kardex_componentes(
     articulos_map = {a.id: a for a in bd.query(CatalogoArticulo).all()}
     sucursales_map = {s.id: s for s in bd.query(Sucursal).all()}
 
+    termino_q = (q or "").strip().lower()
     saldos = []
     for art_id, suc_id, stock in consulta_saldos.all():
+        stock_int = int(stock or 0)
+        if solo_con_stock and stock_int <= 0:
+            continue
         art = articulos_map.get(art_id)
+        if termino_q and art is not None:
+            if termino_q not in (art.sku or "").lower() and termino_q not in (art.descripcion or "").lower():
+                continue
         suc = sucursales_map.get(suc_id)
         saldos.append(
             {
@@ -1356,7 +1377,7 @@ def consultar_kardex_componentes(
                 "descripcion": art.descripcion if art else "",
                 "sucursal_id": suc_id,
                 "sucursal": suc.nombre if suc else "",
-                "stock_actual": int(stock),
+                "stock_actual": stock_int,
             }
         )
 

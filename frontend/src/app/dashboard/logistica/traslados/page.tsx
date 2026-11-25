@@ -53,6 +53,10 @@ export default function PaginaTraslados() {
   const [equiposDisponibles, setEquiposDisponibles] = useState<
     EquipoInventario[]
   >([]);
+  const [busquedaEquipoOrigen, setBusquedaEquipoOrigen] = useState("");
+  const [stockProductosOrigen, setStockProductosOrigen] = useState<
+    Record<number, number>
+  >({});
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [exito, setExito] = useState<string | null>(null);
@@ -87,7 +91,7 @@ export default function PaginaTraslados() {
       const [respTrs, respSuc, respCat] = await Promise.all([
         solicitarApi<TrasladoResumen[]>("/api/logistica/traslados"),
         solicitarApi<Sucursal[]>("/api/sucursales"),
-        solicitarApi<CatalogoPaginado>("/api/catalogo?por_pagina=200"),
+        solicitarApi<CatalogoPaginado>("/api/catalogo?por_pagina=100"),
       ]);
       setTraslados(respTrs);
       setSucursales(respSuc);
@@ -112,27 +116,35 @@ export default function PaginaTraslados() {
   useEffect(() => {
     if (!origenId) {
       setEquiposDisponibles([]);
+      setStockProductosOrigen({});
       return;
     }
-    const cargarEquipos = async () => {
+    const cargarOrigen = async () => {
       try {
-        const lista = await solicitarApi<EquipoInventario[]>(
-          `/api/logistica/inventario/equipos?sucursal_id=${origenId}`
-        );
-        setEquiposDisponibles(
-          lista.filter(
-            (e) =>
-              e.estado !== "EN_TRANSITO" &&
-              e.estado !== "VENDIDO" &&
-              e.estado !== "CEMENTERIO"
-          )
-        );
+        const qParam = busquedaEquipoOrigen.trim()
+          ? `&q=${encodeURIComponent(busquedaEquipoOrigen.trim())}`
+          : "";
+        const [listaEq, kardex] = await Promise.all([
+          solicitarApi<EquipoInventario[]>(
+            `/api/logistica/inventario/equipos?sucursal_id=${origenId}&solo_disponibles_traslado=true${qParam}`
+          ),
+          solicitarApi<{ saldos: { articulo_id: number; stock_actual: number }[] }>(
+            `/api/logistica/inventario/kardex?sucursal_id=${origenId}&solo_con_stock=true`
+          ),
+        ]);
+        setEquiposDisponibles(listaEq);
+        const mapa: Record<number, number> = {};
+        for (const s of kardex.saldos || []) {
+          mapa[s.articulo_id] = s.stock_actual;
+        }
+        setStockProductosOrigen(mapa);
       } catch {
         setEquiposDisponibles([]);
+        setStockProductosOrigen({});
       }
     };
-    void cargarEquipos();
-  }, [origenId]);
+    void cargarOrigen();
+  }, [origenId, busquedaEquipoOrigen]);
 
   const manejarCrearTraslado = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -597,9 +609,18 @@ export default function PaginaTraslados() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Equipos disponibles en origen ({equiposDisponibles.length})
-                </label>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-1.5">
+                  <label className="block text-xs font-bold text-slate-700">
+                    Equipos disponibles en origen ({equiposDisponibles.length})
+                  </label>
+                  <input
+                    type="text"
+                    value={busquedaEquipoOrigen}
+                    onChange={(e) => setBusquedaEquipoOrigen(e.target.value)}
+                    placeholder="Buscar serial o modelo..."
+                    className="sm:w-56 px-2.5 py-1 rounded-lg border border-slate-300 text-xs"
+                  />
+                </div>
                 <div className="max-h-44 overflow-y-auto border border-slate-200 rounded-xl p-2 space-y-1">
                   {equiposDisponibles.length === 0 ? (
                     <p className="text-xs text-slate-500 p-2">
@@ -666,12 +687,15 @@ export default function PaginaTraslados() {
                           }
                           className="flex-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs"
                         >
-                          <option value="">Selecciona SKU / producto...</option>
-                          {productosCatalogo.map((p) => (
-                            <option key={p.id} value={p.id}>
-                              {p.sku} — {p.descripcion}
-                            </option>
-                          ))}
+                          <option value="">Selecciona SKU / producto con stock...</option>
+                          {productosCatalogo
+                            .filter((p) => !origenId || (stockProductosOrigen[p.id] ?? 0) > 0)
+                            .map((p) => (
+                              <option key={p.id} value={p.id}>
+                                {p.sku} — {p.descripcion}
+                                {origenId ? ` (Stock: ${stockProductosOrigen[p.id] ?? 0})` : ""}
+                              </option>
+                            ))}
                         </select>
                         <input
                           type="number"
