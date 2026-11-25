@@ -32,6 +32,7 @@ from app.modelos_logistica import (
     Traslado,
     TrasladoDetalle,
 )
+from app.modelos_contabilidad import EquipoComponenteInstalado
 from app.rutas.logistica import (
     calcular_stock_componente,
     generar_correlativo,
@@ -40,6 +41,7 @@ from app.rutas.logistica import (
 )
 from app.rutas.tasas import obtener_fecha_hoy
 from app.seguridad import obtener_usuario_actual, puede_ver_costos, requerir_admin, requerir_roles
+from app.servicios.contabilidad import crear_asiento_contable
 
 
 enrutador = APIRouter(tags=["Logística Avanzada y Preparaciones"])
@@ -656,8 +658,19 @@ def cambiar_estado_masivo(
                 if getattr(articulo, "precios", None)
                 else Decimal("0")
             )
-            eq_unico.costo_taller_usd = (eq_unico.costo_taller_usd or Decimal("0")) + (
-                costo_ref * comp.cantidad
+            costo_linea = (costo_ref * comp.cantidad).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            eq_unico.costo_taller_usd = (eq_unico.costo_taller_usd or Decimal("0")) + costo_linea
+            bd.add(
+                EquipoComponenteInstalado(
+                    equipo_id=eq_unico.id,
+                    articulo_id=articulo.id,
+                    sku=articulo.sku,
+                    descripcion=articulo.descripcion,
+                    cantidad=comp.cantidad,
+                    costo_unitario_usd=costo_ref,
+                    costo_total_usd=costo_linea,
+                    instalado_por_id=usuario_actual.id,
+                )
             )
             bd.add(
                 MovimientoInventario(
@@ -672,6 +685,20 @@ def cambiar_estado_masivo(
                     usuario_id=usuario_actual.id,
                 )
             )
+            if costo_linea > 0:
+                cuenta_destino_eq = "1.1.03" if estado_destino == EstadoEquipo.LISTO.value else "1.1.04"
+                crear_asiento_contable(
+                    bd=bd,
+                    usuario=usuario_actual,
+                    fecha_op=obtener_fecha_hoy(),
+                    descripcion=f"Costeo preparación {eq_unico.serial}: {articulo.sku} x{comp.cantidad}",
+                    origen_tipo="PREPARACION",
+                    origen_id=eq_unico.id,
+                    lineas=[
+                        {"cuenta_codigo": cuenta_destino_eq, "debe_usd": costo_linea, "haber_usd": Decimal("0")},
+                        {"cuenta_codigo": "1.1.05", "debe_usd": Decimal("0"), "haber_usd": costo_linea},
+                    ],
+                )
 
     incluir_costos = puede_ver_costos(usuario_actual.rol)
     actualizados: list[dict[str, Any]] = []

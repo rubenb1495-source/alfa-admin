@@ -10,12 +10,14 @@ from sqlalchemy import inspect, text
 from app.base_datos import Base, SesionLocal, motor
 from app.configuracion import configuracion
 from app import modelos_admin as _modelos_admin  # noqa: F401
+from app import modelos_contabilidad as _modelos_contabilidad  # noqa: F401
 from app import modelos_finanzas as _modelos_finanzas  # noqa: F401
 from app import modelos_logistica as _modelos_logistica  # noqa: F401
 from app import modelos_operaciones as _modelos_operaciones  # noqa: F401
 from app import modelos_taller as _modelos_taller  # noqa: F401
-from app.rutas import admin_importacion, administracion, alertas, autenticacion, catalogo, cierre_diario, direccion, finanzas, logistica, logistica_avanzada, operaciones, taller, tasas, tesoreria, usuarios, ventas
+from app.rutas import admin_importacion, administracion, alertas, autenticacion, catalogo, cierre_diario, contabilidad, direccion, finanzas, logistica, logistica_avanzada, operaciones, taller, tasas, tesoreria, usuarios, ventas
 from app.semilla import ejecutar_semilla
+from app.semilla_contabilidad import ejecutar_semilla_contabilidad
 from app.semilla_finanzas import ejecutar_semilla_finanzas
 
 
@@ -200,6 +202,7 @@ async def ciclo_vida(_app: FastAPI) -> AsyncIterator[None]:
     try:
         ejecutar_semilla(bd)
         ejecutar_semilla_finanzas(bd)
+        ejecutar_semilla_contabilidad(bd)
     finally:
         bd.close()
     yield
@@ -240,5 +243,6 @@ app.include_router(direccion.enrutador)
 app.include_router(alertas.enrutador)
 app.include_router(administracion.enrutador)
 app.include_router(admin_importacion.enrutador)
+app.include_router(contabilidad.enrutador)
 app.include_router(cierre_diario.enrutador)
 app.include_router(operaciones.enrutador)

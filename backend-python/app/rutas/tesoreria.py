@@ -376,6 +376,31 @@ def crear_movimiento_tesoreria(
     if pago_entrada is not None:
         pago_entrada.origen_id = mov.id
 
+    # Asiento automático de Diferencial Cambiario en Tesorería
+    if diferencial_usd != 0:
+        from app.servicios.contabilidad import crear_asiento_contable
+
+        monto_diff = abs(diferencial_usd)
+        if diferencial_usd > 0:
+            lineas_tes = [
+                {"cuenta_codigo": "1.1.01", "debe_usd": monto_diff, "haber_usd": Decimal("0"), "nota": f"Ganancia cambiaria {codigo}"},
+                {"cuenta_codigo": "8.1.03", "debe_usd": Decimal("0"), "haber_usd": monto_diff, "nota": f"Diferencial cambiario {codigo}"},
+            ]
+        else:
+            lineas_tes = [
+                {"cuenta_codigo": "8.1.03", "debe_usd": monto_diff, "haber_usd": Decimal("0"), "nota": f"Pérdida cambiaria {codigo}"},
+                {"cuenta_codigo": "1.1.01", "debe_usd": Decimal("0"), "haber_usd": monto_diff, "nota": f"Diferencial cambiario {codigo}"},
+            ]
+        crear_asiento_contable(
+            bd=bd,
+            usuario=usuario_actual,
+            fecha_op=fecha_op,
+            descripcion=f"Tesorería {codigo}: {concepto_final}",
+            origen_tipo="TESORERIA",
+            origen_id=mov.id,
+            lineas=lineas_tes,
+        )
+
     bd.commit()
     mov_cargado = (
         bd.query(MovimientoTesoreria)
@@ -428,6 +453,8 @@ def anular_movimiento_tesoreria(
         mov.pago_entrada.nota = f"{mov.pago_entrada.nota} | ANULADO: {datos.motivo.strip()}"
 
     from app.rutas.administracion import registrar_auditoria
+    from app.servicios.contabilidad import reversar_asiento_origen
+
     registrar_auditoria(
         bd,
         usuario_actual,
@@ -436,6 +463,14 @@ def anular_movimiento_tesoreria(
         mov.id,
         datos_anteriores={"estado": "CONFIRMADO", "codigo": mov.codigo},
         datos_nuevos={"estado": "ANULADO", "motivo": datos.motivo.strip()},
+    )
+    reversar_asiento_origen(
+        bd=bd,
+        usuario=usuario_actual,
+        origen_tipo="TESORERIA",
+        origen_id=mov.id,
+        fecha_op=obtener_fecha_hoy(),
+        motivo=datos.motivo.strip(),
     )
 
     bd.commit()

@@ -924,6 +924,56 @@ def crear_venta(
             cot_origen.estado = EstadoCotizacion.CONVERTIDA.value
             cot_origen.venta_id = venta.id
 
+    # Asiento contable automático de la venta (Ingresos, COGS e impacto de comisiones)
+    from app.servicios.contabilidad import crear_asiento_contable
+
+    total_vta_usd = Decimal(calc["total_promo_usd"] or 0)
+    saldo_cxc_usd = Decimal(calc["falta_usd_promo"] or 0) if calc["estado"] == EstadoVenta.CON_SALDO.value else Decimal("0")
+    cobrado_usd = max(Decimal("0"), total_vta_usd - saldo_cxc_usd)
+    lineas_vta: list[dict[str, Any]] = []
+    if cobrado_usd > 0:
+        lineas_vta.append({"cuenta_codigo": "1.1.01", "debe_usd": cobrado_usd, "haber_usd": Decimal("0"), "nota": f"Cobro {numero_venta}"})
+    if saldo_cxc_usd > 0:
+        lineas_vta.append({"cuenta_codigo": "1.1.02", "debe_usd": saldo_cxc_usd, "haber_usd": Decimal("0"), "nota": f"CxC {numero_venta}"})
+    if total_vta_usd > 0:
+        lineas_vta.append({"cuenta_codigo": "4.1.01", "debe_usd": Decimal("0"), "haber_usd": total_vta_usd, "nota": f"Ingreso {numero_venta}"})
+
+    costo_eq_vta = sum((Decimal(d["costo_total_snapshot_usd"] or 0) for d in calc["detalles"] if d["equipo"] is not None), Decimal("0"))
+    costo_comp_vta = sum((Decimal(d["costo_total_snapshot_usd"] or 0) for d in calc["detalles"] if d["equipo"] is None), Decimal("0"))
+    if costo_eq_vta > 0:
+        lineas_vta.append({"cuenta_codigo": "5.1.01", "debe_usd": costo_eq_vta, "haber_usd": Decimal("0"), "nota": f"COGS Equipos {numero_venta}"})
+        lineas_vta.append({"cuenta_codigo": "1.1.03", "debe_usd": Decimal("0"), "haber_usd": costo_eq_vta, "nota": f"Salida Inv. Equipos {numero_venta}"})
+    if costo_comp_vta > 0:
+        lineas_vta.append({"cuenta_codigo": "5.1.02", "debe_usd": costo_comp_vta, "haber_usd": Decimal("0"), "nota": f"COGS Productos {numero_venta}"})
+        lineas_vta.append({"cuenta_codigo": "1.1.05", "debe_usd": Decimal("0"), "haber_usd": costo_comp_vta, "nota": f"Salida Inv. Prod. {numero_venta}"})
+
+    # Comisión por pagar según reglas Alfa (Pasillo/Lead)
+    if datos.asesor_id is not None and total_vta_usd > 0:
+        asesor_v = bd.query(Usuario).filter(Usuario.id == datos.asesor_id).first()
+        if asesor_v is not None:
+            pct_com = Decimal("0")
+            if datos.origen_venta.value == "LEAD":
+                pct_com = Decimal("0.08")
+            elif asesor_v.rol in (RolUsuario.ENCARGADO_TIENDA.value, RolUsuario.LIDER.value):
+                pct_com = Decimal("0.05")
+            elif asesor_v.rol == RolUsuario.ASESORA.value:
+                pct_com = Decimal("0.01")
+            com_usd = (total_vta_usd * pct_com).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            if com_usd > 0:
+                lineas_vta.append({"cuenta_codigo": "6.1.01", "debe_usd": com_usd, "haber_usd": Decimal("0"), "nota": f"Comisión {asesor_v.nombre}"})
+                lineas_vta.append({"cuenta_codigo": "2.1.02", "debe_usd": Decimal("0"), "haber_usd": com_usd, "nota": f"Comisión por pagar {numero_venta}"})
+
+    if len(lineas_vta) >= 2:
+        crear_asiento_contable(
+            bd=bd,
+            usuario=usuario_actual,
+            fecha_op=fecha_op,
+            descripcion=f"Venta {numero_venta}",
+            origen_tipo="VENTA",
+            origen_id=venta.id,
+            lineas=lineas_vta,
+        )
+
     bd.commit()
 
     venta_completa = (
