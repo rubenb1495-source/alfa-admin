@@ -210,12 +210,17 @@ export interface TrasladoResumen {
   motivo_anulacion: string;
   detalles: {
     id: number;
+    tipo_item?: string;
     equipo_id: number | null;
     serial: string | null;
     modelo: string | null;
     articulo_id: number | null;
     sku: string | null;
+    descripcion?: string;
     cantidad: number;
+    verificado?: boolean;
+    cantidad_recibida?: number | null;
+    observacion_recepcion?: string;
   }[];
 }
 

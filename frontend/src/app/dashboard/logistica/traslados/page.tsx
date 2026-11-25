@@ -5,12 +5,15 @@ import {
   AlertCircle,
   Ban,
   CheckCircle2,
+  ClipboardCheck,
   Copy,
   Download,
   FileSpreadsheet,
   Plus,
+  Printer,
   Trash2,
   Truck,
+  X,
 } from "lucide-react";
 import BuscadorTabla from "@/componentes/BuscadorTabla";
 import ModalCargaMasiva, {
@@ -23,6 +26,7 @@ import {
 } from "@/lib/whatsapp";
 import {
   ErrorApi,
+  descargarPdfApi,
   puedeGestionarCatalogo,
   solicitarApi,
 } from "@/servicios/api";
@@ -68,6 +72,13 @@ export default function PaginaTraslados() {
     null
   );
   const [motivoAnulacion, setMotivoAnulacion] = useState("");
+
+  // Modal recepción ítem por ítem
+  const [trasladoRecibir, setTrasladoRecibir] = useState<TrasladoResumen | null>(null);
+  const [notaRecepcion, setNotaRecepcion] = useState("Recibido conforme");
+  const [checksItems, setChecksItems] = useState<
+    Record<number, { verificado: boolean; cantidad_recibida: number; observacion_recepcion: string }>
+  >({});
 
   const cargarDatos = useCallback(async () => {
     setCargando(true);
@@ -171,20 +182,71 @@ export default function PaginaTraslados() {
     }
   };
 
-  const confirmarRecepcion = async (trasladoId: number) => {
+  const abrirPdfTraslado = async (t: TrasladoResumen) => {
+    setError(null);
+    try {
+      await descargarPdfApi(
+        `/api/logistica/traslados/${t.id}/pdf`,
+        `hoja_traslado_${t.numero_traslado}.pdf`
+      );
+    } catch (err) {
+      setError(
+        err instanceof ErrorApi ? err.message : "No se pudo descargar la Hoja de Traslado PDF."
+      );
+    }
+  };
+
+  const abrirModalRecepcion = (t: TrasladoResumen) => {
+    const inicial: Record<
+      number,
+      { verificado: boolean; cantidad_recibida: number; observacion_recepcion: string }
+    > = {};
+    for (const d of t.detalles) {
+      inicial[d.id] = {
+        verificado: Boolean(d.verificado),
+        cantidad_recibida: d.cantidad_recibida ?? d.cantidad,
+        observacion_recepcion: d.observacion_recepcion || "",
+      };
+    }
+    setChecksItems(inicial);
+    setNotaRecepcion("Recibido conforme");
+    setTrasladoRecibir(t);
+  };
+
+  const confirmarRecepcionConChequeo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!trasladoRecibir) return;
     setError(null);
     setExito(null);
+    setProcesando(true);
     try {
-      await solicitarApi(`/api/logistica/traslados/${trasladoId}/confirmar`, {
-        method: "POST",
-        body: JSON.stringify({ nota_recepcion: "Recibido conforme" }),
+      const items_verificados = trasladoRecibir.detalles.map((d) => {
+        const st = checksItems[d.id];
+        return {
+          detalle_id: d.id,
+          verificado: st ? st.verificado : true,
+          cantidad_recibida: st ? st.cantidad_recibida : d.cantidad,
+          observacion_recepcion: st ? st.observacion_recepcion : "",
+        };
       });
-      setExito("Recepción física confirmada. Stock habilitado en destino.");
+      await solicitarApi(`/api/logistica/traslados/${trasladoRecibir.id}/confirmar`, {
+        method: "POST",
+        body: JSON.stringify({
+          nota_recepcion: notaRecepcion.trim(),
+          items_verificados,
+        }),
+      });
+      setExito(
+        `Traslado ${trasladoRecibir.numero_traslado} recibido y verificado. Stock ingresado en destino.`
+      );
+      setTrasladoRecibir(null);
       await cargarDatos();
     } catch (err) {
       setError(
         err instanceof ErrorApi ? err.message : "No se pudo confirmar traslado."
       );
+    } finally {
+      setProcesando(false);
     }
   };
 
@@ -432,6 +494,14 @@ export default function PaginaTraslados() {
                     <td className="px-4 py-3 text-right space-x-2 whitespace-nowrap">
                       <button
                         type="button"
+                        onClick={() => void abrirPdfTraslado(t)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold cursor-pointer"
+                      >
+                        <Printer className="w-3.5 h-3.5" />
+                        Hoja PDF
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => void copiarTrasladoWa(t)}
                         className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-800 text-xs font-bold cursor-pointer"
                       >
@@ -442,11 +512,11 @@ export default function PaginaTraslados() {
                         <>
                           <button
                             type="button"
-                            onClick={() => void confirmarRecepcion(t.id)}
+                            onClick={() => abrirModalRecepcion(t)}
                             className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold cursor-pointer"
                           >
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            Confirmar recepción
+                            <ClipboardCheck className="w-3.5 h-3.5" />
+                            Chequear y Recibir
                           </button>
                           {puedeEnviar && (
                             <button
@@ -702,6 +772,181 @@ export default function PaginaTraslados() {
                   className="px-4 py-2 rounded-xl bg-red-600 text-white text-sm font-bold cursor-pointer"
                 >
                   Confirmar anulación
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Chequeo Ítem por Ítem y Recepción */}
+      {trasladoRecibir && (
+        <div className="fixed inset-0 z-50 bg-black/45 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-3xl w-full shadow-2xl border border-slate-200 overflow-hidden max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between bg-[#003566] px-5 py-3.5 text-white">
+              <div>
+                <h3 className="font-bold text-sm">
+                  Recepción de Traslado · {trasladoRecibir.numero_traslado}
+                </h3>
+                <p className="text-[11px] text-blue-100">
+                  {trasladoRecibir.origen} → {trasladoRecibir.destino}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setTrasladoRecibir(null)}
+                className="text-white/80 hover:text-white cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form
+              onSubmit={confirmarRecepcionConChequeo}
+              className="p-5 space-y-4 overflow-y-auto"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs font-bold text-slate-700">
+                  Verificados:{" "}
+                  {
+                    trasladoRecibir.detalles.filter((d) => checksItems[d.id]?.verificado)
+                      .length
+                  }{" "}
+                  / {trasladoRecibir.detalles.length} ítems
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const todos: typeof checksItems = {};
+                    for (const d of trasladoRecibir.detalles) {
+                      todos[d.id] = {
+                        verificado: true,
+                        cantidad_recibida: checksItems[d.id]?.cantidad_recibida ?? d.cantidad,
+                        observacion_recepcion: checksItems[d.id]?.observacion_recepcion ?? "",
+                      };
+                    }
+                    setChecksItems(todos);
+                  }}
+                  className="px-3 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold hover:bg-emerald-100 cursor-pointer"
+                >
+                  ✓ Marcar todos verificados
+                </button>
+              </div>
+
+              <div className="border border-slate-200 rounded-xl overflow-hidden">
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-[11px] uppercase text-slate-500">
+                    <tr>
+                      <th className="px-3 py-2 w-10 text-center">OK</th>
+                      <th className="px-3 py-2">Ítem / Serial</th>
+                      <th className="px-3 py-2 text-center">Env.</th>
+                      <th className="px-3 py-2 w-24 text-center">Recibida</th>
+                      <th className="px-3 py-2">Observación / Novedad</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {trasladoRecibir.detalles.map((d) => {
+                      const st = checksItems[d.id] || {
+                        verificado: false,
+                        cantidad_recibida: d.cantidad,
+                        observacion_recepcion: "",
+                      };
+                      const esEquipo = Boolean(d.equipo_id);
+                      return (
+                        <tr key={d.id} className={st.verificado ? "bg-emerald-50/40" : ""}>
+                          <td className="px-3 py-2 text-center">
+                            <input
+                              type="checkbox"
+                              checked={st.verificado}
+                              onChange={(e) =>
+                                setChecksItems((prev) => ({
+                                  ...prev,
+                                  [d.id]: { ...st, verificado: e.target.checked },
+                                }))
+                              }
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <div className="font-bold text-slate-900">
+                              {esEquipo
+                                ? d.modelo || "Equipo"
+                                : `${d.sku || ""} · ${d.descripcion || ""}`}
+                            </div>
+                            <div className="text-[11px] font-mono text-slate-500">
+                              {esEquipo ? `Serial: ${d.serial}` : "Producto por cantidad"}
+                            </div>
+                          </td>
+                          <td className="px-3 py-2 text-center font-bold">{d.cantidad}</td>
+                          <td className="px-3 py-2 text-center">
+                            {esEquipo ? (
+                              <span className="font-bold">{st.verificado ? 1 : 0}</span>
+                            ) : (
+                              <input
+                                type="number"
+                                min={0}
+                                max={d.cantidad}
+                                value={st.cantidad_recibida}
+                                onChange={(e) =>
+                                  setChecksItems((prev) => ({
+                                    ...prev,
+                                    [d.id]: {
+                                      ...st,
+                                      cantidad_recibida: Number(e.target.value || 0),
+                                    },
+                                  }))
+                                }
+                                className="w-16 px-2 py-1 rounded-lg border border-slate-300 text-center"
+                              />
+                            )}
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              type="text"
+                              value={st.observacion_recepcion}
+                              onChange={(e) =>
+                                setChecksItems((prev) => ({
+                                  ...prev,
+                                  [d.id]: { ...st, observacion_recepcion: e.target.value },
+                                }))
+                              }
+                              placeholder="Opcional (ej. faltante o novedad)"
+                              className="w-full px-2 py-1 rounded-lg border border-slate-200 text-xs"
+                            />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Nota general de recepción
+                </label>
+                <input
+                  type="text"
+                  value={notaRecepcion}
+                  onChange={(e) => setNotaRecepcion(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setTrasladoRecibir(null)}
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={procesando}
+                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold disabled:opacity-60 cursor-pointer flex items-center gap-1.5"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  {procesando ? "Procesando..." : "Recibido · Ingresar Stock"}
                 </button>
               </div>
             </form>

@@ -199,8 +199,16 @@ class TrasladoCrearEntrada(BaseModel):
     nota: str = Field(default="", max_length=1000)
 
 
+class TrasladoItemVerificacionEntrada(BaseModel):
+    detalle_id: int
+    verificado: bool = True
+    cantidad_recibida: int | None = Field(default=None, ge=0)
+    observacion_recepcion: str = Field(default="", max_length=255)
+
+
 class TrasladoConfirmarEntrada(BaseModel):
     nota_recepcion: str = Field(default="", max_length=500)
+    items_verificados: list[TrasladoItemVerificacionEntrada] = Field(default_factory=list)
 
 
 class TrasladoAnularEntrada(BaseModel):

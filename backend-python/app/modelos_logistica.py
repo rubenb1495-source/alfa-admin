@@ -281,6 +281,9 @@ class TrasladoDetalle(Base):
     equipo_id: Mapped[int | None] = mapped_column(ForeignKey("equipos.id"), nullable=True)
     articulo_id: Mapped[int | None] = mapped_column(ForeignKey("catalogo_articulos.id"), nullable=True)
     cantidad: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    verificado: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    cantidad_recibida: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    observacion_recepcion: Mapped[str] = mapped_column(String(255), default="", nullable=False)
 
     traslado = relationship("Traslado", back_populates="detalles")
     equipo = relationship("Equipo")

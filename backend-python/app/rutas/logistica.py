@@ -920,12 +920,21 @@ def listar_traslados(
             "detalles": [
                 {
                     "id": d.id,
+                    "tipo_item": "EQUIPO" if d.equipo is not None else (d.articulo.tipo if d.articulo else "COMPONENTE"),
                     "equipo_id": d.equipo_id,
                     "serial": d.equipo.serial if d.equipo else None,
                     "modelo": d.equipo.modelo if d.equipo else None,
                     "articulo_id": d.articulo_id,
                     "sku": d.articulo.sku if d.articulo else None,
+                    "descripcion": (
+                        d.equipo.modelo
+                        if d.equipo is not None
+                        else (d.articulo.descripcion if d.articulo else "")
+                    ),
                     "cantidad": d.cantidad,
+                    "verificado": bool(getattr(d, "verificado", False)),
+                    "cantidad_recibida": getattr(d, "cantidad_recibida", None),
+                    "observacion_recepcion": getattr(d, "observacion_recepcion", "") or "",
                 }
                 for d in t.detalles
             ],
@@ -1092,12 +1101,28 @@ def confirmar_traslado(
     traslado.fecha_recepcion = ahora
     traslado.nota_recepcion = datos.nota_recepcion.strip()
 
+    mapa_verif = {it.detalle_id: it for it in (datos.items_verificados or [])}
+    novedades = 0
+
     for det in traslado.detalles:
+        verif_in = mapa_verif.get(det.id)
+        if verif_in is not None:
+            det.verificado = bool(verif_in.verificado)
+            det.observacion_recepcion = verif_in.observacion_recepcion.strip()
+        else:
+            det.verificado = True
+
         if det.equipo is not None:
             eq = det.equipo
+            det.cantidad_recibida = 1 if det.verificado else 0
+            if not det.verificado:
+                novedades += 1
             eq.ubicacion_id = traslado.destino_id
             eq.estado = eq.estado_previo_traslado or EstadoEquipo.LISTO.value
             eq.estado_previo_traslado = None
+            motivo_eq = f"Recepción confirmada en {traslado.destino.nombre}"
+            if det.observacion_recepcion:
+                motivo_eq += f" · Obs: {det.observacion_recepcion}"
             bd.add(
                 MovimientoInventario(
                     tipo=TipoMovimientoInventario.TRASLADO_ENTRADA.value,
@@ -1107,24 +1132,36 @@ def confirmar_traslado(
                     cantidad=1,
                     costo_unitario_usd=eq.costo_compra_usd + eq.costo_flete_usd + eq.costo_taller_usd,
                     documento_ref=traslado.numero_traslado,
-                    motivo=f"Recepción confirmada en {traslado.destino.nombre}",
+                    motivo=motivo_eq,
                     usuario_id=usuario_actual.id,
                 )
             )
         elif det.articulo_id is not None:
-            bd.add(
-                MovimientoInventario(
-                    tipo=TipoMovimientoInventario.TRASLADO_ENTRADA.value,
-                    articulo_id=det.articulo_id,
-                    equipo_id=None,
-                    sucursal_id=traslado.destino_id,
-                    cantidad=det.cantidad,
-                    costo_unitario_usd=Decimal("0"),
-                    documento_ref=traslado.numero_traslado,
-                    motivo=f"Recepción de componentes en {traslado.destino.nombre}",
-                    usuario_id=usuario_actual.id,
-                )
+            cant_rec = (
+                verif_in.cantidad_recibida
+                if (verif_in is not None and verif_in.cantidad_recibida is not None)
+                else det.cantidad
             )
+            det.cantidad_recibida = cant_rec
+            if cant_rec != det.cantidad or not det.verificado:
+                novedades += 1
+            motivo_comp = f"Recepción de componentes en {traslado.destino.nombre} ({cant_rec}/{det.cantidad})"
+            if det.observacion_recepcion:
+                motivo_comp += f" · Obs: {det.observacion_recepcion}"
+            if cant_rec > 0:
+                bd.add(
+                    MovimientoInventario(
+                        tipo=TipoMovimientoInventario.TRASLADO_ENTRADA.value,
+                        articulo_id=det.articulo_id,
+                        equipo_id=None,
+                        sucursal_id=traslado.destino_id,
+                        cantidad=cant_rec,
+                        costo_unitario_usd=Decimal("0"),
+                        documento_ref=traslado.numero_traslado,
+                        motivo=motivo_comp,
+                        usuario_id=usuario_actual.id,
+                    )
+                )
 
     bd.commit()
     return {
@@ -1132,7 +1169,41 @@ def confirmar_traslado(
         "numero_traslado": traslado.numero_traslado,
         "estado": traslado.estado,
         "recibido_por": usuario_actual.nombre,
+        "novedades": novedades,
     }
+
+
+@enrutador.get("/traslados/{traslado_id}/pdf")
+def descargar_hoja_traslado_pdf(
+    traslado_id: int,
+    _usuario: Usuario = Depends(obtener_usuario_actual),
+    bd: Session = Depends(obtener_bd),
+):
+    from fastapi import Response
+    from app.servicios.pdf_traslado import generar_pdf_hoja_traslado
+
+    traslado = (
+        bd.query(Traslado)
+        .options(
+            joinedload(Traslado.origen),
+            joinedload(Traslado.destino),
+            joinedload(Traslado.enviado_por),
+            joinedload(Traslado.recibido_por),
+            joinedload(Traslado.detalles).joinedload(TrasladoDetalle.equipo),
+            joinedload(Traslado.detalles).joinedload(TrasladoDetalle.articulo),
+        )
+        .filter(Traslado.id == traslado_id)
+        .first()
+    )
+    if traslado is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Traslado no encontrado.")
+
+    pdf_bytes = generar_pdf_hoja_traslado(traslado)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="hoja_traslado_{traslado.numero_traslado}.pdf"'},
+    )
 
 
 @enrutador.post("/traslados/{traslado_id}/anular")

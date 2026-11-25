@@ -229,6 +229,19 @@ def asegurar_columnas_compatibles() -> None:
                         "ADD COLUMN stock_minimo INTEGER NOT NULL DEFAULT 2"
                     )
                 )
+    if inspector.has_table("traslados_detalle"):
+        columnas_td = {col["name"] for col in inspector.get_columns("traslados_detalle")}
+        nuevas_td = [
+            ("verificado", "BOOLEAN NOT NULL DEFAULT FALSE"),
+            ("cantidad_recibida", "INTEGER NULL"),
+            ("observacion_recepcion", "VARCHAR(255) NOT NULL DEFAULT ''"),
+        ]
+        for nombre_col, ddl_col in nuevas_td:
+            if nombre_col not in columnas_td:
+                with motor.begin() as conexion:
+                    conexion.execute(
+                        text(f"ALTER TABLE traslados_detalle ADD COLUMN {nombre_col} {ddl_col}")
+                    )
 
 
 @asynccontextmanager
