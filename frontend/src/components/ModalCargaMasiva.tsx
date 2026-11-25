@@ -10,6 +10,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
+import { parsearErrorApi } from "@/lib/apiErrors";
 import { obtenerToken } from "@/servicios/api";
 
 export type TipoCargaMasiva =
@@ -190,13 +191,10 @@ export default function ModalCargaMasiva({
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: construirFormData(),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
       if (!res.ok) {
-        const det =
-          typeof data?.detail === "string"
-            ? data.detail
-            : data?.detail?.mensaje || "Error al validar el archivo.";
-        throw new Error(det);
+        const { message } = parsearErrorApi(data, res.status);
+        throw new Error(message);
       }
       setPreview(data as RespuestaPreview);
     } catch (e) {
@@ -227,13 +225,10 @@ export default function ModalCargaMasiva({
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: construirFormData(),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
       if (!res.ok) {
-        const det =
-          typeof data?.detail === "string"
-            ? data.detail
-            : data?.detail?.mensaje || "Error al confirmar la carga masiva.";
-        throw new Error(det);
+        const { message } = parsearErrorApi(data, res.status);
+        throw new Error(message);
       }
       setExitoMsg(
         `Carga masiva confirmada con éxito (${data.filas_procesadas ?? preview.validas_count} filas procesadas${data.codigo ? ` · Código ${data.codigo}` : ""}).`

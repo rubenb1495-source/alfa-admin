@@ -5,7 +5,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session, joinedload
 
 from app.base_datos import obtener_bd
@@ -71,6 +71,24 @@ class MovimientoTesoreriaCrearEntrada(BaseModel):
     concepto: str = Field(default="", max_length=200)
     referencia: str = Field(default="", max_length=120)
     observaciones: str = Field(default="", max_length=500)
+
+    @field_validator("fecha", "cuenta_origen_id", "cuenta_destino_id", "monto_entrada", "tasa_operacion", mode="before")
+    @classmethod
+    def _vacio_a_none(cls, v: Any) -> Any:
+        if isinstance(v, str) and not v.strip():
+            return None
+        if isinstance(v, str) and "," in v:
+            return v.strip().replace(",", ".")
+        return v
+
+    @field_validator("monto_salida", "comision_usd", mode="before")
+    @classmethod
+    def _vacio_a_cero(cls, v: Any) -> Any:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return Decimal("0")
+        if isinstance(v, str):
+            return v.strip().replace(",", ".")
+        return v
 
 
 class MovimientoTesoreriaAnularEntrada(BaseModel):

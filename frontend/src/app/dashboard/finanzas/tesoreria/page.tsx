@@ -13,6 +13,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { usarSesion } from "@/contexto/SesionContexto";
+import { cleanPayload } from "@/lib/apiErrors";
 import {
   ErrorApi,
   esRolAdministrativo,
@@ -251,7 +252,7 @@ export default function PaginaTesoreria() {
 
       const creado = await solicitarApi<MovimientoTesoreria>("/api/tesoreria/movimientos", {
         method: "POST",
-        body: JSON.stringify(payload),
+        body: JSON.stringify(cleanPayload(payload)),
       });
       setExito(
         `Movimiento ${creado.codigo} registrado. Saldos actualizados atómicamente.`

@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from fastapi.responses import StreamingResponse
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from sqlalchemy import func
@@ -161,6 +161,22 @@ class FacturaGastoCrearEntrada(BaseModel):
     igtf_bs: Decimal = Field(default=Decimal("0"), ge=Decimal("0"))
     tasa_bcv_fecha: Decimal | None = Field(default=None, gt=Decimal("0"))
     observaciones: str = Field(default="", max_length=500)
+
+    @field_validator("fecha_emision", "fecha_vencimiento", "tasa_bcv_fecha", mode="before")
+    @classmethod
+    def _opt_vacio_a_none(cls, v: Any) -> Any:
+        if isinstance(v, str) and not v.strip():
+            return None
+        return v
+
+    @field_validator("base_imponible_bs", "monto_exento_bs", "alicuota_iva", "igtf_bs", mode="before")
+    @classmethod
+    def _num_vacio_a_cero(cls, v: Any) -> Any:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return Decimal("0")
+        if isinstance(v, str):
+            return v.strip().replace(",", ".")
+        return v
 
 
 class PagarGastoEntrada(BaseModel):
