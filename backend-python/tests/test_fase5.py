@@ -85,7 +85,7 @@ def _preparar_escenario_base(cliente: TestClient) -> dict:
         json={
             "nombre": "Valeria Asesora",
             "correo": "valeria.f5@alfa.com",
-            "clave": "Password123!",
+            "clave": "Password123!", "debe_cambiar_clave": False,
             "rol": "ASESORA",
             "sucursal_id": 1,
         },

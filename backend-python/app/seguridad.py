@@ -7,7 +7,7 @@ from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 
 import jwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session, joinedload
 
@@ -173,11 +173,20 @@ def puede_ver_costos(rol: str) -> bool:
     return rol not in ROLES_SIN_COSTOS
 
 
+RUTAS_PERMITIDAS_CAMBIO_CLAVE: frozenset[str] = frozenset({
+    "/api/auth/me",
+    "/api/auth/perfil",
+    "/api/auth/cambiar-clave",
+    "/api/auth/logout",
+})
+
+
 def obtener_usuario_actual(
+    request: Request,
     credenciales: HTTPAuthorizationCredentials | None = Depends(esquema_bearer),
     bd: Session = Depends(obtener_bd),
 ) -> Usuario:
-    """Valida el JWT Bearer y devuelve el usuario activo."""
+    """Valida el JWT Bearer, devuelve el usuario activo y bloquea el acceso si debe cambiar su clave temporal."""
     if credenciales is None or not credenciales.credentials:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -208,6 +217,15 @@ def obtener_usuario_actual(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Usuario inactivo, sin acceso o inexistente.",
         )
+
+    if getattr(usuario, "debe_cambiar_clave", False):
+        ruta_limpia = (request.url.path or "").rstrip("/")
+        if ruta_limpia not in RUTAS_PERMITIDAS_CAMBIO_CLAVE:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Debes cambiar tu contraseña temporal antes de continuar.",
+            )
+
     return usuario
 
 

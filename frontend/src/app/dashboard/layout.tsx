@@ -42,6 +42,7 @@ import CampanaAlertas from "@/components/CampanaAlertas";
 import LogoAlfa from "@/components/LogoAlfa";
 import ModalAperturaDiaria from "@/components/ModalAperturaDiaria";
 import ModalCambiarClave from "@/components/ModalCambiarClave";
+import PantallaCambioClaveObligatorio from "@/components/PantallaCambioClaveObligatorio";
 import { usarSesion } from "@/contexto/SesionContexto";
 import {
   esRolAdministrativo,
@@ -113,7 +114,6 @@ export default function DisenoDashboard({
     if (
       esDir &&
       (rutaActual.startsWith("/dashboard/ventas/nueva") ||
-        rutaActual.startsWith("/dashboard/cierre-diario") ||
         rutaActual.startsWith("/dashboard/logistica/compras"))
     ) {
       router.replace("/dashboard/direccion");
@@ -131,6 +131,10 @@ export default function DisenoDashboard({
         </div>
       </div>
     );
+  }
+
+  if (usuario.debe_cambiar_clave) {
+    return <PantallaCambioClaveObligatorio />;
   }
 
   const esAdmin = esRolAdministrativo(usuario.rol);

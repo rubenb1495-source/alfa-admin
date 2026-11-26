@@ -80,6 +80,7 @@ class UsuarioSalida(BaseModel):
 
 class LoginSalida(BaseModel):
     token: str
+    debe_cambiar_clave: bool = False
     usuario: UsuarioSalida
 
 
@@ -91,6 +92,7 @@ class UsuarioCrearEntrada(BaseModel):
     telefono: str = Field(default="", max_length=40)
     cedula: str = Field(default="", max_length=40)
     tiene_acceso: bool | None = None
+    debe_cambiar_clave: bool | None = None
     correo: EmailStr | None = None
     clave: str | None = Field(default=None, max_length=128)
     sucursal_id: int | None = None

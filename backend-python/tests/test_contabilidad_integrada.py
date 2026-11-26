@@ -265,7 +265,7 @@ def test_3_prestamos_balance_y_rbac(entorno):
         client.post(
             "/api/usuarios",
             headers=h_admin,
-            json={"nombre": nombre, "rol": rol, "tiene_acceso": True, "correo": correo, "clave": "Password123!"},
+            json={"nombre": nombre, "rol": rol, "tiene_acceso": True, "correo": correo, "clave": "Password123!", "debe_cambiar_clave": False},
         )
 
     h_dir = _login(client, "dir.ctb@alfaimportaciones.com", "Password123!")

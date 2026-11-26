@@ -48,6 +48,7 @@ export interface Usuario {
 
 export interface RespuestaLogin {
   token: string;
+  debe_cambiar_clave?: boolean;
   usuario: Usuario;
 }
 

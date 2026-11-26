@@ -211,7 +211,7 @@ def test_3_alertas_rbac_admin_director_vs_encargado(entorno):
             "rol": "DIRECTOR",
             "tiene_acceso": True,
             "correo": "dir.alertas@alfaimportaciones.com",
-            "clave": "Password123!",
+            "clave": "Password123!", "debe_cambiar_clave": False,
         },
     )
     assert r_dir.status_code == 201, r_dir.text
@@ -224,7 +224,7 @@ def test_3_alertas_rbac_admin_director_vs_encargado(entorno):
             "rol": "ENCARGADO_TIENDA",
             "tiene_acceso": True,
             "correo": "enc.alertas@alfaimportaciones.com",
-            "clave": "Password123!",
+            "clave": "Password123!", "debe_cambiar_clave": False,
         },
     )
     assert r_enc.status_code == 201, r_enc.text

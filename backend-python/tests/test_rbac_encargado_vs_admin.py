@@ -73,7 +73,7 @@ def test_rbac_admin_vs_encargado_de_tienda_y_sanitizacion_costos(cliente: TestCl
             "sucursal_id": t38_id,
             "tiene_acceso": True,
             "correo": "marcos@alfaimportaciones.com",
-            "clave": "ClaveEncargado123!",
+            "clave": "ClaveEncargado123!", "debe_cambiar_clave": False,
         },
     )
     assert resp_enc.status_code == 201, resp_enc.text

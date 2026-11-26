@@ -127,6 +127,11 @@ def crear_usuario(
                 detail="La sucursal indicada no existe.",
             )
 
+    debe_cambiar_inicial = (
+        bool(datos.debe_cambiar_clave)
+        if datos.debe_cambiar_clave is not None
+        else tiene_acceso
+    )
     nuevo = Usuario(
         nombre=datos.nombre,
         usuario=usuario_acceso,
@@ -137,6 +142,7 @@ def crear_usuario(
         telefono=datos.telefono.strip(),
         cedula=datos.cedula.strip(),
         tiene_acceso=tiene_acceso,
+        debe_cambiar_clave=debe_cambiar_inicial,
         sucursal_id=datos.sucursal_id,
         cargo=datos.cargo.strip(),
         salario_base_usd=datos.salario_base_usd,
@@ -232,6 +238,8 @@ def actualizar_usuario(
 
         if datos.clave:
             usuario.clave_hash = generar_hash_clave(datos.clave)
+            if usuario.id != usuario_actual.id:
+                usuario.debe_cambiar_clave = True
         elif not usuario.clave_hash:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -307,10 +315,10 @@ def restablecer_clave_usuario(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Usuario no encontrado.",
         )
-    if not getattr(usuario, "tiene_acceso", True) or not usuario.correo:
+    if not getattr(usuario, "tiene_acceso", True):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Este colaborador no tiene acceso al sistema habilitado. Habilita su acceso y correo primero.",
+            detail="Este colaborador no tiene acceso al sistema habilitado. Habilita su acceso primero.",
         )
 
     clave_manual = (payload or {}).get("nueva_clave") if isinstance(payload, dict) else None
@@ -396,6 +404,7 @@ def desbloquear_acceso_usuario(
         "usuario": usuario.usuario or usuario.nombre,
         "cuenta_bloqueada": False,
         "intentos_fallidos": 0,
+        "debe_cambiar_clave": bool(usuario.debe_cambiar_clave),
         "clave_temporal": clave_asignada,
         "mensaje": f"Acceso desbloqueado correctamente para {usuario.nombre}.",
     }

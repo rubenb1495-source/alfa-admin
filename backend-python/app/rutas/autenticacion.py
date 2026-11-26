@@ -138,8 +138,17 @@ def iniciar_sesion(datos: LoginEntrada, bd: Session = Depends(obtener_bd)):
     token = crear_token_acceso(usuario)
     return LoginSalida(
         token=token,
+        debe_cambiar_clave=bool(getattr(usuario, "debe_cambiar_clave", False)),
         usuario=_serializar_usuario_con_permisos(usuario),
     )
+
+
+@enrutador.post("/logout")
+def cerrar_sesion(
+    _usuario_actual: Usuario = Depends(obtener_usuario_actual),
+) -> dict[str, str]:
+    """Endpoint de cierre de sesión (permitido incluso cuando debe_cambiar_clave es True)."""
+    return {"mensaje": "Sesión cerrada correctamente."}
 
 
 @enrutador.get("/perfil", response_model=UsuarioSalida)
@@ -159,7 +168,7 @@ def cambiar_mi_clave(
     datos: CambiarClaveEntrada,
     usuario_actual: Usuario = Depends(obtener_usuario_actual),
     bd: Session = Depends(obtener_bd),
-) -> dict[str, str]:
+) -> dict[str, object]:
     if not usuario_actual.clave_hash or not verificar_clave(datos.clave_actual, usuario_actual.clave_hash):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -170,24 +179,35 @@ def cambiar_mi_clave(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="La nueva clave y su confirmación no coinciden.",
         )
-    if datos.nueva_clave == datos.clave_actual:
+    if datos.nueva_clave == datos.clave_actual or verificar_clave(datos.nueva_clave, usuario_actual.clave_hash):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="La nueva clave debe ser diferente a la clave actual.",
+            detail="La nueva clave debe ser distinta a la clave temporal actual.",
         )
 
+    era_primer_ingreso = bool(getattr(usuario_actual, "debe_cambiar_clave", False))
     usuario_actual.clave_hash = generar_hash_clave(datos.nueva_clave)
     usuario_actual.debe_cambiar_clave = False
     bd.add(
         AuditLog(
             usuario_id=usuario_actual.id,
             usuario_nombre=usuario_actual.nombre,
+            rol=usuario_actual.rol,
             modulo="SEGURIDAD",
-            accion="CAMBIO_CLAVE",
+            accion="CAMBIO_CLAVE_PRIMER_INGRESO" if era_primer_ingreso else "CAMBIO_CLAVE",
             entidad_id=str(usuario_actual.id),
-            datos_anteriores_json="{}",
-            datos_nuevos_json=json.dumps({"usuario": usuario_actual.usuario or usuario_actual.nombre}, ensure_ascii=False),
+            datos_anteriores_json=json.dumps({"debe_cambiar_clave": era_primer_ingreso}, ensure_ascii=False),
+            datos_nuevos_json=json.dumps(
+                {
+                    "usuario": usuario_actual.usuario or usuario_actual.nombre,
+                    "debe_cambiar_clave": False,
+                },
+                ensure_ascii=False,
+            ),
         )
     )
     bd.commit()
-    return {"mensaje": "Contraseña actualizada correctamente."}
+    return {
+        "mensaje": "Contraseña actualizada correctamente.",
+        "debe_cambiar_clave": False,
+    }

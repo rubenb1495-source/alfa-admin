@@ -285,7 +285,7 @@ def test_4_rbac_admin_director_encargado_en_administracion(entorno):
             "rol": "DIRECTOR",
             "tiene_acceso": True,
             "correo": "dir.fin@alfaimportaciones.com",
-            "clave": "Password123!",
+            "clave": "Password123!", "debe_cambiar_clave": False,
         },
     )
     client.post(
@@ -296,7 +296,7 @@ def test_4_rbac_admin_director_encargado_en_administracion(entorno):
             "rol": "ENCARGADO_TIENDA",
             "tiene_acceso": True,
             "correo": "enc.fin@alfaimportaciones.com",
-            "clave": "Password123!",
+            "clave": "Password123!", "debe_cambiar_clave": False,
         },
     )
     h_dir = _login(client, "dir.fin@alfaimportaciones.com", "Password123!")

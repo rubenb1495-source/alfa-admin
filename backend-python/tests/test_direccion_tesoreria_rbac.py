@@ -86,7 +86,7 @@ def test_1_director_solo_lectura_y_compartir_credenciales(entorno):
             "rol": "DIRECTOR",
             "tiene_acceso": True,
             "correo": "socio@alfaimportaciones.com",
-            "clave": "ClaveInicial123",
+            "clave": "ClaveInicial123", "debe_cambiar_clave": False,
             "telefono": "04141234567",
         },
     )
@@ -104,8 +104,19 @@ def test_1_director_solo_lectura_y_compartir_credenciales(entorno):
     assert reset.json()["debe_cambiar_clave"] is True
     assert reset.json()["url_app"] == "https://alfa-admin-web.vercel.app"
 
-    # Director inicia sesión con la clave temporal
+    # Director inicia sesión con la clave temporal -> bloqueado hasta cambiar clave
     headers_dir = _login(client, "socio@alfaimportaciones.com", clave_temp)
+    assert client.get("/api/direccion/resumen", headers=headers_dir).status_code == 403
+    r_cc = client.post(
+        "/api/auth/cambiar-clave",
+        headers=headers_dir,
+        json={
+            "clave_actual": clave_temp,
+            "nueva_clave": "DirectorDefinitiva2026!",
+            "confirmar_clave": "DirectorDefinitiva2026!",
+        },
+    )
+    assert r_cc.status_code == 200, r_cc.text
 
     # Director PUEDE leer Panel Ejecutivo y Tesorería
     res_dir = client.get("/api/direccion/resumen", headers=headers_dir)
@@ -137,11 +148,11 @@ def test_1_director_solo_lectura_y_compartir_credenciales(entorno):
     )
     assert res_tes_post.status_code == 403
 
-    # Director puede cambiar su propia clave temporal
+    # Director puede cambiar su propia clave nuevamente cuando desee
     cambio = client.post(
         "/api/auth/cambiar-clave",
         headers=headers_dir,
-        json={"clave_actual": clave_temp, "nueva_clave": "MiClavePropia2026!"},
+        json={"clave_actual": "DirectorDefinitiva2026!", "nueva_clave": "MiClavePropia2026!"},
     )
     assert cambio.status_code == 200
     headers_dir_nuevo = _login(client, "socio@alfaimportaciones.com", "MiClavePropia2026!")

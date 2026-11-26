@@ -13,6 +13,7 @@ interface ValorContextoSesion {
   cerrarSesion: () => void;
   recargarTasaHoy: () => Promise<void>;
   actualizarTasaHoyLocal: (tasa: TasaHoy) => void;
+  marcarClaveCambiada: () => Promise<void>;
 }
 
 const ContextoSesion = createContext<ValorContextoSesion | undefined>(undefined);
@@ -44,9 +45,11 @@ export function ProveedorSesion({ children }: { children: React.ReactNode }) {
         return;
       }
       try {
-        const perfil = await solicitarApi<Usuario>("/api/auth/perfil");
+        const perfil = await solicitarApi<Usuario>("/api/auth/me");
         setUsuario(perfil);
-        await recargarTasaHoy();
+        if (!perfil.debe_cambiar_clave) {
+          await recargarTasaHoy();
+        }
       } catch {
         guardarToken(null);
         setUsuario(null);
@@ -64,17 +67,33 @@ export function ProveedorSesion({ children }: { children: React.ReactNode }) {
         body: JSON.stringify({ usuario: usuarioNombre, clave }),
       });
       guardarToken(respuesta.token);
-      setUsuario(respuesta.usuario);
-      await recargarTasaHoy();
+      const usr = {
+        ...respuesta.usuario,
+        debe_cambiar_clave: Boolean(
+          respuesta.debe_cambiar_clave ?? respuesta.usuario.debe_cambiar_clave
+        ),
+      };
+      setUsuario(usr);
+      if (!usr.debe_cambiar_clave) {
+        await recargarTasaHoy();
+      }
     },
     [recargarTasaHoy]
   );
 
   const cerrarSesion = useCallback(() => {
+    if (obtenerToken()) {
+      void solicitarApi("/api/auth/logout", { method: "POST" }).catch(() => {});
+    }
     guardarToken(null);
     setUsuario(null);
     setTasaHoy(null);
   }, []);
+
+  const marcarClaveCambiada = useCallback(async () => {
+    setUsuario((prev) => (prev ? { ...prev, debe_cambiar_clave: false } : prev));
+    await recargarTasaHoy();
+  }, [recargarTasaHoy]);
 
   const actualizarTasaHoyLocal = useCallback((tasa: TasaHoy) => {
     setTasaHoy(tasa);
@@ -91,6 +110,7 @@ export function ProveedorSesion({ children }: { children: React.ReactNode }) {
         cerrarSesion,
         recargarTasaHoy,
         actualizarTasaHoyLocal,
+        marcarClaveCambiada,
       }}
     >
       {children}

@@ -73,7 +73,7 @@ def test_rbac_oculta_costos_y_bloquea_usuarios_para_asesora_y_tecnico(cliente: T
         json={
             "nombre": "Caira Asesora",
             "correo": "caira@alfaelectronics.com",
-            "clave": "ClaveSegura123",
+            "clave": "ClaveSegura123", "debe_cambiar_clave": False, "debe_cambiar_clave": False,
             "rol": "ASESORA",
             "sucursal_id": 2,
         },
@@ -86,7 +86,7 @@ def test_rbac_oculta_costos_y_bloquea_usuarios_para_asesora_y_tecnico(cliente: T
         json={
             "nombre": "Cristihan Técnico",
             "correo": "cristihan@alfaelectronics.com",
-            "clave": "ClaveSegura123",
+            "clave": "ClaveSegura123", "debe_cambiar_clave": False, "debe_cambiar_clave": False,
             "rol": "TECNICO",
             "sucursal_id": 1,
         },
@@ -134,7 +134,7 @@ def test_borrado_logico_usuario(cliente: TestClient) -> None:
         json={
             "nombre": "Usuario Temporal",
             "correo": "temporal@alfaelectronics.com",
-            "clave": "ClaveSegura123",
+            "clave": "ClaveSegura123", "debe_cambiar_clave": False, "debe_cambiar_clave": False,
             "rol": "LOGISTICA",
         },
     )

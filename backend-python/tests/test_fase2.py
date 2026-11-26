@@ -65,7 +65,7 @@ def crear_usuario_rol(
         json={
             "nombre": nombre,
             "correo": correo,
-            "clave": "ClaveSegura123",
+            "clave": "ClaveSegura123", "debe_cambiar_clave": False,
             "rol": rol,
             "sucursal_id": sucursal_id,
         },
