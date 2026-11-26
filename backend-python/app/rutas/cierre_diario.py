@@ -40,7 +40,11 @@ from app.modelos_taller import (
 )
 from app.rutas.tasas import obtener_fecha_hoy
 from app.rutas.ventas import redondear_usd
-from app.seguridad import es_administrador, requerir_roles
+from app.seguridad import es_administrador, es_director_solo_lectura, requerir_roles
+from app.servicios.cierre_diario_servicio import (
+    calcular_saldos_cajas_y_movimientos,
+    generar_mensaje_whatsapp_cierre,
+)
 
 
 enrutador = APIRouter(prefix="/api/cierre-diario", tags=["Cierre Diario de Tienda"])
@@ -48,8 +52,15 @@ enrutador = APIRouter(prefix="/api/cierre-diario", tags=["Cierre Diario de Tiend
 ROLES_CIERRE_DIARIO = (
     RolUsuario.DIRECCION.value,
     RolUsuario.ADMINISTRACION.value,
+    RolUsuario.DIRECTOR.value,
     RolUsuario.ENCARGADO_TIENDA.value,
     RolUsuario.LIDER.value,
+)
+
+ROLES_EJECUTIVOS_CIERRE = (
+    RolUsuario.DIRECCION.value,
+    RolUsuario.ADMINISTRACION.value,
+    RolUsuario.DIRECTOR.value,
 )
 
 
@@ -73,6 +84,8 @@ def calcular_snapshot_cierre_diario(
     bd: Session,
     fecha_obj: date,
     sucursal_id: int | None = None,
+    alcance: str = "TIENDA",
+    es_vista_ejecutiva: bool = False,
 ) -> dict[str, Any]:
     """Calcula en vivo el movimiento operativo y comercial de tienda del día (SIN liquidaciones ni pagos de comisiones)."""
     sucursal_obj = (
@@ -241,7 +254,7 @@ def calcular_snapshot_cierre_diario(
     )
     pagos_dia = q_pagos.all()
     if sucursal_id is not None:
-        pagos_dia = [p for p in pagos_dia if p.venta is None or p.venta.sucursal_id == sucursal_id]
+        pagos_dia = [p for p in pagos_dia if p.venta is not None and p.venta.sucursal_id == sucursal_id]
 
     recibido_map: dict[int, dict[str, Any]] = {}
     total_recibido_usd = Decimal("0")
@@ -543,11 +556,17 @@ def calcular_snapshot_cierre_diario(
         for a in sorted(asesores_map.values(), key=lambda x: (-float(x["total_usd"]), x["nombre"]))
     ]
 
-    return {
+    alcance_norm = (alcance or "TIENDA").upper()
+    snapshot: dict[str, Any] = {
+        "alcance": alcance_norm,
         "jornada": {
             "fecha": fecha_obj.isoformat(),
             "sucursal_id": sucursal_id,
-            "sucursal_nombre": sucursal_obj.nombre if sucursal_obj else "Todas las sucursales",
+            "sucursal_nombre": (
+                sucursal_obj.nombre
+                if sucursal_obj
+                else ("Administración General (Consolidado)" if alcance_norm == "GENERAL" else "Todas las sucursales")
+            ),
             "encargado_sugerido_id": (
                 cierre_prev.encargado_tienda_id
                 if cierre_prev
@@ -616,16 +635,94 @@ def calcular_snapshot_cierre_diario(
         },
     }
 
+    if es_vista_ejecutiva:
+        fin_data = calcular_saldos_cajas_y_movimientos(
+            bd=bd,
+            fecha_obj=fecha_obj,
+            tasa_bcv=tasa_bcv,
+            sucursal_id=None if alcance_norm == "GENERAL" else sucursal_id,
+            incluir_saldos_globales=(alcance_norm == "GENERAL"),
+        )
+        snapshot["resumen_financiero"] = fin_data["resumen_financiero"]
+        snapshot["movimientos_dia"] = fin_data["movimientos_dia"]
+        if alcance_norm == "GENERAL":
+            snapshot["egresos_dia"] = fin_data["egresos_dia"]
+            snapshot["saldos_cajas"] = fin_data["saldos_cajas"]
+            snapshot["comparativa_tiendas"] = fin_data["comparativa_tiendas"]
+            snapshot["operacion_general"] = fin_data["operacion_general"]
+        else:
+            snapshot["egresos_dia"] = None
+            snapshot["saldos_cajas"] = None
+            snapshot["comparativa_tiendas"] = None
+            snapshot["operacion_general"] = None
+    else:
+        # Estricto para ENCARGADO: cero costos internos, cero comisiones, cero finanzas globales
+        snapshot["resumen_financiero"] = None
+        snapshot["egresos_dia"] = None
+        snapshot["saldos_cajas"] = None
+        snapshot["comparativa_tiendas"] = None
+        snapshot["movimientos_dia"] = None
+        snapshot["operacion_general"] = None
+
+    snapshot["mensaje_whatsapp"] = generar_mensaje_whatsapp_cierre(
+        snapshot,
+        observaciones=snapshot["jornada"]["observaciones_guardadas"],
+    )
+    return snapshot
+
 
 @enrutador.get("")
 def obtener_cierre_diario_en_vivo(
     fecha: date | None = Query(default=None),
     sucursal_id: int | None = Query(default=None),
-    _usuario: Usuario = Depends(requerir_roles(*ROLES_CIERRE_DIARIO)),
+    alcance: str | None = Query(default=None, pattern="^(TIENDA|GENERAL)$"),
+    usuario_actual: Usuario = Depends(requerir_roles(*ROLES_CIERRE_DIARIO)),
     bd: Session = Depends(obtener_bd),
 ) -> dict[str, Any]:
     fecha_obj = fecha or obtener_fecha_hoy()
-    return calcular_snapshot_cierre_diario(bd, fecha_obj, sucursal_id)
+    es_ejecutivo = usuario_actual.rol in ROLES_EJECUTIVOS_CIERRE
+
+    if not es_ejecutivo:
+        # ENCARGADO / LIDER: bloqueado estrictamente a su propia sucursal y alcance TIENDA
+        if alcance == "GENERAL":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="El cierre completo de Administración General es exclusivo para Dirección, Administración o Director.",
+            )
+        if usuario_actual.sucursal_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Tu usuario no tiene una tienda asignada para consultar el cierre diario.",
+            )
+        if sucursal_id is not None and sucursal_id != usuario_actual.sucursal_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Solo tienes acceso al cierre diario de tu propia tienda asignada.",
+            )
+        alcance_efectivo = "TIENDA"
+        sucursal_efectiva = usuario_actual.sucursal_id
+    else:
+        if alcance == "GENERAL":
+            alcance_efectivo = "GENERAL"
+            sucursal_efectiva = None
+        elif alcance == "TIENDA":
+            alcance_efectivo = "TIENDA"
+            sucursal_efectiva = sucursal_id
+        else:
+            if sucursal_id is not None:
+                alcance_efectivo = "TIENDA"
+                sucursal_efectiva = sucursal_id
+            else:
+                alcance_efectivo = "GENERAL"
+                sucursal_efectiva = None
+
+    return calcular_snapshot_cierre_diario(
+        bd=bd,
+        fecha_obj=fecha_obj,
+        sucursal_id=sucursal_efectiva,
+        alcance=alcance_efectivo,
+        es_vista_ejecutiva=es_ejecutivo,
+    )
 
 
 @enrutador.post("/cerrar", status_code=status.HTTP_201_CREATED)
@@ -634,9 +731,30 @@ def guardar_cierre_diario(
     usuario_actual: Usuario = Depends(requerir_roles(*ROLES_CIERRE_DIARIO)),
     bd: Session = Depends(obtener_bd),
 ) -> dict[str, Any]:
+    if es_director_solo_lectura(usuario_actual.rol):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="El rol Director es de solo lectura y no puede registrar ni modificar cierres.",
+        )
+
+    es_admin = es_administrador(usuario_actual.rol)
+    sucursal_objetivo = datos.sucursal_id
+    if not es_admin:
+        if usuario_actual.sucursal_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Tu usuario no tiene una tienda asignada.",
+            )
+        if sucursal_objetivo is not None and sucursal_objetivo != usuario_actual.sucursal_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Solo puedes guardar el cierre diario de tu propia tienda.",
+            )
+        sucursal_objetivo = usuario_actual.sucursal_id
+
     hoy = obtener_fecha_hoy()
     fecha_obj = datos.fecha or hoy
-    if fecha_obj < hoy and not es_administrador(usuario_actual.rol):
+    if fecha_obj < hoy and not es_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Solo Dirección o Administración pueden registrar o modificar cierres de fechas anteriores.",
@@ -653,21 +771,32 @@ def guardar_cierre_diario(
         bd.query(CierreDiario)
         .filter(
             CierreDiario.fecha == fecha_obj,
-            CierreDiario.sucursal_id == datos.sucursal_id,
+            CierreDiario.sucursal_id == sucursal_objetivo,
         )
         .first()
     )
-    if existente is not None and not es_administrador(usuario_actual.rol):
+    if existente is not None and not es_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="El cierre diario de esta fecha ya fue registrado. Solo Dirección o Administración pueden reabrirlo o modificarlo.",
         )
 
-    snapshot = calcular_snapshot_cierre_diario(bd, fecha_obj, datos.sucursal_id)
+    alcance_guardar = "GENERAL" if (es_admin and sucursal_objetivo is None) else "TIENDA"
+    snapshot = calcular_snapshot_cierre_diario(
+        bd=bd,
+        fecha_obj=fecha_obj,
+        sucursal_id=sucursal_objetivo,
+        alcance=alcance_guardar,
+        es_vista_ejecutiva=es_admin,
+    )
     snapshot["jornada"]["encargado_sugerido_id"] = encargado.id
     snapshot["jornada"]["encargado_sugerido_nombre"] = encargado.nombre
     snapshot["jornada"]["ya_cerrado"] = True
     snapshot["jornada"]["observaciones_guardadas"] = datos.observaciones.strip()
+    snapshot["mensaje_whatsapp"] = generar_mensaje_whatsapp_cierre(
+        snapshot,
+        observaciones=datos.observaciones.strip(),
+    )
 
     tasa_bcv_dec = Decimal(str(snapshot["jornada"]["tasa_bcv"]))
     tasa_usdt_dec = Decimal(str(snapshot["jornada"]["tasa_usdt"]))
@@ -687,7 +816,7 @@ def guardar_cierre_diario(
     else:
         cierre = CierreDiario(
             fecha=fecha_obj,
-            sucursal_id=datos.sucursal_id,
+            sucursal_id=sucursal_objetivo,
             encargado_tienda_id=encargado.id,
             encargado_tienda_nombre=encargado.nombre,
             tasa_bcv=tasa_bcv_dec,
@@ -722,9 +851,23 @@ def listar_historial_cierres_diarios(
     fecha_inicio: date | None = Query(default=None),
     fecha_fin: date | None = Query(default=None),
     sucursal_id: int | None = Query(default=None),
-    _usuario: Usuario = Depends(requerir_roles(*ROLES_CIERRE_DIARIO)),
+    usuario_actual: Usuario = Depends(requerir_roles(*ROLES_CIERRE_DIARIO)),
     bd: Session = Depends(obtener_bd),
 ) -> list[dict[str, Any]]:
+    es_ejecutivo = usuario_actual.rol in ROLES_EJECUTIVOS_CIERRE
+    if not es_ejecutivo:
+        if usuario_actual.sucursal_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Tu usuario no tiene una tienda asignada.",
+            )
+        if sucursal_id is not None and sucursal_id != usuario_actual.sucursal_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Solo puedes consultar el historial de cierres de tu propia tienda.",
+            )
+        sucursal_id = usuario_actual.sucursal_id
+
     consulta = bd.query(CierreDiario).options(
         joinedload(CierreDiario.sucursal),
         joinedload(CierreDiario.cerrado_por),
@@ -748,7 +891,7 @@ def listar_historial_cierres_diarios(
                 "id": c.id,
                 "fecha": c.fecha.isoformat(),
                 "sucursal_id": c.sucursal_id,
-                "sucursal_nombre": c.sucursal.nombre if c.sucursal else "Todas las sucursales",
+                "sucursal_nombre": c.sucursal.nombre if c.sucursal else "Administración General (Consolidado)",
                 "encargado_tienda_id": c.encargado_tienda_id,
                 "encargado_tienda_nombre": c.encargado_tienda_nombre,
                 "tasa_bcv": float(c.tasa_bcv),

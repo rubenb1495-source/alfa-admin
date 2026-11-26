@@ -51,24 +51,20 @@ def iniciar_sesion_como(cliente: TestClient, correo: str, clave: str) -> dict[st
 
 
 def test_semilla_sucursales_y_login_direccion(cliente: TestClient) -> None:
-    cabeceras = iniciar_sesion_como(cliente, "direccion@alfaelectronics.com", "Alfa2026!")
+    cabeceras = iniciar_sesion_como(cliente, "direccion@alfaimportaciones.com", "Alfa2026!")
 
     resp = cliente.get("/api/sucursales", headers=cabeceras)
     assert resp.status_code == 200
     sucursales = {s["nombre"]: s for s in resp.json()}
 
-    assert set(sucursales.keys()) == {"Bodega", "Alfa central", "Gran Bazar", "INFOT", "Free Market C13"}
-    assert sucursales["Bodega"]["estado"] == "ACTIVA"
-    assert sucursales["Alfa central"]["estado"] == "ACTIVA"
-    assert sucursales["Gran Bazar"]["estado"] == "ACTIVA"
-    assert sucursales["INFOT"]["estado"] == "CERRADA"
-    assert sucursales["INFOT"]["fecha_cierre"] == "2026-11-08"
-    assert sucursales["Free Market C13"]["estado"] == "CERRADA"
-    assert sucursales["Free Market C13"]["fecha_cierre"] == "2026-11-16"
+    assert set(sucursales.keys()) == {"Almacén Guaparo Norte", "Local T38", "Local V30-V31"}
+    assert sucursales["Almacén Guaparo Norte"]["estado"] == "ACTIVA"
+    assert sucursales["Local T38"]["estado"] == "ACTIVA"
+    assert sucursales["Local V30-V31"]["estado"] == "ACTIVA"
 
 
 def test_rbac_oculta_costos_y_bloquea_usuarios_para_asesora_y_tecnico(cliente: TestClient) -> None:
-    cab_dir = iniciar_sesion_como(cliente, "direccion@alfaelectronics.com", "Alfa2026!")
+    cab_dir = iniciar_sesion_como(cliente, "direccion@alfaimportaciones.com", "Alfa2026!")
 
     # Crear usuaria ASESORA y usuario TECNICO
     resp_asesora = cliente.post(
@@ -131,7 +127,7 @@ def test_rbac_oculta_costos_y_bloquea_usuarios_para_asesora_y_tecnico(cliente: T
 
 
 def test_borrado_logico_usuario(cliente: TestClient) -> None:
-    cab_dir = iniciar_sesion_como(cliente, "direccion@alfaelectronics.com", "Alfa2026!")
+    cab_dir = iniciar_sesion_como(cliente, "direccion@alfaimportaciones.com", "Alfa2026!")
     resp_u = cliente.post(
         "/api/usuarios",
         headers=cab_dir,
@@ -160,7 +156,7 @@ def test_borrado_logico_usuario(cliente: TestClient) -> None:
 
 
 def test_tasas_bloqueo_sin_tasa_inmutabilidad_y_actualizacion_hoy(cliente: TestClient) -> None:
-    cab_dir = iniciar_sesion_como(cliente, "direccion@alfaelectronics.com", "Alfa2026!")
+    cab_dir = iniciar_sesion_como(cliente, "direccion@alfaimportaciones.com", "Alfa2026!")
     hoy = obtener_fecha_hoy()
     ayer = hoy - timedelta(days=1)
 
@@ -216,7 +212,7 @@ def test_tasas_bloqueo_sin_tasa_inmutabilidad_y_actualizacion_hoy(cliente: TestC
 
 
 def test_sku_duplicado_409_e_historial_precios_inmutable(cliente: TestClient) -> None:
-    cab_dir = iniciar_sesion_como(cliente, "direccion@alfaelectronics.com", "Alfa2026!")
+    cab_dir = iniciar_sesion_como(cliente, "direccion@alfaimportaciones.com", "Alfa2026!")
     hoy = obtener_fecha_hoy()
 
     # Registrar tasa hoy (BCV = 60, Recargo = 30%)

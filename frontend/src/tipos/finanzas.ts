@@ -324,7 +324,98 @@ export interface LiquidacionComisionResumen {
   ventas?: LiquidacionVentaItem[];
 }
 
+export interface SaldoCajaCierre {
+  instrumento_id: number;
+  nombre: string;
+  moneda: string;
+  es_liquidez: boolean;
+  saldo_inicial: number;
+  entradas: number;
+  salidas: number;
+  saldo_final: number;
+  saldo_inicial_usd: number;
+  entradas_usd: number;
+  salidas_usd: number;
+  saldo_final_usd: number;
+}
+
+export interface ComparativaTiendaCierre {
+  sucursal_id: number | null;
+  nombre: string;
+  cantidad_ventas: number;
+  ventas_promo_usd: number;
+  ingresos_usd: number;
+  egresos_usd: number;
+  flujo_neto_usd: number;
+}
+
+export interface MovimientoDiaCierre {
+  id: number;
+  hora: string;
+  sede_id: number | null;
+  sede_nombre: string;
+  instrumento_id: number;
+  instrumento_nombre: string;
+  moneda: string;
+  tipo_movimiento: "INGRESO" | "EGRESO" | string;
+  tipo_documento: string;
+  categoria: string;
+  concepto: string;
+  referencia: string;
+  monto_moneda_origen: number;
+  monto_usd: number;
+}
+
+export interface EgresosDiaCierre {
+  total_usd: number;
+  gastos_operativos_usd: number;
+  envios_delivery_usd: number;
+  nomina_usd: number;
+  comisiones_usd: number;
+  proveedores_prestamos_usd: number;
+  impuestos_usd: number;
+  otros_egresos_usd: number;
+  items: {
+    id: number;
+    categoria_resumen: string;
+    tipo_documento: string;
+    categoria: string;
+    concepto: string;
+    instrumento: string;
+    moneda: string;
+    monto_moneda_origen: number;
+    monto_usd: number;
+    referencia: string;
+  }[];
+}
+
 export interface CierreDiarioSnapshot {
+  alcance?: "TIENDA" | "GENERAL";
+  mensaje_whatsapp?: string;
+  resumen_financiero?: {
+    ingresos_totales_usd: number;
+    egresos_totales_usd: number;
+    flujo_neto_usd: number;
+    liquidez_total_usd: number;
+  } | null;
+  egresos_dia?: EgresosDiaCierre | null;
+  saldos_cajas?: SaldoCajaCierre[] | null;
+  comparativa_tiendas?: ComparativaTiendaCierre[] | null;
+  movimientos_dia?: MovimientoDiaCierre[] | null;
+  operacion_general?: {
+    traslados_despachados_hoy: number;
+    traslados_recibidos_hoy: number;
+    preparaciones_hoy: number;
+    cashea_dia: {
+      cantidad: number;
+      total_regular_usd: number;
+      inicial_usd: number;
+      financiado_usd: number;
+      cargos_usd: number;
+      neto_por_cobrar_usd: number;
+      cobrado_hoy_usd: number;
+    };
+  } | null;
   jornada: {
     fecha: string;
     sucursal_id: number | null;

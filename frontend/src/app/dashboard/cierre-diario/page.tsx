@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import {
   AlertCircle,
   Boxes,
+  Building2,
   Check,
   CheckCircle2,
   ClipboardCheck,
@@ -17,9 +18,12 @@ import {
   PackageCheck,
   Save,
   ShieldCheck,
+  Store,
   Users,
   X,
 } from "lucide-react";
+import DashboardCierreDiario from "@/components/DashboardCierreDiario";
+import { usarSesion } from "@/contexto/SesionContexto";
 import {
   construirUrlWhatsApp,
   copiarTextoPortapapeles,
@@ -39,9 +43,21 @@ import type {
 } from "@/tipos/finanzas";
 
 export default function PaginaCierreDiario() {
+  const { usuario } = usarSesion();
+  const rolUsuario = usuario?.rol || "";
+  const esEjecutivo = ["DIRECCION", "ADMINISTRACION", "DIRECTOR"].includes(rolUsuario);
+  const esSoloLectura = rolUsuario === "DIRECTOR";
+
+  const usuarioSucursalId = usuario?.sucursal?.id ?? null;
+
   const [pestana, setPestana] = useState<"hoy" | "historial">("hoy");
   const [fecha, setFecha] = useState(fechaHoyCaracas());
-  const [sucursalId, setSucursalId] = useState("");
+  const [alcance, setAlcance] = useState<"TIENDA" | "GENERAL">(
+    esEjecutivo ? "GENERAL" : "TIENDA"
+  );
+  const [sucursalId, setSucursalId] = useState(
+    !esEjecutivo && usuarioSucursalId ? String(usuarioSucursalId) : ""
+  );
   const [sucursales, setSucursales] = useState<Sucursal[]>([]);
 
   const [cierre, setCierre] = useState<CierreDiarioSnapshot | null>(null);
@@ -60,6 +76,13 @@ export default function PaginaCierreDiario() {
   const [exito, setExito] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!esEjecutivo && usuarioSucursalId) {
+      setAlcance("TIENDA");
+      setSucursalId(String(usuarioSucursalId));
+    }
+  }, [esEjecutivo, usuarioSucursalId]);
+
+  useEffect(() => {
     solicitarApi<Sucursal[]>("/api/sucursales")
       .then((res) => setSucursales(res.filter((s) => s.estado === "ACTIVA")))
       .catch(() => {});
@@ -71,7 +94,17 @@ export default function PaginaCierreDiario() {
     try {
       const params = new URLSearchParams();
       if (fecha) params.set("fecha", fecha);
-      if (sucursalId) params.set("sucursal_id", sucursalId);
+      if (esEjecutivo) {
+        params.set("alcance", alcance);
+        if (alcance === "TIENDA" && sucursalId) {
+          params.set("sucursal_id", sucursalId);
+        }
+      } else {
+        params.set("alcance", "TIENDA");
+        if (usuarioSucursalId) {
+          params.set("sucursal_id", String(usuarioSucursalId));
+        }
+      }
       const data = await solicitarApi<CierreDiarioSnapshot>(
         `/api/cierre-diario?${params.toString()}`
       );
@@ -86,17 +119,24 @@ export default function PaginaCierreDiario() {
       setError(
         err instanceof ErrorApi
           ? err.message
-          : "No se pudo cargar el cierre diario de tienda."
+          : "No se pudo cargar el cierre diario."
       );
     } finally {
       setCargando(false);
     }
-  }, [fecha, sucursalId]);
+  }, [fecha, alcance, sucursalId, esEjecutivo, usuarioSucursalId]);
 
   const cargarHistorial = useCallback(async () => {
     setCargandoHistorial(true);
     try {
-      const qs = sucursalId ? `?sucursal_id=${sucursalId}` : "";
+      const sid = esEjecutivo
+        ? alcance === "TIENDA"
+          ? sucursalId
+          : ""
+        : usuarioSucursalId
+        ? String(usuarioSucursalId)
+        : "";
+      const qs = sid ? `?sucursal_id=${sid}` : "";
       const res = await solicitarApi<CierreDiarioHistorialItem[]>(
         `/api/cierre-diario/historial${qs}`
       );
@@ -106,7 +146,7 @@ export default function PaginaCierreDiario() {
     } finally {
       setCargandoHistorial(false);
     }
-  }, [sucursalId]);
+  }, [sucursalId, alcance, esEjecutivo, usuarioSucursalId]);
 
   useEffect(() => {
     void cargarCierre();
@@ -125,6 +165,25 @@ export default function PaginaCierreDiario() {
     cierre?.jornada.encargado_sugerido_nombre ||
     "";
 
+  const construirMensajeWhatsApp = (
+    snap: CierreDiarioSnapshot,
+    encNombre: string,
+    obs?: string
+  ) => {
+    const base =
+      snap.mensaje_whatsapp ||
+      formatearWhatsAppCierreDiario(snap, encNombre, obs);
+    const obsLimpia = (obs || "").trim();
+    if (
+      snap.mensaje_whatsapp &&
+      obsLimpia &&
+      !base.includes(obsLimpia)
+    ) {
+      return `${base}\n\n📝 *Observaciones:* ${obsLimpia}`;
+    }
+    return base;
+  };
+
   const manejarGuardarCierre = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
@@ -135,11 +194,18 @@ export default function PaginaCierreDiario() {
     }
     setGuardando(true);
     try {
+      const sucGuardar = esEjecutivo
+        ? alcance === "GENERAL"
+          ? null
+          : sucursalId
+          ? Number(sucursalId)
+          : null
+        : usuarioSucursalId;
       await solicitarApi("/api/cierre-diario/cerrar", {
         method: "POST",
         body: JSON.stringify({
           fecha,
-          sucursal_id: sucursalId ? Number(sucursalId) : null,
+          sucursal_id: sucGuardar,
           encargado_tienda_id: Number(encargadoId),
           observaciones: observaciones.trim(),
         }),
@@ -164,13 +230,13 @@ export default function PaginaCierreDiario() {
     encNombre: string,
     obs?: string
   ) => {
-    const msg = formatearWhatsAppCierreDiario(snap, encNombre, obs);
+    const msg = construirMensajeWhatsApp(snap, encNombre, obs);
     window.open(construirUrlWhatsApp(msg), "_blank", "noopener,noreferrer");
   };
 
   const copiarResumen = async () => {
     if (!cierre) return;
-    const msg = formatearWhatsAppCierreDiario(
+    const msg = construirMensajeWhatsApp(
       cierre,
       encargadoActualNombre,
       observaciones
@@ -181,6 +247,10 @@ export default function PaginaCierreDiario() {
       setTimeout(() => setCopiadoOk(false), 2200);
     }
   };
+
+  const tiendasSelector = sucursales.filter(
+    (s) => !s.nombre.toLowerCase().includes("almac")
+  );
 
   return (
     <div className="space-y-6">
@@ -240,8 +310,64 @@ export default function PaginaCierreDiario() {
 
       {pestana === "hoy" && (
         <>
-          {/* Barra de Jornada: Fecha, Sucursal, Encargado de Tienda y Tasas */}
+          {/* Selector rápido de Vista (ADMIN/DIRECTOR: Tienda 1 | Tienda 2 | Admin General; ENCARGADO: fija su tienda) */}
           <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
+            {esEjecutivo ? (
+              <div className="flex flex-wrap items-center gap-2 pb-3 border-b border-slate-100">
+                <span className="text-[11px] font-bold uppercase text-slate-500 mr-1">
+                  Alcance del Cierre:
+                </span>
+                {tiendasSelector.map((t, idx) => {
+                  const activo =
+                    alcance === "TIENDA" && sucursalId === String(t.id);
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => {
+                        setAlcance("TIENDA");
+                        setSucursalId(String(t.id));
+                      }}
+                      className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+                        activo
+                          ? "bg-[#003566] text-white shadow-xs"
+                          : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                      }`}
+                    >
+                      <Store className="w-3.5 h-3.5" />
+                      Tienda {idx + 1} ({t.nombre})
+                    </button>
+                  );
+                })}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAlcance("GENERAL");
+                    setSucursalId("");
+                  }}
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+                    alcance === "GENERAL"
+                      ? "bg-[#001D3D] text-white shadow-xs"
+                      : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                  }`}
+                >
+                  <Building2 className="w-3.5 h-3.5" />
+                  Administración General (Completo)
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#EDF3FA] text-[#003566] text-xs font-bold">
+                  <Store className="w-3.5 h-3.5" />
+                  Cierre Operativo Exclusivo:{" "}
+                  {cierre?.jornada.sucursal_nombre || "Mi Tienda"}
+                </span>
+                <span className="text-[11px] text-slate-500">
+                  Vista restringida a tu tienda asignada
+                </span>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
               <div>
                 <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">
@@ -257,20 +383,39 @@ export default function PaginaCierreDiario() {
 
               <div>
                 <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">
-                  Sucursal
+                  Sucursal / Alcance
                 </label>
-                <select
-                  value={sucursalId}
-                  onChange={(e) => setSucursalId(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-semibold bg-white"
-                >
-                  <option value="">Todas las sucursales</option>
-                  {sucursales.map((s) => (
-                    <option key={s.id} value={String(s.id)}>
-                      {s.nombre}
+                {esEjecutivo ? (
+                  <select
+                    value={alcance === "GENERAL" ? "GENERAL" : sucursalId}
+                    onChange={(e) => {
+                      if (e.target.value === "GENERAL") {
+                        setAlcance("GENERAL");
+                        setSucursalId("");
+                      } else {
+                        setAlcance("TIENDA");
+                        setSucursalId(e.target.value);
+                      }
+                    }}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-semibold bg-white"
+                  >
+                    <option value="GENERAL">
+                      Administración General (Completo)
                     </option>
-                  ))}
-                </select>
+                    {sucursales.map((s) => (
+                      <option key={s.id} value={String(s.id)}>
+                        {s.nombre}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    readOnly
+                    value={cierre?.jornada.sucursal_nombre || "Tienda asignada"}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-700"
+                  />
+                )}
               </div>
 
               <div className="sm:col-span-2">
@@ -351,7 +496,22 @@ export default function PaginaCierreDiario() {
             </div>
           ) : (
             <>
-              {/* 5 Tarjetas KPI */}
+              {/* Dashboard Visual de Saldos, Gráficos, Movimientos y Vista Previa WhatsApp */}
+              <DashboardCierreDiario
+                cierre={cierre}
+                mensajeWhatsApp={construirMensajeWhatsApp(
+                  cierre,
+                  encargadoActualNombre,
+                  observaciones
+                )}
+                onAbrirWhatsApp={() =>
+                  abrirWhatsApp(cierre, encargadoActualNombre, observaciones)
+                }
+                onCopiarResumen={() => void copiarResumen()}
+                copiadoOk={copiadoOk}
+              />
+
+              {/* 5 Tarjetas KPI Operativas */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                 <div className="bg-white p-4 rounded-2xl border border-slate-200 border-t-2 border-t-[#003566]">
                   <p className="text-[11px] font-bold uppercase text-slate-500">
@@ -755,18 +915,20 @@ export default function PaginaCierreDiario() {
                     <MessageCircle className="w-4 h-4" />
                     Enviar Cierre por WhatsApp
                   </button>
-                  <button
-                    type="submit"
-                    disabled={guardando || !encargadoId}
-                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#003566] hover:bg-[#001D3D] disabled:opacity-60 text-white text-xs font-bold cursor-pointer"
-                  >
-                    {guardando ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Save className="w-4 h-4" />
-                    )}
-                    Guardar Cierre del Día
-                  </button>
+                  {!esSoloLectura && (
+                    <button
+                      type="submit"
+                      disabled={guardando || !encargadoId}
+                      className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#003566] hover:bg-[#001D3D] disabled:opacity-60 text-white text-xs font-bold cursor-pointer"
+                    >
+                      {guardando ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Save className="w-4 h-4" />
+                      )}
+                      Guardar Cierre del Día
+                    </button>
+                  )}
                 </div>
               </form>
             </>

@@ -75,7 +75,7 @@ def crear_usuario_rol(
 
 
 def test_prorrateo_flete_y_doble_verificacion_en_guia(cliente: TestClient) -> None:
-    cab_dir, dir_user = login(cliente, "direccion@alfaelectronics.com", "Alfa2026!")
+    cab_dir, dir_user = login(cliente, "direccion@alfaimportaciones.com", "Alfa2026!")
     cab_log, log_user = crear_usuario_rol(
         cliente, cab_dir, "Luis Logística", "logistica@alfaelectronics.com", "LOGISTICA", 1
     )
@@ -154,7 +154,7 @@ def test_prorrateo_flete_y_doble_verificacion_en_guia(cliente: TestClient) -> No
 
 
 def test_validar_archivo_excel_bloquea_serial_duplicado(cliente: TestClient) -> None:
-    cab_dir, _ = login(cliente, "direccion@alfaelectronics.com", "Alfa2026!")
+    cab_dir, _ = login(cliente, "direccion@alfaimportaciones.com", "Alfa2026!")
 
     # Crear equipo previo en inventario
     cliente.post(
@@ -201,12 +201,12 @@ def test_validar_archivo_excel_bloquea_serial_duplicado(cliente: TestClient) -> 
 
 
 def test_traslado_en_dos_pasos_bloqueo_y_confirmacion(cliente: TestClient) -> None:
-    cab_dir, _ = login(cliente, "direccion@alfaelectronics.com", "Alfa2026!")
+    cab_dir, _ = login(cliente, "direccion@alfaimportaciones.com", "Alfa2026!")
 
     # Obtener IDs de Bodega y Alfa central
     sucs = {s["nombre"]: s["id"] for s in cliente.get("/api/sucursales", headers=cab_dir).json()}
-    bodega_id = sucs["Bodega"]
-    central_id = sucs["Alfa central"]
+    bodega_id = sucs["Almacén Guaparo Norte"]
+    central_id = sucs["Local T38"]
 
     # Crear equipo LISTO en Bodega
     cliente.post(
@@ -264,7 +264,7 @@ def test_traslado_en_dos_pasos_bloqueo_y_confirmacion(cliente: TestClient) -> No
 
 
 def test_ajuste_pendiente_solo_aprobable_por_direccion_y_rbac_oculta_costos(cliente: TestClient) -> None:
-    cab_dir, _ = login(cliente, "direccion@alfaelectronics.com", "Alfa2026!")
+    cab_dir, _ = login(cliente, "direccion@alfaimportaciones.com", "Alfa2026!")
     cab_log, _ = crear_usuario_rol(
         cliente, cab_dir, "Logística", "log2@alfaelectronics.com", "LOGISTICA", 1
     )
@@ -276,7 +276,7 @@ def test_ajuste_pendiente_solo_aprobable_por_direccion_y_rbac_oculta_costos(clie
     )
 
     sucs = {s["nombre"]: s["id"] for s in cliente.get("/api/sucursales", headers=cab_dir).json()}
-    bodega_id = sucs["Bodega"]
+    bodega_id = sucs["Almacén Guaparo Norte"]
 
     # Crear equipo
     cliente.post(

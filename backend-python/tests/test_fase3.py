@@ -72,13 +72,13 @@ def crear_usuario_rol(
 
 
 def test_preparacion_listo_descuenta_ram_actualiza_costo_y_oculta_al_tecnico(cliente: TestClient) -> None:
-    cab_dir, _ = login(cliente, "direccion@alfaelectronics.com", "Alfa2026!")
+    cab_dir, _ = login(cliente, "direccion@alfaimportaciones.com", "Alfa2026!")
     cab_tec, _ = crear_usuario_rol(
         cliente, cab_dir, "Cristihan Técnico", "cristihan@alfaelectronics.com", "TECNICO"
     )
 
     sucs = {s["nombre"]: s["id"] for s in cliente.get("/api/sucursales", headers=cab_dir).json()}
-    bodega_id = sucs["Bodega"]
+    bodega_id = sucs["Almacén Guaparo Norte"]
 
     # 1. Crear componente RAM en catálogo con costo_referencia_usd = 15.00
     ram = cliente.post(
@@ -159,7 +159,7 @@ def test_preparacion_listo_descuenta_ram_actualiza_costo_y_oculta_al_tecnico(cli
 
 
 def test_hospital_crea_repuesto_y_logistica_activa_alerta_en_cola(cliente: TestClient) -> None:
-    cab_dir, _ = login(cliente, "direccion@alfaelectronics.com", "Alfa2026!")
+    cab_dir, _ = login(cliente, "direccion@alfaimportaciones.com", "Alfa2026!")
     cab_tec, _ = crear_usuario_rol(
         cliente, cab_dir, "Técnico Hospital", "tec_hosp@alfaelectronics.com", "TECNICO"
     )
@@ -178,7 +178,7 @@ def test_hospital_crea_repuesto_y_logistica_activa_alerta_en_cola(cliente: TestC
                 {
                     "serial": "LAP-HOSP-1",
                     "modelo": "HP EliteBook",
-                    "ubicacion_id": sucs["Bodega"],
+                    "ubicacion_id": sucs["Almacén Guaparo Norte"],
                     "costo_compra_usd": 180.0,
                 }
             ],
@@ -223,12 +223,12 @@ def test_hospital_crea_repuesto_y_logistica_activa_alerta_en_cola(cliente: TestC
 
 
 def test_caso_st_bloquea_terminado_sin_presupuesto_y_calcula_resumen_tecnico(cliente: TestClient) -> None:
-    cab_dir, _ = login(cliente, "direccion@alfaelectronics.com", "Alfa2026!")
+    cab_dir, _ = login(cliente, "direccion@alfaimportaciones.com", "Alfa2026!")
     cab_tec, tec_user = crear_usuario_rol(
         cliente, cab_dir, "Técnico ST", "tec_st@alfaelectronics.com", "TECNICO"
     )
     sucs = {s["nombre"]: s["id"] for s in cliente.get("/api/sucursales", headers=cab_dir).json()}
-    bodega_id = sucs["Bodega"]
+    bodega_id = sucs["Almacén Guaparo Norte"]
 
     # Crear 1 equipo para preparación estándar ($1) y 1 repuesto con stock
     ssd = cliente.post(
@@ -281,7 +281,7 @@ def test_caso_st_bloquea_terminado_sin_presupuesto_y_calcula_resumen_tecnico(cli
         headers=cab_tec,
         json={
             "tipo": "SERVICIO",
-            "sucursal_id": sucs["Alfa central"],
+            "sucursal_id": sucs["Local T38"],
             "descripcion_equipo": "Laptop ASUS VivoBook",
             "falla_reportada": "No enciende el sistema operativo",
         },

@@ -76,7 +76,7 @@ def _login(cliente: TestClient, correo: str, clave: str) -> dict[str, str]:
 
 
 def _preparar_escenario_base(cliente: TestClient) -> dict:
-    headers_dir = _login(cliente, "direccion@alfaelectronics.com", "Alfa2026!")
+    headers_dir = _login(cliente, "direccion@alfaimportaciones.com", "Alfa2026!")
 
     # Crear asesora y asegurar tasa del día
     resp_as = cliente.post(

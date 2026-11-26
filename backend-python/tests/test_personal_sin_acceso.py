@@ -159,15 +159,14 @@ def test_personal_sin_acceso_pos_comisiones_y_validaciones(cliente: TestClient) 
     )
     assert resp_login_fail.status_code in (401, 403)
 
-    # 4. Verificar que tiene_acceso=True SIN correo devuelve error de validación (422)
+    # 4. Verificar que tiene_acceso=True SIN clave devuelve error de validación (400/422)
     resp_invalido = cliente.post(
         "/api/usuarios",
         headers=cab,
         json={
-            "nombre": "Usuario Sin Correo",
+            "nombre": "Usuario Sin Clave",
             "rol": "ADMINISTRACION",
             "tiene_acceso": True,
-            "clave": "ClaveSegura123!",
         },
     )
     assert resp_invalido.status_code in (400, 422), resp_invalido.text
