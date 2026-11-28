@@ -182,7 +182,7 @@ def test_cierres_diarios_tienda_vs_general_rbac_y_cuadre_saldos(entorno):
             "canal_visita": "Tienda",
             "origen_venta": "PASILLO",
             "entrega": "Tienda",
-            "items": [{"equipo_id": eqs["CD-S1-1"]["id"], "cantidad": 1}],
+            "sin_cargador": True, "items": [{"equipo_id": eqs["CD-S1-1"]["id"], "cantidad": 1}],
             "pagos": [
                 {"instrumento_id": insts["Efectivo divisas"]["id"], "monto_moneda_origen": 200.0},
                 {"instrumento_id": insts["Zelle"]["id"], "monto_moneda_origen": 100.0, "referencia": "ZEL-S1"},
@@ -203,7 +203,7 @@ def test_cierres_diarios_tienda_vs_general_rbac_y_cuadre_saldos(entorno):
             "canal_visita": "Instagram",
             "origen_venta": "LEAD",
             "entrega": "Tienda",
-            "items": [{"equipo_id": eqs["CD-S2-1"]["id"], "cantidad": 1}],
+            "sin_cargador": True, "items": [{"equipo_id": eqs["CD-S2-1"]["id"], "cantidad": 1}],
             "pagos": [
                 {"instrumento_id": insts["Bancamiga (Bs)"]["id"], "monto_moneda_origen": 42000.0, "referencia": "BM-S2"},
             ],
@@ -220,7 +220,7 @@ def test_cierres_diarios_tienda_vs_general_rbac_y_cuadre_saldos(entorno):
             "canal_visita": "Tienda",
             "origen_venta": "PASILLO",
             "entrega": "Tienda",
-            "items": [{"equipo_id": eqs["CD-S2-2"]["id"], "cantidad": 1}],
+            "sin_cargador": True, "items": [{"equipo_id": eqs["CD-S2-2"]["id"], "cantidad": 1}],
             "pagos": [
                 {"instrumento_id": insts["Efectivo divisas"]["id"], "monto_moneda_origen": 180.0},
                 {"instrumento_id": insts["Cashea · financiado"]["id"], "monto_moneda_origen": 30000.0, "referencia": "CSH-S2"},

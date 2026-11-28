@@ -101,7 +101,7 @@ def test_paridad_tekio_etiqueta_fragil_cashea_lote_y_apertura(entorno):
                 "agencia_oficina": "MRW Chacao",
                 "modalidad": "Cobro en Destino",
             },
-            "items": [{"equipo_id": eqs["PAR-1"]["id"], "cantidad": 1}],
+            "sin_cargador": True, "items": [{"equipo_id": eqs["PAR-1"]["id"], "cantidad": 1}],
             "pagos": [{"instrumento_id": insts["Efectivo divisas"]["id"], "monto_moneda_origen": 300.0}],
         },
     )
@@ -120,7 +120,7 @@ def test_paridad_tekio_etiqueta_fragil_cashea_lote_y_apertura(entorno):
             "canal_visita": "Tienda",
             "origen_venta": "PASILLO",
             "entrega": "Tienda",
-            "items": [{"equipo_id": eqs["PAR-2"]["id"], "cantidad": 1}],
+            "sin_cargador": True, "items": [{"equipo_id": eqs["PAR-2"]["id"], "cantidad": 1}],
             "pagos": [
                 {"instrumento_id": insts["Efectivo divisas"]["id"], "monto_moneda_origen": 120.0},
                 {"instrumento_id": insts["Cashea · financiado"]["id"], "monto_moneda_origen": 24000.0, "referencia": "ORD-CSH-999"},

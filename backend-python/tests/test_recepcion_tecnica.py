@@ -156,6 +156,7 @@ def test_recepcion_garantia_servicio_tecnico_pdf_y_cierre_diario(entorno):
             "sucursal_id": suc_id,
             "cliente_id": cli["id"],
             "origen_venta": "PASILLO",
+            "sin_cargador": True,
             "items": [{"articulo_id": art["id"], "equipo_id": eq["id"], "cantidad": 1}],
             "pagos": [{"instrumento_id": inst_id, "monto_moneda_origen": 380.0, "referencia": "EFE-1"}],
         },

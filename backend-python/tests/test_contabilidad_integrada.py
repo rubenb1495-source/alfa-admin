@@ -207,7 +207,7 @@ def test_2_costeo_real_preparacion_venta_y_rentabilidad_post_comision(entorno):
             "sucursal_id": suc.id,
             "asesor_id": asesor_id,
             "origen_venta": "LEAD",
-            "items": [{"equipo_id": eq["id"], "cantidad": 1, "precio_promo_usd": "350.00"}],
+            "sin_cargador": True, "items": [{"equipo_id": eq["id"], "cantidad": 1, "precio_promo_usd": "350.00"}],
             "pagos": [{"instrumento_id": cta_usd.id, "monto_moneda_origen": "350.00"}],
         },
     )

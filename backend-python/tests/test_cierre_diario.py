@@ -124,7 +124,7 @@ def test_cierre_diario_excluye_comisiones_y_consolida_operacion(cliente: TestCli
             "canal_visita": "Tienda",
             "origen_venta": "PASILLO",
             "entrega": "Tienda",
-            "items": [{"equipo_id": eqs["CIE-1"]["id"], "cantidad": 1}],
+            "sin_cargador": True, "items": [{"equipo_id": eqs["CIE-1"]["id"], "cantidad": 1}],
             "pagos": [{"instrumento_id": inst_usd["id"], "monto_moneda_origen": 200.0}],
         },
     ).json()
@@ -137,7 +137,7 @@ def test_cierre_diario_excluye_comisiones_y_consolida_operacion(cliente: TestCli
             "canal_visita": "WhatsApp",
             "origen_venta": "LEAD",
             "entrega": "Tienda",
-            "items": [{"equipo_id": eqs["CIE-2"]["id"], "cantidad": 1}],
+            "sin_cargador": True, "items": [{"equipo_id": eqs["CIE-2"]["id"], "cantidad": 1}],
             "pagos": [{"instrumento_id": inst_usd["id"], "monto_moneda_origen": 300.0}],
         },
     ).json()

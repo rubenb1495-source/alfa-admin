@@ -139,7 +139,7 @@ def test_personal_sin_acceso_pos_comisiones_y_validaciones(cliente: TestClient) 
             "canal_visita": "WhatsApp",
             "origen_venta": "LEAD",
             "entrega": "Tienda",
-            "items": [{"equipo_id": eq["id"], "cantidad": 1}],
+            "sin_cargador": True, "items": [{"equipo_id": eq["id"], "cantidad": 1}],
             "pagos": [{"instrumento_id": inst_usd["id"], "monto_moneda_origen": 250.0}],
         },
     )

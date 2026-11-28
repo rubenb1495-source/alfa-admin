@@ -282,7 +282,7 @@ def _crear_venta_rapida(cliente: TestClient, headers: dict[str, str], ctx: dict,
             "sucursal_id": 1,
             "cliente_id": ctx["cliente_id"],
             "asesor_id": ctx["asesora_id"],
-            "items": [{"equipo_id": equipo_id, "cantidad": 1}],
+            "sin_cargador": True, "items": [{"equipo_id": equipo_id, "cantidad": 1}],
             "pagos": [{"instrumento_id": ctx["inst_usd_id"], "monto_moneda_origen": monto}],
         },
     )
@@ -553,7 +553,7 @@ def test_cotizacion_asesora_pdf_sin_descontar_stock_y_conversion_a_venta(cliente
             "vigencia_horas": 48,
             "modalidad_precio": "CASHEA",
             "nota": "Incluye bolso de cortesía",
-            "items": [
+            "sin_cargador": True, "items": [
                 {"equipo_id": ctx["eq_hp_1"], "cantidad": 1},
                 {"articulo_id": ctx["art_cargador_id"], "cantidad": 1, "precio_pactado_usd": 0},
             ],
@@ -591,7 +591,7 @@ def test_cotizacion_asesora_pdf_sin_descontar_stock_y_conversion_a_venta(cliente
             "cliente_id": ctx["cliente_id"],
             "asesor_id": ctx["asesora_id"],
             "cotizacion_id": cot["id"],
-            "items": [{"equipo_id": ctx["eq_hp_1"], "cantidad": 1}],
+            "sin_cargador": True, "items": [{"equipo_id": ctx["eq_hp_1"], "cantidad": 1}],
             "pagos": [{"instrumento_id": ctx["inst_usd_id"], "monto_moneda_origen": 400.0}],
         },
     )

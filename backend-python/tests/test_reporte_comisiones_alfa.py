@@ -133,7 +133,7 @@ def test_reporte_comisiones_filtros_personal_rango_fechas_y_origen(cliente: Test
                 "canal_visita": "WhatsApp" if origen == "LEAD" else "Tienda",
                 "origen_venta": origen,
                 "entrega": "Tienda",
-                "items": [{"equipo_id": eqs[serial]["id"], "cantidad": 1}],
+                "sin_cargador": True, "items": [{"equipo_id": eqs[serial]["id"], "cantidad": 1}],
                 "pagos": [{"instrumento_id": inst_usd["id"], "monto_moneda_origen": monto}],
             },
         )

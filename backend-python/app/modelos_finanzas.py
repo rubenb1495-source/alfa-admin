@@ -103,10 +103,15 @@ class InstrumentoFinanciero(Base):
     nombre: Mapped[str] = mapped_column(String(120), unique=True, nullable=False)
     moneda: Mapped[str] = mapped_column(String(10), nullable=False)
     tipo_precio: Mapped[str] = mapped_column(String(15), nullable=False)
+    tipo_instrumento: Mapped[str] = mapped_column(String(30), default="", nullable=False)
+    cuenta_contable: Mapped[str] = mapped_column(String(120), default="", nullable=False)
+    sucursal_id: Mapped[int | None] = mapped_column(ForeignKey("sucursales.id"), index=True, nullable=True)
     requiere_verificacion: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     liquida_en_bs: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     saldo_inicial: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"), nullable=False)
     activo: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+    sucursal = relationship("Sucursal", foreign_keys=[sucursal_id])
 
 
 class Venta(Base):
@@ -148,6 +153,8 @@ class Venta(Base):
     estado_comision: Mapped[str] = mapped_column(String(20), default=EstadoComision.PENDIENTE.value, nullable=False, index=True)
     liquidacion_id: Mapped[int | None] = mapped_column(ForeignKey("liquidaciones_comisiones.id"), nullable=True, index=True)
     motivo_anulacion: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    sin_cargador: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    motivo_sin_cargador: Mapped[str] = mapped_column(String(255), default="", nullable=False)
     nota: Mapped[str] = mapped_column(Text, default="", nullable=False)
     creado_por_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), nullable=False)
     creado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)

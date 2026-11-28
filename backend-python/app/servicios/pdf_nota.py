@@ -445,7 +445,12 @@ def generar_pdf_nota_entrega(venta: Venta) -> bytes:
         pdf.drawString(x_izq + 5, y_pie + 3.2, izq_lbl)
         pdf.drawRightString(x_izq + mitad - 6, y_pie + 3.2, "[  ] SI   [  ] NO")
         pdf.drawString(x_der + 5, y_pie + 3.2, der_lbl)
-        pdf.drawRightString(x_der + mitad - 6, y_pie + 3.2, "[  ] SI   [  ] NO")
+        marca_der = (
+            "[  ] SI   [X] NO"
+            if (der_lbl == "CARGADOR" and getattr(venta, "sin_cargador", False))
+            else "[  ] SI   [  ] NO"
+        )
+        pdf.drawRightString(x_der + mitad - 6, y_pie + 3.2, marca_der)
 
     # ¿Cómo nos encontraste?
     y_pie -= 13
@@ -463,13 +468,21 @@ def generar_pdf_nota_entrega(venta: Venta) -> bytes:
         f"[{m_ig}] Instagram     [{m_tt}] TikTok     [{m_fb}] Facebook     [{m_ot}] Otros",
     )
 
-    # Observaciones
+    # Observaciones (incluye constancia explícita cuando se autorizó venta sin cargador)
     y_pie -= 12
     pdf.setFont("Helvetica-Bold", 7.3)
     pdf.drawString(0.50 * inch, y_pie, "Observaciones:")
     pdf.setFont("Helvetica", 7.3)
+    obs_partes: list[str] = []
+    if getattr(venta, "sin_cargador", False):
+        motivo_sc = (getattr(venta, "motivo_sin_cargador", "") or "").strip()
+        obs_sc = "Equipo entregado SIN cargador" + (f" ({motivo_sc})" if motivo_sc else "")
+        obs_partes.append(obs_sc)
     if venta.nota and venta.nota.strip():
-        pdf.drawString(1.36 * inch, y_pie, venta.nota.strip()[:95])
+        obs_partes.append(venta.nota.strip())
+    obs_texto = " · ".join(obs_partes)
+    if obs_texto:
+        pdf.drawString(1.36 * inch, y_pie, obs_texto[:105])
     else:
         pdf.setStrokeColorRGB(0.78, 0.80, 0.83)
         pdf.line(1.36 * inch, y_pie - 2, ancho - 0.50 * inch, y_pie - 2)

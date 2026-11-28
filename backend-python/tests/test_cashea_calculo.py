@@ -172,6 +172,7 @@ def test_venta_cashea_impacta_cxc_rentabilidad_y_contabilidad_cuadrada(entorno):
             "sucursal_id": suc_id,
             "cliente_id": cli["id"],
             "origen_venta": "PASILLO",
+            "sin_cargador": True,
             "items": [{"articulo_id": art["id"], "equipo_id": eq_id, "cantidad": 1}],
             "pagos": [
                 {"instrumento_id": inst_efe, "monto_moneda_origen": 120.0, "referencia": "INI-1"},

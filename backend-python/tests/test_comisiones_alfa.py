@@ -201,7 +201,7 @@ def test_comisiones_alfa_cuatro_escenarios_y_exclusiones(cliente: TestClient) ->
                 "canal_visita": "WhatsApp" if origen_venta == "LEAD" else "Tienda",
                 "origen_venta": origen_venta,
                 "entrega": "Tienda",
-                "items": [{"equipo_id": eq["id"], "cantidad": 1}],
+                "sin_cargador": True, "items": [{"equipo_id": eq["id"], "cantidad": 1}],
                 "pagos": pagos,
             },
         )

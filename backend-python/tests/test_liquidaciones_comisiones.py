@@ -113,7 +113,7 @@ def test_liquidacion_exitosa_bloqueo_doble_pago_y_anulacion(cliente: TestClient)
             "canal_visita": "Tienda",
             "origen_venta": "PASILLO",
             "entrega": "Tienda",
-            "items": [{"equipo_id": eqs["LIQ-EQ-1"]["id"], "cantidad": 1}],
+            "sin_cargador": True, "items": [{"equipo_id": eqs["LIQ-EQ-1"]["id"], "cantidad": 1}],
             "pagos": [{"instrumento_id": inst_usd["id"], "monto_moneda_origen": 200.0}],
         },
     ).json()
@@ -126,7 +126,7 @@ def test_liquidacion_exitosa_bloqueo_doble_pago_y_anulacion(cliente: TestClient)
             "canal_visita": "WhatsApp",
             "origen_venta": "LEAD",
             "entrega": "Tienda",
-            "items": [{"equipo_id": eqs["LIQ-EQ-2"]["id"], "cantidad": 1}],
+            "sin_cargador": True, "items": [{"equipo_id": eqs["LIQ-EQ-2"]["id"], "cantidad": 1}],
             "pagos": [{"instrumento_id": inst_usd["id"], "monto_moneda_origen": 300.0}],
         },
     ).json()
@@ -273,7 +273,7 @@ def test_integracion_liquidacion_con_finanzas_usd_bs_reversion_y_bloqueo(cliente
             "canal_visita": "WhatsApp",
             "origen_venta": "LEAD",
             "entrega": "Tienda",
-            "items": [{"equipo_id": eqs["FIN-EQ-1"]["id"], "cantidad": 1}],
+            "sin_cargador": True, "items": [{"equipo_id": eqs["FIN-EQ-1"]["id"], "cantidad": 1}],
             "pagos": [{"instrumento_id": inst_usd["id"], "monto_moneda_origen": 200.0}],
         },
     ).json()
@@ -288,7 +288,7 @@ def test_integracion_liquidacion_con_finanzas_usd_bs_reversion_y_bloqueo(cliente
             "canal_visita": "WhatsApp",
             "origen_venta": "LEAD",
             "entrega": "Tienda",
-            "items": [{"equipo_id": eqs["FIN-EQ-2"]["id"], "cantidad": 1}],
+            "sin_cargador": True, "items": [{"equipo_id": eqs["FIN-EQ-2"]["id"], "cantidad": 1}],
             "pagos": [{"instrumento_id": inst_usd["id"], "monto_moneda_origen": 300.0}],
         },
     ).json()

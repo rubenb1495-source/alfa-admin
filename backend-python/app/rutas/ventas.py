@@ -477,6 +477,8 @@ def serializar_venta(venta: Venta, incluir_costos: bool) -> dict[str, Any]:
         "creado_en": venta.creado_en.isoformat() if venta.creado_en else None,
         "estado": venta.estado,
         "motivo_anulacion": venta.motivo_anulacion,
+        "sin_cargador": bool(getattr(venta, "sin_cargador", False)),
+        "motivo_sin_cargador": getattr(venta, "motivo_sin_cargador", "") or "",
         "nota": venta.nota,
         "detalles": [
             {
@@ -730,6 +732,33 @@ def crear_venta(
         validar_disponibilidad=True,
     )
 
+    # Validación obligatoria de cargador cuando la venta incluye al menos un Equipo
+    tiene_equipo_en_venta = False
+    tiene_cargador_en_venta = False
+    for it_res in calc["detalles"]:
+        eq_obj = it_res.get("equipo")
+        art_obj = it_res.get("articulo")
+        desc_l = str(it_res.get("descripcion") or "").lower()
+        if eq_obj is not None or (art_obj is not None and art_obj.tipo == TipoArticulo.EQUIPO.value):
+            tiene_equipo_en_venta = True
+        if art_obj is not None:
+            sku_u = (art_obj.sku or "").strip().upper()
+            cat_l = (art_obj.categoria or "").strip().lower()
+            art_desc_l = (art_obj.descripcion or "").strip().lower()
+            if sku_u.startswith("AC-CARG") or "cargador" in art_desc_l or "cargador" in cat_l or "charger" in art_desc_l:
+                tiene_cargador_en_venta = True
+        if "cargador" in desc_l or "charger" in desc_l:
+            tiene_cargador_en_venta = True
+
+    if tiene_equipo_en_venta and not tiene_cargador_en_venta and not datos.sin_cargador:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=(
+                "¡Atención! Estás vendiendo un equipo sin cargador en el carrito. "
+                "Agrega el cargador correspondiente o confirma el desbloqueo ('sin_cargador: true')."
+            ),
+        )
+
     if calc["tiene_servicio_tecnico"]:
         if datos.tecnico_id is None:
             raise HTTPException(
@@ -816,6 +845,8 @@ def crear_venta(
         es_factura=datos.es_factura,
         numero_control=datos.numero_control.strip(),
         estado=calc["estado"],
+        sin_cargador=bool(datos.sin_cargador),
+        motivo_sin_cargador=(datos.motivo_sin_cargador or "").strip(),
         nota=datos.nota.strip(),
         creado_por_id=usuario_actual.id,
     )

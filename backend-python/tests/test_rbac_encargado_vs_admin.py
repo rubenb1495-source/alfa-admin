@@ -140,7 +140,7 @@ def test_rbac_admin_vs_encargado_de_tienda_y_sanitizacion_costos(cliente: TestCl
             "canal_visita": "Tienda",
             "origen_venta": "PASILLO",
             "entrega": "Tienda",
-            "items": [{"equipo_id": inv_enc["id"], "cantidad": 1}],
+            "sin_cargador": True, "items": [{"equipo_id": inv_enc["id"], "cantidad": 1}],
             "pagos": [{"instrumento_id": inst_usd["id"], "monto_moneda_origen": 220.0}],
         },
     )

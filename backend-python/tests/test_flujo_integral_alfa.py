@@ -196,7 +196,7 @@ def test_flujo_integral_completo_alfa(entorno_e2e):
             "sucursal_id": suc_id,
             "asesor_id": asesor_id,
             "origen_venta": "LEAD",
-            "items": [{"equipo_id": eq["id"], "cantidad": 1, "precio_promo_usd": "200.00"}],
+            "sin_cargador": True, "items": [{"equipo_id": eq["id"], "cantidad": 1, "precio_promo_usd": "200.00"}],
             "pagos": [{"instrumento_id": cta_usd_id, "monto_moneda_origen": "200.00"}],
         },
     )
@@ -277,7 +277,7 @@ def test_flujo_integral_completo_alfa(entorno_e2e):
             "sucursal_id": suc_id,
             "asesor_id": asesor_id,
             "origen_venta": "LEAD",
-            "items": [{"equipo_id": eq["id"], "cantidad": 1, "precio_promo_usd": "200.00"}],
+            "sin_cargador": True, "items": [{"equipo_id": eq["id"], "cantidad": 1, "precio_promo_usd": "200.00"}],
             "pagos": [{"instrumento_id": cta_usd_id, "monto_moneda_origen": "200.00"}],
         },
     )
@@ -294,7 +294,7 @@ def test_flujo_integral_completo_alfa(entorno_e2e):
             "sucursal_id": suc_id,
             "asesor_id": asesor_id,
             "origen_venta": "LEAD",
-            "items": [{"equipo_id": eq["id"], "cantidad": 1, "precio_promo_usd": "200.00"}],
+            "sin_cargador": True, "items": [{"equipo_id": eq["id"], "cantidad": 1, "precio_promo_usd": "200.00"}],
             "pagos": [{"instrumento_id": cta_usd_id, "monto_moneda_origen": "200.00"}],
         },
     )

@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
+  AlertTriangle,
   Check,
   CheckCircle2,
   ChevronDown,
@@ -10,6 +11,7 @@ import {
   ExternalLink,
   FileDown,
   Gift,
+  LockOpen,
   MessageSquare,
   Plus,
   Printer,
@@ -118,6 +120,8 @@ export default function PaginaNuevaVentaPOS() {
   );
   const [tasaHoy, setTasaHoy] = useState<TasaHoy | null>(null);
   const [cargando, setCargando] = useState(true);
+  const [sinCargadorAutorizado, setSinCargadorAutorizado] = useState(false);
+  const [motivoSinCargador, setMotivoSinCargador] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const [sucursalId, setSucursalId] = useState("");
@@ -785,6 +789,11 @@ export default function PaginaNuevaVentaPOS() {
           })),
           pagos: pagosValidos,
           queda_con_saldo: quedaConSaldo,
+          sin_cargador: requiereAlertaCargador && sinCargadorAutorizado,
+          motivo_sin_cargador:
+            requiereAlertaCargador && sinCargadorAutorizado
+              ? motivoSinCargador.trim()
+              : "",
           nota: nota.trim(),
           cotizacion_id: cotizacionOrigenId,
         }),
@@ -865,6 +874,8 @@ export default function PaginaNuevaVentaPOS() {
     setOrigenVenta("PASILLO");
     setEntrega("Tienda");
     setQuedaConSaldo(false);
+    setSinCargadorAutorizado(false);
+    setMotivoSinCargador("");
     setNota("");
     setCotizacionOrigenId(null);
     setCotizacionNumero(null);
@@ -967,6 +978,93 @@ export default function PaginaNuevaVentaPOS() {
       setGuardandoCliente(false);
     }
   };
+
+  const tieneEquipoEnCarrito = useMemo(
+    () =>
+      carrito.some((c) => {
+        if (c.tipo === "EQUIPO" || c.equipo_id) return true;
+        if (c.articulo_id) {
+          const art = catalogo.find((a) => a.id === c.articulo_id);
+          if (art?.tipo === "EQUIPO") return true;
+        }
+        return false;
+      }),
+    [carrito, catalogo]
+  );
+
+  const tieneCargadorEnCarrito = useMemo(
+    () =>
+      carrito.some((c) => {
+        const etq = (c.etiqueta || "").toLowerCase();
+        if (
+          etq.includes("cargador") ||
+          etq.includes("charger") ||
+          etq.includes("ac-carg")
+        ) {
+          return true;
+        }
+        if (c.articulo_id) {
+          const art = catalogo.find((a) => a.id === c.articulo_id);
+          if (art) {
+            const sku = (art.sku || "").toUpperCase();
+            const desc = (art.descripcion || "").toLowerCase();
+            const cat = (art.categoria || "").toLowerCase();
+            if (
+              sku.startsWith("AC-CARG") ||
+              desc.includes("cargador") ||
+              desc.includes("charger") ||
+              cat.includes("cargador")
+            ) {
+              return true;
+            }
+          }
+        }
+        return false;
+      }),
+    [carrito, catalogo]
+  );
+
+  const requiereAlertaCargador =
+    tieneEquipoEnCarrito && !tieneCargadorEnCarrito;
+  const bloqueadoPorCargador =
+    requiereAlertaCargador && !sinCargadorAutorizado;
+
+  useEffect(() => {
+    if (!requiereAlertaCargador && sinCargadorAutorizado) {
+      setSinCargadorAutorizado(false);
+      setMotivoSinCargador("");
+    }
+  }, [requiereAlertaCargador, sinCargadorAutorizado]);
+
+  const alertaSonadaRef = useRef(false);
+  useEffect(() => {
+    if (bloqueadoPorCargador && !alertaSonadaRef.current) {
+      alertaSonadaRef.current = true;
+      try {
+        const AudioCtx =
+          window.AudioContext ||
+          (window as unknown as { webkitAudioContext?: typeof AudioContext })
+            .webkitAudioContext;
+        if (AudioCtx) {
+          const ctx = new AudioCtx();
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(520, ctx.currentTime);
+          gain.gain.setValueAtTime(0.05, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start();
+          osc.stop(ctx.currentTime + 0.18);
+        }
+      } catch {
+        // Silencioso si el navegador bloquea audio sin gesto previo
+      }
+    } else if (!bloqueadoPorCargador) {
+      alertaSonadaRef.current = false;
+    }
+  }, [bloqueadoPorCargador]);
 
   if (cargando) {
     return (
@@ -2247,15 +2345,82 @@ export default function PaginaNuevaVentaPOS() {
             Permitir registrar como Cuenta por Cobrar (CON_SALDO)
           </label>
 
+          {/* Alerta obligatoria de cargador al vender equipos */}
+          {bloqueadoPorCargador && (
+            <div className="p-4 rounded-xl border-2 border-red-300 bg-red-50 text-red-900 space-y-3">
+              <div className="flex items-start gap-2.5">
+                <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                <div className="text-xs space-y-1">
+                  <p className="font-black text-sm text-red-800">
+                    ¡Atención! Falta el cargador en el carrito
+                  </p>
+                  <p className="leading-relaxed">
+                    ¡Atención! Estás vendiendo un equipo sin cargador en el
+                    carrito. Agrega el cargador correspondiente antes de
+                    finalizar la venta.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSinCargadorAutorizado(true)}
+                className="w-full inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl border border-amber-400 bg-amber-100 hover:bg-amber-200 text-amber-950 text-xs font-black transition-colors cursor-pointer"
+              >
+                <LockOpen className="w-4 h-4" />
+                Desbloquear: este equipo no lleva cargador
+              </button>
+            </div>
+          )}
+
+          {requiereAlertaCargador && sinCargadorAutorizado && (
+            <div className="p-3.5 rounded-xl border border-amber-300 bg-amber-50 space-y-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-200/80 text-amber-950 text-[11px] font-black">
+                  <LockOpen className="w-3.5 h-3.5" />
+                  Venta autorizada sin cargador
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSinCargadorAutorizado(false);
+                    setMotivoSinCargador("");
+                  }}
+                  className="text-[11px] font-bold text-amber-800 hover:underline cursor-pointer"
+                >
+                  Volver a bloquear
+                </button>
+              </div>
+              <input
+                type="text"
+                value={motivoSinCargador}
+                onChange={(e) => setMotivoSinCargador(e.target.value)}
+                maxLength={255}
+                placeholder="Motivo opcional (ej. Equipo solo / cliente ya tiene cargador / CPU de escritorio)"
+                className="w-full px-3 py-2 rounded-lg border border-amber-300 bg-white text-xs text-slate-800"
+              />
+              <p className="text-[11px] text-amber-900">
+                Se imprimirá en la Nota de Entrega PDF:{" "}
+                <strong>Observación: Equipo entregado SIN cargador</strong>.
+              </p>
+            </div>
+          )}
+
           <button
             type="submit"
-            disabled={guardando || carrito.length === 0 || ventaCreada !== null}
+            disabled={
+              guardando ||
+              carrito.length === 0 ||
+              ventaCreada !== null ||
+              bloqueadoPorCargador
+            }
             className="w-full py-3 rounded-xl bg-[#003566] hover:bg-[#001D3D] disabled:opacity-50 disabled:cursor-not-allowed text-white font-black text-sm cursor-pointer transition-colors"
           >
             {guardando
               ? "Registrando venta..."
               : ventaCreada
               ? `Nota ${ventaCreada.numero_venta} emitida · Usa el panel inferior`
+              : bloqueadoPorCargador
+              ? "Agrega un cargador o desbloquea para continuar"
               : "Confirmar y Emitir Nota"}
           </button>
         </div>
@@ -2289,6 +2454,12 @@ export default function PaginaNuevaVentaPOS() {
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold">
                       {ventaCreada.estado}
                     </span>
+                    {ventaCreada.sin_cargador && (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-100 border border-amber-300 text-amber-900 text-xs font-bold">
+                        <AlertTriangle className="w-3.5 h-3.5" />
+                        Entregado SIN cargador
+                      </span>
+                    )}
                   </div>
                   <h3 className="text-lg font-black text-[#000814] mt-1">
                     ¡Venta registrada correctamente!
