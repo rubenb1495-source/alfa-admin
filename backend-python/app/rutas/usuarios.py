@@ -294,15 +294,21 @@ def cambiar_estado_usuario(
 
 
 @enrutador.post("/usuarios/{usuario_id}/restablecer-clave")
+@enrutador.post("/usuarios/{usuario_id}/regenerar-clave")
 def restablecer_clave_usuario(
     usuario_id: int,
     payload: dict | None = None,
-    _usuario_actual: Usuario = Depends(requerir_roles(*ROLES_ADMINISTRATIVOS)),
+    usuario_actual: Usuario = Depends(requerir_roles(*ROLES_ADMINISTRATIVOS)),
     bd: Session = Depends(obtener_bd),
 ) -> dict[str, object]:
-    """Genera una contraseña temporal compartible para un usuario con acceso al sistema."""
+    """Genera una contraseña temporal segura (12 caracteres), desbloquea la cuenta y exige cambio al iniciar sesión."""
+    import json
     import secrets
-    import string
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    from app.modelos_admin import AuditLog
+    from app.rutas.recuperacion_clave import SolicitudRecuperacionClave
 
     usuario = (
         bd.query(Usuario)
@@ -325,15 +331,42 @@ def restablecer_clave_usuario(
     if clave_manual and isinstance(clave_manual, str) and len(clave_manual.strip()) >= 6:
         clave_temporal = clave_manual.strip()
     else:
-        alfabeto = string.ascii_uppercase + string.digits
-        sufijo = "".join(secrets.choice(alfabeto) for _ in range(5))
+        alfabeto = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789"
+        sufijo = "".join(secrets.choice(alfabeto) for _ in range(6))
         clave_temporal = f"Alfa-{sufijo}!"
 
+    estaba_bloqueada = bool(getattr(usuario, "cuenta_bloqueada", False))
     usuario.clave_hash = generar_hash_clave(clave_temporal)
     usuario.debe_cambiar_clave = True
     usuario.cuenta_bloqueada = False
     usuario.intentos_fallidos = 0
     usuario.fecha_bloqueo = None
+
+    bd.query(SolicitudRecuperacionClave).filter(
+        SolicitudRecuperacionClave.usuario_id == usuario.id,
+        SolicitudRecuperacionClave.atendida.is_(False),
+    ).update({"atendida": True, "usado": True}, synchronize_session=False)
+
+    bd.add(
+        AuditLog(
+            usuario_id=usuario_actual.id,
+            usuario_nombre=usuario_actual.nombre,
+            rol=usuario_actual.rol,
+            modulo="SEGURIDAD",
+            accion="REGENERAR_CLAVE_TEMPORAL",
+            entidad_id=str(usuario.id),
+            datos_anteriores_json=json.dumps({"cuenta_bloqueada": estaba_bloqueada}, ensure_ascii=False),
+            datos_nuevos_json=json.dumps(
+                {
+                    "usuario_objetivo": usuario.usuario or usuario.nombre,
+                    "cuenta_bloqueada": False,
+                    "intentos_fallidos": 0,
+                    "debe_cambiar_clave": True,
+                },
+                ensure_ascii=False,
+            ),
+        )
+    )
     bd.commit()
 
     return {
@@ -345,6 +378,7 @@ def restablecer_clave_usuario(
         "telefono": usuario.telefono or "",
         "clave_temporal": clave_temporal,
         "debe_cambiar_clave": True,
+        "cuenta_bloqueada": False,
         "url_app": "https://alfa-admin-web.vercel.app",
     }
 

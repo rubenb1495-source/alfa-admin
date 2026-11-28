@@ -192,6 +192,23 @@ def registrar_cobro_cashea(
     if reg.estado == "COBRADO":
         raise HTTPException(status_code=400, detail="Esta operación Cashea ya fue cobrada en su totalidad.")
 
+    ref_limpia = datos.referencia.strip()
+    if ref_limpia:
+        duplicado = (
+            bd.query(Pago)
+            .filter(
+                Pago.anulado.is_(False),
+                Pago.origen_tipo == "COBRO_CASHEA",
+                Pago.referencia == ref_limpia,
+            )
+            .first()
+        )
+        if duplicado is not None:
+            raise HTTPException(
+                status_code=409,
+                detail=f"La referencia/orden Cashea '{ref_limpia}' ya fue liquidada anteriormente (Pago #{duplicado.id}).",
+            )
+
     inst = (
         bd.query(InstrumentoFinanciero)
         .filter(InstrumentoFinanciero.id == datos.instrumento_destino_id, InstrumentoFinanciero.activo.is_(True))

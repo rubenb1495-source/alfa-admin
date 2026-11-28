@@ -120,7 +120,14 @@ export default function PaginaTesoreria() {
         solicitarApi<InstrumentoSaldo[]>("/api/finanzas/instrumentos"),
         solicitarApi<RespuestaTesoreria>(`/api/tesoreria/movimientos${sufijo}`),
       ]);
-      setInstrumentos(respInst);
+      const NO_LIQUIDOS = new Set([
+        "cashea · financiado",
+        "equipo como parte de pago",
+        "cuenta por cobrar",
+      ]);
+      setInstrumentos(
+        respInst.filter((i) => !NO_LIQUIDOS.has(i.nombre.trim().toLowerCase()))
+      );
       setDatos(respMovs);
     } catch (err) {
       setError(

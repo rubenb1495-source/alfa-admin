@@ -645,14 +645,15 @@ def calcular_snapshot_cierre_diario(
         )
         snapshot["resumen_financiero"] = fin_data["resumen_financiero"]
         snapshot["movimientos_dia"] = fin_data["movimientos_dia"]
+        snapshot["traspasos_cambios_dia"] = fin_data["traspasos_cambios_dia"]
         if alcance_norm == "GENERAL":
             snapshot["egresos_dia"] = fin_data["egresos_dia"]
             snapshot["saldos_cajas"] = fin_data["saldos_cajas"]
             snapshot["comparativa_tiendas"] = fin_data["comparativa_tiendas"]
             snapshot["operacion_general"] = fin_data["operacion_general"]
         else:
-            snapshot["egresos_dia"] = None
-            snapshot["saldos_cajas"] = None
+            snapshot["egresos_dia"] = fin_data["egresos_dia"]
+            snapshot["saldos_cajas"] = fin_data["saldos_cajas"] if sucursal_id is not None else None
             snapshot["comparativa_tiendas"] = None
             snapshot["operacion_general"] = None
     else:

@@ -6,6 +6,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from typing import Any
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile, status
+from pydantic import BaseModel, Field
 from sqlalchemy import extract, func
 from sqlalchemy.orm import Session, joinedload
 
@@ -86,13 +87,17 @@ def listar_instrumentos(
             "nombre": i.nombre,
             "moneda": i.moneda,
             "tipo_precio": i.tipo_precio,
+            "tipo_instrumento": i.tipo_instrumento or "",
+            "cuenta_contable": i.cuenta_contable or "",
+            "sucursal_id": i.sucursal_id,
             "requiere_verificacion": i.requiere_verificacion,
             "liquida_en_bs": i.liquida_en_bs,
             **(
                 {
+                    "saldo_inicial": redondear_usd(i.saldo_inicial or Decimal("0")),
                     "saldo_actual": redondear_usd(
                         (i.saldo_inicial or Decimal("0")) + neto_por_inst.get(i.id, Decimal("0"))
-                    )
+                    ),
                 }
                 if incluir_saldos
                 else {}
@@ -100,6 +105,69 @@ def listar_instrumentos(
         }
         for i in filas
     ]
+
+
+class SaldoInicialInstrumentoEntrada(BaseModel):
+    saldo_inicial: Decimal = Field(ge=0)
+
+
+class SaldoInicialMasivoItem(BaseModel):
+    instrumento_id: int
+    saldo_inicial: Decimal = Field(ge=0)
+
+
+class SaldosInicialesMasivoEntrada(BaseModel):
+    saldos: list[SaldoInicialMasivoItem] = Field(min_length=1)
+
+
+@enrutador.patch("/instrumentos/{instrumento_id}/saldo-inicial")
+def actualizar_saldo_inicial_instrumento(
+    instrumento_id: int,
+    datos: SaldoInicialInstrumentoEntrada,
+    _usuario_actual: Usuario = Depends(requerir_roles(RolUsuario.DIRECCION.value, RolUsuario.ADMINISTRACION.value)),
+    bd: Session = Depends(obtener_bd),
+) -> dict[str, Any]:
+    """Actualiza el saldo inicial de apertura de un instrumento financiero."""
+    inst = bd.query(InstrumentoFinanciero).filter(InstrumentoFinanciero.id == instrumento_id).first()
+    if inst is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Instrumento financiero no encontrado.")
+    inst.saldo_inicial = datos.saldo_inicial.quantize(Decimal("0.01"))
+    bd.commit()
+    bd.refresh(inst)
+    return {
+        "id": inst.id,
+        "nombre": inst.nombre,
+        "moneda": inst.moneda,
+        "saldo_inicial": redondear_usd(inst.saldo_inicial),
+    }
+
+
+@enrutador.put("/instrumentos/saldos-iniciales")
+def cargar_saldos_iniciales_masivo(
+    datos: SaldosInicialesMasivoEntrada,
+    _usuario_actual: Usuario = Depends(requerir_roles(RolUsuario.DIRECCION.value, RolUsuario.ADMINISTRACION.value)),
+    bd: Session = Depends(obtener_bd),
+) -> dict[str, Any]:
+    """Carga masiva de saldos iniciales de apertura sobre los instrumentos financieros."""
+    actualizados: list[dict[str, Any]] = []
+    for item in datos.saldos:
+        inst = bd.query(InstrumentoFinanciero).filter(InstrumentoFinanciero.id == item.instrumento_id).first()
+        if inst is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Instrumento financiero #{item.instrumento_id} no encontrado.",
+            )
+        inst.saldo_inicial = item.saldo_inicial.quantize(Decimal("0.01"))
+        actualizados.append(
+            {
+                "id": inst.id,
+                "nombre": inst.nombre,
+                "moneda": inst.moneda,
+                "saldo_inicial": redondear_usd(inst.saldo_inicial),
+            }
+        )
+    bd.commit()
+    return {"actualizados": len(actualizados), "instrumentos": actualizados}
 
 
 @enrutador.get("/pagos")

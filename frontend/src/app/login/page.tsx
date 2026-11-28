@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertCircle, ArrowRight, Eye, EyeOff, Lock, ShieldAlert, User } from "lucide-react";
 import LogoAlfa from "@/components/LogoAlfa";
+import ModalRecuperarClave from "@/components/ModalRecuperarClave";
 import { usarSesion } from "@/contexto/SesionContexto";
 import { ErrorApi } from "@/servicios/api";
 
@@ -17,6 +18,7 @@ export default function PaginaLogin() {
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [bloqueado, setBloqueado] = useState(false);
+  const [modalRecuperar, setModalRecuperar] = useState(false);
 
   useEffect(() => {
     if (!cargandoSesion && usuario) {
@@ -164,9 +166,26 @@ export default function PaginaLogin() {
               <span>{enviando ? "Verificando acceso..." : "Ingresar al sistema"}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
+
+            <div className="text-center pt-1">
+              <button
+                type="button"
+                onClick={() => setModalRecuperar(true)}
+                className="text-xs font-bold text-[#003566] hover:underline cursor-pointer"
+              >
+                ¿Olvidaste tu contraseña?
+              </button>
+            </div>
           </form>
         </div>
       </div>
+
+      <ModalRecuperarClave
+        abierto={modalRecuperar}
+        alCerrar={() => setModalRecuperar(false)}
+        colorPrimario="#003566"
+        colorHover="#001D3D"
+      />
     </div>
   );
 }

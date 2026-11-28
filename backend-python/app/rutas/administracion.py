@@ -377,6 +377,81 @@ def pagar_factura_gasto(
     }
 
 
+@enrutador.post("/cxp/{cxp_id}/pagar")
+def pagar_cuenta_por_pagar_proveedor(
+    cxp_id: int,
+    datos: PagarGastoEntrada,
+    usuario_actual: Usuario = Depends(requerir_admin),
+    bd: Session = Depends(obtener_bd),
+) -> dict[str, Any]:
+    """Registra un abono parcial o total a una Cuenta por Pagar de proveedor (crédito/consignación) en partida doble."""
+    from app.modelos_finanzas import CuentaPorPagar
+
+    cxp = bd.query(CuentaPorPagar).filter(CuentaPorPagar.id == cxp_id).first()
+    if cxp is None:
+        raise HTTPException(status_code=404, detail="Cuenta por pagar no encontrada.")
+    if cxp.estado == "PAGADA" or Decimal(cxp.monto_pendiente_usd or 0) <= Decimal("0"):
+        raise HTTPException(status_code=400, detail="Esta cuenta por pagar ya está liquidada.")
+
+    pendiente = _q2(Decimal(cxp.monto_pendiente_usd or 0))
+    if datos.monto_usd > pendiente + Decimal("0.01"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"El monto (${_r2(datos.monto_usd):.2f}) excede el saldo pendiente (${_r2(pendiente):.2f}).",
+        )
+
+    estado_ant = cxp.estado
+    pago = _descontar_en_tesoreria(
+        bd=bd,
+        usuario=usuario_actual,
+        instrumento_id=datos.instrumento_pago_id,
+        monto_usd=datos.monto_usd,
+        fecha_op=obtener_fecha_hoy(),
+        categoria=f"Pago Proveedor · {cxp.proveedor_nombre}",
+        origen_tipo="CXP_PROVEEDOR",
+        origen_id=cxp.id,
+        referencia=datos.referencia or cxp.referencia or f"CXP-{cxp.id}",
+        nota=datos.nota or f"Abono a proveedor {cxp.proveedor_nombre} ({cxp.concepto})",
+    )
+    pago.tipo_documento = TipoDocumentoPago.COMPRA.value
+
+    nuevo_pendiente = max(Decimal("0"), _q2(pendiente - datos.monto_usd))
+    cxp.monto_pendiente_usd = nuevo_pendiente
+    cxp.estado = "PAGADA" if nuevo_pendiente <= Decimal("0.01") else "PARCIAL"
+
+    crear_asiento_contable(
+        bd=bd,
+        usuario=usuario_actual,
+        fecha_op=obtener_fecha_hoy(),
+        descripcion=f"Abono CxP Proveedor {cxp.proveedor_nombre}: {cxp.concepto[:80]}",
+        origen_tipo="CXP_PROVEEDOR",
+        origen_id=cxp.id,
+        lineas=[
+            {"cuenta_codigo": "2.1.01", "debe_usd": datos.monto_usd, "haber_usd": 0, "nota": f"Rebaja CxP {cxp.proveedor_nombre}"},
+            {"cuenta_codigo": "1.1.01", "debe_usd": 0, "haber_usd": datos.monto_usd, "nota": f"Pago proveedor {cxp.referencia or cxp.id}"},
+        ],
+    )
+
+    registrar_auditoria(
+        bd,
+        usuario_actual,
+        "GASTOS_CXP",
+        "PAGAR_CXP",
+        cxp.id,
+        datos_anteriores={"estado": estado_ant, "monto_pendiente_usd": float(pendiente)},
+        datos_nuevos={"estado": cxp.estado, "monto_pendiente_usd": float(nuevo_pendiente), "pago_id": pago.id},
+    )
+    bd.commit()
+    return {
+        "id": cxp.id,
+        "proveedor_nombre": cxp.proveedor_nombre,
+        "estado": cxp.estado,
+        "monto_abonado_usd": _r2(datos.monto_usd),
+        "monto_pendiente_usd": _r2(nuevo_pendiente),
+        "pago_id": pago.id,
+    }
+
+
 # ---------------- 2. Fiscal y Tributario (Libros IVA, Retenciones, Obligaciones) ----------------
 
 

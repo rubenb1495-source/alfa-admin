@@ -38,6 +38,7 @@ from app.modelos_finanzas import (
     CierreDiario,
     CierreMensual,
     CuentaPorCobrar,
+    CuentaPorPagar,
     ExtractoBancario,
     InstrumentoFinanciero,
     LiquidacionComision,
@@ -53,8 +54,10 @@ from app.modelos_logistica import (
     AjusteInventario,
     Compra,
     CompraComponente,
+    CompraInternacionalLote,
     Equipo,
     GuiaImportacion,
+    HistorialEstadoEquipo,
     LoteTransito,
     LoteTransitoItem,
     MovimientoInventario,
@@ -219,11 +222,15 @@ def ejecutar_reset_en_cero(
             detail=f"Frase de confirmación inválida. Escribe exactamente: {FRASE_CONFIRMACION_RESET}",
         )
 
+    from app.rutas.recuperacion_clave import SolicitudRecuperacionClave
+
     eliminados: dict[str, int] = {}
     # Borrado en orden seguro respetando llaves foráneas
     modelos_orden = [
+        ("solicitudes_recuperacion_clave", SolicitudRecuperacionClave),
         ("venta_cashea_finanzas", VentaCasheaFinanzas),
         ("cuentas_por_cobrar", CuentaPorCobrar),
+        ("cuentas_por_pagar", CuentaPorPagar),
         ("notas_credito", NotaCredito),
         ("devoluciones_garantia", DevolucionGarantia),
         ("ventas_detalle", VentaDetalle),
@@ -241,8 +248,10 @@ def ejecutar_reset_en_cero(
         ("ordenes_recepcion_tecnica", OrdenRecepcionTecnica),
         ("casos_postventa", CasoPostventa),
         ("equipo_componentes_instalados", EquipoComponenteInstalado),
+        ("historial_estados_equipo", HistorialEstadoEquipo),
         ("movimientos_inventario", MovimientoInventario),
         ("equipos", Equipo),
+        ("compras_internacionales_lotes", CompraInternacionalLote),
         ("lotes_transito_items", LoteTransitoItem),
         ("lotes_transito", LoteTransito),
         ("compras_componentes", CompraComponente),

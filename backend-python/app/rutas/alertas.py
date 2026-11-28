@@ -307,6 +307,27 @@ def obtener_resumen_alertas(
         }
         for u in bloqueados
     ]
+    from app.rutas.recuperacion_clave import SolicitudRecuperacionClave
+
+    solicitudes_rec = (
+        bd.query(SolicitudRecuperacionClave)
+        .filter(SolicitudRecuperacionClave.atendida.is_(False))
+        .order_by(SolicitudRecuperacionClave.id.desc())
+        .limit(20)
+        .all()
+    )
+    for sr in solicitudes_rec:
+        alertas_seguridad.append(
+            {
+                "usuario_id": sr.usuario_id,
+                "nombre": sr.usuario_nombre,
+                "usuario": sr.usuario_nombre,
+                "rol": "RECUPERACION",
+                "intentos_fallidos": 0,
+                "fecha_bloqueo": sr.creado_en.isoformat() if sr.creado_en else None,
+                "mensaje": f"Solicitud de recuperación de clave para {sr.usuario_nombre}. Regenera su clave temporal en Usuarios.",
+            }
+        )
 
     return {
         "fecha_evaluacion": hoy.isoformat(),

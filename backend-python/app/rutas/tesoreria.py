@@ -29,6 +29,23 @@ from app.seguridad import requerir_admin, requerir_direccion_lectura
 
 enrutador = APIRouter(prefix="/api/tesoreria", tags=["Tesorería y Diferencial Cambiario"])
 
+INSTRUMENTOS_NO_LIQUIDOS = {
+    "cashea · financiado",
+    "equipo como parte de pago",
+    "cuenta por cobrar",
+}
+
+
+def _validar_instrumento_liquido(inst: InstrumentoFinanciero, etiqueta: str) -> None:
+    if inst.nombre.strip().lower() in INSTRUMENTOS_NO_LIQUIDOS:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                f"El instrumento de {etiqueta} '{inst.nombre}' no es un instrumento líquido "
+                "y no puede usarse en traslados ni cambios de divisas."
+            ),
+        )
+
 
 def _q2(valor: Decimal) -> Decimal:
     return valor.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
@@ -235,6 +252,8 @@ def crear_movimiento_tesoreria(
                 status_code=400,
                 detail="Debes seleccionar cuenta de origen y cuenta de destino.",
             )
+        _validar_instrumento_liquido(origen, "origen")
+        _validar_instrumento_liquido(destino, "destino")
         if origen.id == destino.id:
             raise HTTPException(
                 status_code=400,
@@ -243,45 +262,61 @@ def crear_movimiento_tesoreria(
         if monto_salida <= 0:
             raise HTTPException(status_code=400, detail="El monto de salida debe ser mayor a 0.")
 
-        # Si no viene monto_entrada explícito, calcularlo con tasa_operacion o paridad
-        if datos.monto_entrada is None:
-            if tasa_op is not None:
-                if origen.moneda != MonedaInstrumento.BS.value and destino.moneda == MonedaInstrumento.BS.value:
-                    monto_entrada = _q2(monto_salida * tasa_op)
-                elif origen.moneda == MonedaInstrumento.BS.value and destino.moneda != MonedaInstrumento.BS.value:
-                    monto_entrada = _q2(monto_salida / tasa_op)
-                else:
-                    monto_entrada = _q2(monto_salida * tasa_op)
-            elif origen.moneda == destino.moneda:
+        es_misma_moneda = origen.moneda == destino.moneda
+
+        if es_misma_moneda:
+            # Traslado en misma moneda (Bs->Bs, USD->USD, USDT->USDT): tasa 1:1, sin diferencial cambiario
+            tasa_op = Decimal("1.0000")
+            if datos.monto_entrada is None:
                 monto_entrada = _q2(monto_salida)
-            else:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Debes indicar monto_entrada o tasa_operacion para cambios entre monedas distintas.",
-                )
-
-        if monto_entrada <= 0:
-            raise HTTPException(status_code=400, detail="El monto de entrada debe ser mayor a 0.")
-
-        # Calcular tasa efectiva si no se envió explícita y hay cruce BS <-> USD
-        if tasa_op is None:
-            if origen.moneda != MonedaInstrumento.BS.value and destino.moneda == MonedaInstrumento.BS.value:
-                tasa_op = _q4(monto_entrada / monto_salida)
-            elif origen.moneda == MonedaInstrumento.BS.value and destino.moneda != MonedaInstrumento.BS.value:
-                tasa_op = _q4(monto_salida / monto_entrada)
-
-        eq_salida_usd = _convertir_a_usd(monto_salida, origen.moneda, tasa_ref)
-        eq_entrada_usd = _convertir_a_usd(monto_entrada, destino.moneda, tasa_ref)
-        diferencial_usd = _q2(eq_entrada_usd - eq_salida_usd - datos.comision_usd)
-        if eq_salida_usd > 0:
-            diferencial_pct = _q2((diferencial_usd / eq_salida_usd) * Decimal("100"))
-
-        if diferencial_usd > 0:
-            resultado_tipo = ResultadoCambiario.GANANCIA.value
-        elif diferencial_usd < 0:
-            resultado_tipo = ResultadoCambiario.PERDIDA.value
-        else:
+            if monto_entrada <= 0:
+                raise HTTPException(status_code=400, detail="El monto de entrada debe ser mayor a 0.")
+            eq_salida_usd = _convertir_a_usd(monto_salida, origen.moneda, tasa_ref)
+            eq_entrada_usd = _convertir_a_usd(monto_entrada, destino.moneda, tasa_ref)
+            diferencial_usd = Decimal("0")
+            diferencial_pct = Decimal("0")
             resultado_tipo = ResultadoCambiario.NEUTRO.value
+        else:
+            # Cambio entre monedas distintas (Bs <-> USD <-> USDT, incluyendo USDT <-> USD)
+            if datos.monto_entrada is None:
+                if tasa_op is not None:
+                    if origen.moneda != MonedaInstrumento.BS.value and destino.moneda == MonedaInstrumento.BS.value:
+                        monto_entrada = _q2(monto_salida * tasa_op)
+                    elif origen.moneda == MonedaInstrumento.BS.value and destino.moneda != MonedaInstrumento.BS.value:
+                        monto_entrada = _q2(monto_salida / tasa_op)
+                    else:
+                        # Cruce USDT <-> USD con tasa/spread editable (ej. 0.98 o 1.02)
+                        monto_entrada = _q2(monto_salida * tasa_op)
+                else:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Debes indicar monto_entrada o tasa_operacion para cambios entre monedas distintas.",
+                    )
+
+            if monto_entrada <= 0:
+                raise HTTPException(status_code=400, detail="El monto de entrada debe ser mayor a 0.")
+
+            # Calcular tasa efectiva si no se envió explícita (BS <-> USD/USDT o USDT <-> USD)
+            if tasa_op is None:
+                if origen.moneda != MonedaInstrumento.BS.value and destino.moneda == MonedaInstrumento.BS.value:
+                    tasa_op = _q4(monto_entrada / monto_salida)
+                elif origen.moneda == MonedaInstrumento.BS.value and destino.moneda != MonedaInstrumento.BS.value:
+                    tasa_op = _q4(monto_salida / monto_entrada)
+                else:
+                    tasa_op = _q4(monto_entrada / monto_salida)
+
+            eq_salida_usd = _convertir_a_usd(monto_salida, origen.moneda, tasa_ref)
+            eq_entrada_usd = _convertir_a_usd(monto_entrada, destino.moneda, tasa_ref)
+            diferencial_usd = _q2(eq_entrada_usd + datos.comision_usd - eq_salida_usd)
+            if eq_salida_usd > 0:
+                diferencial_pct = _q2((diferencial_usd / eq_salida_usd) * Decimal("100"))
+
+            if diferencial_usd > 0:
+                resultado_tipo = ResultadoCambiario.GANANCIA.value
+            elif diferencial_usd < 0:
+                resultado_tipo = ResultadoCambiario.PERDIDA.value
+            else:
+                resultado_tipo = ResultadoCambiario.NEUTRO.value
 
     elif datos.tipo == TipoMovimientoTesoreria.INGRESO_ADMIN:
         if destino is None or monto_entrada <= 0:
@@ -394,21 +429,63 @@ def crear_movimiento_tesoreria(
     if pago_entrada is not None:
         pago_entrada.origen_id = mov.id
 
-    # Asiento automático de Diferencial Cambiario en Tesorería
-    if diferencial_usd != 0:
+    # Asiento automático en partida doble (sin duplicar ingresos ni gastos operativos):
+    # - TRASLADO / CAMBIO_DIVISA: mueve 1.1.01 (Cajas y Bancos) entre origen y destino,
+    #   registrando 8.1.01 (comisión) y 8.1.03 (diferencial cambiario) si aplican.
+    if datos.tipo in (TipoMovimientoTesoreria.TRASLADO, TipoMovimientoTesoreria.CAMBIO_DIVISA):
         from app.servicios.contabilidad import crear_asiento_contable
 
-        monto_diff = abs(diferencial_usd)
+        lineas_tes: list[dict[str, Any]] = [
+            {
+                "cuenta_codigo": "1.1.01",
+                "debe_usd": eq_entrada_usd,
+                "haber_usd": Decimal("0"),
+                "nota": f"Entrada {destino.nombre if destino else ''} ({codigo})",
+            },
+            {
+                "cuenta_codigo": "1.1.01",
+                "debe_usd": Decimal("0"),
+                "haber_usd": eq_salida_usd,
+                "nota": f"Salida {origen.nombre if origen else ''} ({codigo})",
+            },
+        ]
+        if datos.comision_usd > 0:
+            lineas_tes.append(
+                {
+                    "cuenta_codigo": "8.1.01",
+                    "debe_usd": _q2(datos.comision_usd),
+                    "haber_usd": Decimal("0"),
+                    "nota": f"Comisión bancaria/plataforma {codigo}",
+                }
+            )
+            # En traslados misma moneda donde monto_entrada == monto_salida, la comisión sale de caja/banco
+            if origen is not None and destino is not None and origen.moneda == destino.moneda and eq_entrada_usd == eq_salida_usd:
+                lineas_tes.append(
+                    {
+                        "cuenta_codigo": "1.1.01",
+                        "debe_usd": Decimal("0"),
+                        "haber_usd": _q2(datos.comision_usd),
+                        "nota": f"Cargo comisión {origen.nombre} ({codigo})",
+                    }
+                )
         if diferencial_usd > 0:
-            lineas_tes = [
-                {"cuenta_codigo": "1.1.01", "debe_usd": monto_diff, "haber_usd": Decimal("0"), "nota": f"Ganancia cambiaria {codigo}"},
-                {"cuenta_codigo": "8.1.03", "debe_usd": Decimal("0"), "haber_usd": monto_diff, "nota": f"Diferencial cambiario {codigo}"},
-            ]
-        else:
-            lineas_tes = [
-                {"cuenta_codigo": "8.1.03", "debe_usd": monto_diff, "haber_usd": Decimal("0"), "nota": f"Pérdida cambiaria {codigo}"},
-                {"cuenta_codigo": "1.1.01", "debe_usd": Decimal("0"), "haber_usd": monto_diff, "nota": f"Diferencial cambiario {codigo}"},
-            ]
+            lineas_tes.append(
+                {
+                    "cuenta_codigo": "8.1.03",
+                    "debe_usd": Decimal("0"),
+                    "haber_usd": abs(diferencial_usd),
+                    "nota": f"Ganancia cambiaria {codigo}",
+                }
+            )
+        elif diferencial_usd < 0:
+            lineas_tes.append(
+                {
+                    "cuenta_codigo": "8.1.03",
+                    "debe_usd": abs(diferencial_usd),
+                    "haber_usd": Decimal("0"),
+                    "nota": f"Pérdida cambiaria {codigo}",
+                }
+            )
         crear_asiento_contable(
             bd=bd,
             usuario=usuario_actual,

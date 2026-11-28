@@ -72,9 +72,10 @@ export default function PaginaPersonalYUsuarios() {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Modal compartir acceso / restablecer clave
+  // Modal compartir acceso / regenerar clave temporal
   const [credencialesCompartir, setCredencialesCompartir] = useState<{
     nombre: string;
+    usuario?: string;
     correo: string;
     rol: string;
     telefono: string;
@@ -82,6 +83,7 @@ export default function PaginaPersonalYUsuarios() {
     url_app: string;
   } | null>(null);
   const [copiadoCreds, setCopiadoCreds] = useState(false);
+  const [copiadaClaveSolo, setCopiadaClaveSolo] = useState(false);
   const [restableciendoId, setRestableciendoId] = useState<number | null>(null);
 
   const manejarCompartirAcceso = async (u: Usuario) => {
@@ -90,6 +92,7 @@ export default function PaginaPersonalYUsuarios() {
     try {
       const resp = await solicitarApi<{
         nombre: string;
+        usuario?: string;
         correo: string;
         rol: string;
         telefono: string;
@@ -101,6 +104,8 @@ export default function PaginaPersonalYUsuarios() {
       });
       setCredencialesCompartir(resp);
       setCopiadoCreds(false);
+      setCopiadaClaveSolo(false);
+      await cargarDatos();
     } catch (err) {
       setError(
         err instanceof ErrorApi
@@ -580,11 +585,11 @@ export default function PaginaPersonalYUsuarios() {
                             type="button"
                             disabled={restableciendoId === u.id}
                             onClick={() => void manejarCompartirAcceso(u)}
-                            title="Generar clave temporal y compartir por WhatsApp"
+                            title="Regenerar clave temporal aleatoria, desbloquear cuenta y compartir por WhatsApp"
                             className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold cursor-pointer disabled:opacity-50"
                           >
-                            <Share2 className="w-3.5 h-3.5" />
-                            {restableciendoId === u.id ? "..." : "Compartir acceso"}
+                            <KeyRound className="w-3.5 h-3.5" />
+                            {restableciendoId === u.id ? "..." : "Regenerar clave temporal"}
                           </button>
                         )}
                         <button
@@ -948,7 +953,7 @@ export default function PaginaPersonalYUsuarios() {
               <div className="flex items-center gap-2">
                 <KeyRound className="h-4 w-4 text-sky-300" />
                 <h3 className="text-sm font-bold">
-                  Acceso listo para compartir
+                  Clave temporal regenerada (se muestra una sola vez)
                 </h3>
               </div>
               <button
@@ -960,25 +965,49 @@ export default function PaginaPersonalYUsuarios() {
               </button>
             </div>
             <div className="p-5 space-y-4 text-xs">
+              <div className="rounded-xl bg-amber-50 border border-amber-200 px-3 py-2 text-[11px] text-amber-900">
+                Cuenta desbloqueada automáticamente. Al iniciar sesión, el usuario deberá crear su propia contraseña personal.
+              </div>
               <div className="rounded-xl bg-slate-50 border border-slate-200 p-3.5 space-y-1.5">
                 <p>
-                  <span className="text-slate-500">Usuario:</span>{" "}
+                  <span className="text-slate-500">Colaborador:</span>{" "}
                   <strong className="text-[#001D3D]">{credencialesCompartir.nombre}</strong>
                 </p>
+                {credencialesCompartir.usuario && (
+                  <p>
+                    <span className="text-slate-500">Usuario acceso:</span>{" "}
+                    <strong className="font-mono text-[#003566]">{credencialesCompartir.usuario}</strong>
+                  </p>
+                )}
                 <p>
                   <span className="text-slate-500">Enlace:</span>{" "}
                   <strong className="text-[#003566]">{credencialesCompartir.url_app}</strong>
                 </p>
-                <p>
-                  <span className="text-slate-500">Correo:</span>{" "}
-                  <strong className="font-mono">{credencialesCompartir.correo}</strong>
-                </p>
-                <p>
-                  <span className="text-slate-500">Clave temporal:</span>{" "}
-                  <strong className="font-mono text-sm text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
-                    {credencialesCompartir.clave_temporal}
-                  </strong>
-                </p>
+                {credencialesCompartir.correo && (
+                  <p>
+                    <span className="text-slate-500">Correo:</span>{" "}
+                    <strong className="font-mono">{credencialesCompartir.correo}</strong>
+                  </p>
+                )}
+                <div className="flex items-center justify-between gap-2 pt-1">
+                  <p>
+                    <span className="text-slate-500">Clave temporal:</span>{" "}
+                    <strong className="font-mono text-sm text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
+                      {credencialesCompartir.clave_temporal}
+                    </strong>
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void navigator.clipboard.writeText(credencialesCompartir.clave_temporal);
+                      setCopiadaClaveSolo(true);
+                    }}
+                    className="inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-white px-2.5 py-1 text-[11px] font-bold text-emerald-800 hover:bg-emerald-50 cursor-pointer"
+                  >
+                    {copiadaClaveSolo ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                    {copiadaClaveSolo ? "Copiada" : "Copiar clave"}
+                  </button>
+                </div>
                 <p>
                   <span className="text-slate-500">Rol:</span>{" "}
                   <strong>

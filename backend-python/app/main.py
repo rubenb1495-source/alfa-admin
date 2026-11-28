@@ -15,7 +15,7 @@ from app import modelos_finanzas as _modelos_finanzas  # noqa: F401
 from app import modelos_logistica as _modelos_logistica  # noqa: F401
 from app import modelos_operaciones as _modelos_operaciones  # noqa: F401
 from app import modelos_taller as _modelos_taller  # noqa: F401
-from app.rutas import admin_importacion, administracion, alertas, apertura, autenticacion, cashea_finanzas, catalogo, cierre_diario, contabilidad, direccion, finanzas, importaciones_trazabilidad, logistica, logistica_avanzada, operaciones, recepcion_tecnica, respaldo, taller, tasas, tesoreria, transito, usuarios, ventas
+from app.rutas import admin_importacion, administracion, alertas, apertura, autenticacion, cashea_finanzas, catalogo, cierre_diario, contabilidad, direccion, finanzas, importaciones_trazabilidad, logistica, logistica_avanzada, operaciones, recepcion_tecnica, recuperacion_clave, respaldo, taller, tasas, tesoreria, transito, usuarios, ventas
 from app.semilla import ejecutar_semilla
 from app.semilla_contabilidad import ejecutar_semilla_contabilidad
 from app.semilla_finanzas import ejecutar_semilla_finanzas
@@ -337,6 +337,7 @@ def verificar_salud() -> dict[str, str]:
 
 
 app.include_router(autenticacion.enrutador)
+app.include_router(recuperacion_clave.enrutador)
 app.include_router(usuarios.enrutador)
 app.include_router(tasas.enrutador)
 app.include_router(catalogo.enrutador)

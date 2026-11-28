@@ -67,6 +67,14 @@ def _es_liquidez(nombre_inst: str) -> bool:
     return nombre_inst.strip().lower() not in INSTRUMENTOS_NO_LIQUIDEZ
 
 
+def _es_traspaso_o_cambio(p: Pago) -> bool:
+    """Identifica movimientos internos de tesorería (TRASLADO / CAMBIO_DIVISA) para no duplicar ingresos ni gastos."""
+    if (p.tipo_documento or "").upper() != TipoDocumentoPago.TESORERIA.value:
+        return False
+    cat = (p.categoria or "").upper()
+    return "TRASLADO" in cat or "CAMBIO_DIVISA" in cat
+
+
 def _clasificar_egreso(p: Pago) -> str:
     tipo_doc = (p.tipo_documento or "").upper()
     origen = (p.origen_tipo or "").upper()
@@ -129,17 +137,25 @@ def calcular_saldos_cajas_y_movimientos(
         .all()
     )
 
-    # 1. Saldos de TODAS las cajas y bancos (solo para vista GENERAL / ejecutiva)
+    # 1. Saldos de cajas y bancos:
+    #    - Vista GENERAL (incluir_saldos_globales=True): todos los 17 instrumentos activos.
+    #    - Vista TIENDA (sucursal_id != None): solo las cajas de efectivo locales de esa sede.
     saldos_cajas: list[dict[str, Any]] = []
     liquidez_total_usd = Decimal("0")
 
-    if incluir_saldos_globales:
-        ini_nativo: dict[int, Decimal] = {i.id: Decimal(i.saldo_inicial or 0) for i in instrumentos}
+    instrumentos_objetivo: list[InstrumentoFinanciero] = (
+        instrumentos
+        if incluir_saldos_globales
+        else [i for i in instrumentos if sucursal_id is not None and i.sucursal_id == sucursal_id]
+    )
+
+    if instrumentos_objetivo:
+        ini_nativo: dict[int, Decimal] = {i.id: Decimal(i.saldo_inicial or 0) for i in instrumentos_objetivo}
         ent_nativo: dict[int, Decimal] = defaultdict(lambda: Decimal("0"))
         sal_nativo: dict[int, Decimal] = defaultdict(lambda: Decimal("0"))
 
         ini_usd: dict[int, Decimal] = {}
-        for i in instrumentos:
+        for i in instrumentos_objetivo:
             s0 = Decimal(i.saldo_inicial or 0)
             if i.moneda == MonedaInstrumento.BS.value and tasa_bcv_dec > 0:
                 ini_usd[i.id] = _q2(s0 / tasa_bcv_dec)
@@ -173,7 +189,7 @@ def calcular_saldos_cajas_y_movimientos(
                     sal_nativo[iid] += monto_orig
                     sal_usd_map[iid] += monto_usd_eq
 
-        for inst in instrumentos:
+        for inst in instrumentos_objetivo:
             iid = inst.id
             s_ini = _q2(ini_nativo[iid])
             ent = _q2(ent_nativo[iid])
@@ -194,6 +210,9 @@ def calcular_saldos_cajas_y_movimientos(
                     "instrumento_id": iid,
                     "nombre": inst.nombre,
                     "moneda": inst.moneda,
+                    "tipo_instrumento": inst.tipo_instrumento or "",
+                    "cuenta_contable": inst.cuenta_contable or "",
+                    "sucursal_id": inst.sucursal_id,
                     "es_liquidez": es_liq,
                     "saldo_inicial": _r2(s_ini),
                     "entradas": _r2(ent),
@@ -210,13 +229,18 @@ def calcular_saldos_cajas_y_movimientos(
     pagos_hoy = [p for p in pagos_hasta_fecha if p.fecha == fecha_obj]
     if sucursal_id is not None:
         pagos_hoy_filtrados = [
-            p for p in pagos_hoy if p.venta is not None and p.venta.sucursal_id == sucursal_id
+            p
+            for p in pagos_hoy
+            if (p.venta is not None and p.venta.sucursal_id == sucursal_id)
+            or (p.venta is None and p.instrumento is not None and p.instrumento.sucursal_id == sucursal_id)
         ]
     else:
         pagos_hoy_filtrados = pagos_hoy
 
     ingresos_totales_usd = Decimal("0")
     egresos_totales_usd = Decimal("0")
+    retiros_traspasos_usd = Decimal("0")
+    fondeos_traspasos_usd = Decimal("0")
     egresos_cat: dict[str, Decimal] = {
         "gastos_operativos": Decimal("0"),
         "envios_delivery": Decimal("0"),
@@ -227,16 +251,25 @@ def calcular_saldos_cajas_y_movimientos(
         "otros_egresos": Decimal("0"),
     }
     egresos_items: list[dict[str, Any]] = []
+    traspasos_cambios_items: list[dict[str, Any]] = []
     movimientos_dia: list[dict[str, Any]] = []
 
     for p in pagos_hoy_filtrados:
         inst_nom = p.instrumento.nombre if p.instrumento else "Instrumento"
         monto_usd = _q2(p.usd_nominal)
-        sede_id = p.venta.sucursal_id if p.venta is not None else None
+        sede_id = (
+            p.venta.sucursal_id
+            if p.venta is not None
+            else (p.instrumento.sucursal_id if p.instrumento is not None else None)
+        )
         sede_nom = (
             p.venta.sucursal.nombre
             if (p.venta is not None and p.venta.sucursal is not None)
-            else "Administración General"
+            else (
+                p.instrumento.sucursal.nombre
+                if (p.instrumento is not None and p.instrumento.sucursal is not None)
+                else "Administración General"
+            )
         )
         hora_txt = _hora_caracas(p.venta.creado_en) if p.venta is not None else "—"
         if p.venta is not None:
@@ -245,7 +278,26 @@ def calcular_saldos_cajas_y_movimientos(
         else:
             concepto = p.nota or p.categoria or p.tipo_documento or "Movimiento administrativo"
 
-        if p.tipo_movimiento == TipoMovimientoPago.INGRESO.value:
+        es_interno_tes = _es_traspaso_o_cambio(p)
+        if es_interno_tes:
+            if p.tipo_movimiento == TipoMovimientoPago.EGRESO.value:
+                retiros_traspasos_usd += monto_usd
+            elif p.tipo_movimiento == TipoMovimientoPago.INGRESO.value:
+                fondeos_traspasos_usd += monto_usd
+            traspasos_cambios_items.append(
+                {
+                    "id": p.id,
+                    "tipo_movimiento": p.tipo_movimiento,
+                    "categoria": p.categoria or "Tesorería",
+                    "concepto": concepto,
+                    "instrumento": inst_nom,
+                    "moneda": p.moneda,
+                    "monto_moneda_origen": _r2(p.monto_moneda_origen),
+                    "monto_usd": _r2(monto_usd),
+                    "referencia": p.referencia or "",
+                }
+            )
+        elif p.tipo_movimiento == TipoMovimientoPago.INGRESO.value:
             ingresos_totales_usd += monto_usd
         elif p.tipo_movimiento == TipoMovimientoPago.EGRESO.value:
             egresos_totales_usd += monto_usd
@@ -278,6 +330,7 @@ def calcular_saldos_cajas_y_movimientos(
                 "tipo_movimiento": p.tipo_movimiento,
                 "tipo_documento": p.tipo_documento,
                 "categoria": p.categoria or p.origen_tipo or p.tipo_documento,
+                "es_traspaso_cambio": es_interno_tes,
                 "concepto": concepto,
                 "referencia": p.referencia or "",
                 "monto_moneda_origen": _r2(p.monto_moneda_origen),
@@ -332,7 +385,13 @@ def calcular_saldos_cajas_y_movimientos(
             comp_map[v.sucursal_id]["ventas_promo_usd"] += Decimal(v.total_promo_usd or 0)
 
         for p in pagos_hoy:
-            clave_sede = p.venta.sucursal_id if p.venta is not None else None
+            if _es_traspaso_o_cambio(p):
+                continue
+            clave_sede = (
+                p.venta.sucursal_id
+                if p.venta is not None
+                else (p.instrumento.sucursal_id if p.instrumento is not None else None)
+            )
             if clave_sede not in comp_map:
                 comp_map[clave_sede] = {
                     "sucursal_id": clave_sede,
@@ -412,8 +471,11 @@ def calcular_saldos_cajas_y_movimientos(
             "ingresos_totales_usd": _r2(ingresos_totales_usd),
             "egresos_totales_usd": _r2(egresos_totales_usd),
             "flujo_neto_usd": _r2(ingresos_totales_usd - egresos_totales_usd),
+            "retiros_traspasos_usd": _r2(retiros_traspasos_usd),
+            "fondeos_traspasos_usd": _r2(fondeos_traspasos_usd),
             "liquidez_total_usd": _r2(liquidez_total_usd),
         },
+        "traspasos_cambios_dia": traspasos_cambios_items,
         "egresos_dia": {
             "total_usd": _r2(egresos_totales_usd),
             "gastos_operativos_usd": _r2(egresos_cat["gastos_operativos"]),
