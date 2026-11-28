@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.base_datos import obtener_bd
 from app.esquemas_finanzas import (
     AbonoCxcEntrada,
+    AbonoPagoItem,
     CasheaLiquidarEntrada,
     CierreMensualEntrada,
     CruceManualEntrada,
@@ -278,33 +279,60 @@ def eliminar_movimiento_financiero(
 
 # ---------------- Cuentas por Cobrar y Cashea ----------------
 
+ROLES_COBROS_TIENDA = (
+    RolUsuario.DIRECCION,
+    RolUsuario.ADMINISTRACION,
+    RolUsuario.ENCARGADO_TIENDA,
+    RolUsuario.LIDER,
+    RolUsuario.ASESORA,
+)
+
+
 @enrutador.get("/cuentas-por-cobrar")
 def listar_cuentas_por_cobrar(
     tipo: TipoCuentaPorCobrar | None = Query(default=None),
     estado: EstadoCuentaPorCobrar | None = Query(default=None),
-    _usuario: Usuario = Depends(requerir_admin),
+    usuario_actual: Usuario = Depends(requerir_roles(*ROLES_COBROS_TIENDA)),
     bd: Session = Depends(obtener_bd),
 ) -> list[dict[str, Any]]:
+    es_admin = usuario_actual.rol in (RolUsuario.DIRECCION.value, RolUsuario.ADMINISTRACION.value)
+    tipo_efectivo = tipo if es_admin else TipoCuentaPorCobrar.CLIENTE
+
     consulta = bd.query(CuentaPorCobrar).options(
         joinedload(CuentaPorCobrar.venta).joinedload(Venta.sucursal),
         joinedload(CuentaPorCobrar.cliente),
     )
-    if tipo is not None:
-        consulta = consulta.filter(CuentaPorCobrar.tipo == tipo.value)
+    if tipo_efectivo is not None:
+        consulta = consulta.filter(CuentaPorCobrar.tipo == tipo_efectivo.value)
     if estado is not None:
         consulta = consulta.filter(CuentaPorCobrar.estado == estado.value)
 
     filas = consulta.order_by(CuentaPorCobrar.id.desc()).all()
+    if not es_admin and usuario_actual.sucursal_id is not None:
+        filas = [
+            c
+            for c in filas
+            if c.venta is not None and c.venta.sucursal_id == usuario_actual.sucursal_id
+        ]
+    filas = [
+        c
+        for c in filas
+        if c.venta is None or c.venta.estado not in (EstadoVenta.ANULADA.value, EstadoVenta.DEVUELTA.value)
+    ]
     return [
         {
             "id": c.id,
             "venta_id": c.venta_id,
             "numero_venta": c.venta.numero_venta if c.venta else None,
+            "sucursal_id": c.venta.sucursal_id if c.venta else None,
             "sucursal": c.venta.sucursal.nombre if c.venta and c.venta.sucursal else None,
             "fecha_venta": c.venta.fecha.isoformat() if c.venta else None,
             "tipo": c.tipo,
             "cliente": c.cliente.nombre if c.cliente else "Cliente general",
             "monto_original_usd": redondear_usd(c.monto_original_usd),
+            "monto_abonado_usd": redondear_usd(
+                max(Decimal("0"), Decimal(c.monto_original_usd or 0) - Decimal(c.saldo_pendiente_usd or 0))
+            ),
             "saldo_pendiente_usd": redondear_usd(c.saldo_pendiente_usd),
             "cashea_comision_venta_usd": redondear_usd(c.venta.cashea_comision_venta_usd) if c.venta else 0.0,
             "cashea_comision_financiado_usd": redondear_usd(c.venta.cashea_comision_financiado_usd) if c.venta else 0.0,
@@ -326,66 +354,145 @@ def listar_cuentas_por_cobrar(
 def registrar_abono_cxc(
     cxc_id: int,
     datos: AbonoCxcEntrada,
-    _usuario: Usuario = Depends(requerir_admin),
+    usuario_actual: Usuario = Depends(requerir_roles(*ROLES_COBROS_TIENDA)),
     bd: Session = Depends(obtener_bd),
 ) -> dict[str, Any]:
     fecha_op = datos.fecha or obtener_fecha_hoy()
     verificar_mes_abierto(bd, fecha_op)
 
-    cxc = bd.query(CuentaPorCobrar).filter(CuentaPorCobrar.id == cxc_id).first()
+    cxc = (
+        bd.query(CuentaPorCobrar)
+        .options(joinedload(CuentaPorCobrar.venta))
+        .filter(CuentaPorCobrar.id == cxc_id)
+        .first()
+    )
     if cxc is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cuenta por cobrar no encontrada.")
     if cxc.estado != EstadoCuentaPorCobrar.PENDIENTE.value:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Esta cuenta ya no está pendiente.")
 
-    inst = bd.query(InstrumentoFinanciero).filter(InstrumentoFinanciero.id == datos.instrumento_id).first()
-    if inst is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Instrumento no encontrado.")
+    es_admin = usuario_actual.rol in (RolUsuario.DIRECCION.value, RolUsuario.ADMINISTRACION.value)
+    if not es_admin:
+        if cxc.tipo != TipoCuentaPorCobrar.CLIENTE.value:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Solo Dirección o Administración pueden liquidar cuentas Cashea.",
+            )
+        if (
+            usuario_actual.sucursal_id is not None
+            and cxc.venta is not None
+            and cxc.venta.sucursal_id != usuario_actual.sucursal_id
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Solo puedes registrar abonos de notas emitidas en tu sucursal.",
+            )
 
-    tasa = bd.query(TasaDiaria).filter(TasaDiaria.fecha == fecha_op).first()
-    if inst.moneda == MonedaInstrumento.BS.value and tasa is None:
+    items_pago: list[AbonoPagoItem] = []
+    if datos.pagos and len(datos.pagos) > 0:
+        items_pago = list(datos.pagos)
+    elif datos.instrumento_id is not None and datos.monto_moneda_origen is not None:
+        items_pago = [
+            AbonoPagoItem(
+                instrumento_id=datos.instrumento_id,
+                monto_moneda_origen=datos.monto_moneda_origen,
+                referencia=datos.referencia,
+            )
+        ]
+    else:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No existe tasa del día para registrar abonos en bolívares.",
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Debes indicar al menos un método de pago y un monto mayor a cero.",
         )
 
+    tasa = bd.query(TasaDiaria).filter(TasaDiaria.fecha == fecha_op).first()
     tasa_bcv = tasa.tasa_bcv if tasa else Decimal("0")
     tasa_usdt = tasa.tasa_usdt if tasa else Decimal("0")
 
-    if inst.moneda == MonedaInstrumento.BS.value:
-        usd_nominal = (datos.monto_moneda_origen / tasa_bcv).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-        usd_real = (datos.monto_moneda_origen / tasa_usdt).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP) if tasa_usdt > 0 else usd_nominal
-    else:
-        usd_nominal = datos.monto_moneda_origen
-        usd_real = datos.monto_moneda_origen
+    total_usd_nominal = Decimal("0.00")
+    pagos_registrados: list[dict[str, Any]] = []
 
-    bd.add(
-        Pago(
-            venta_id=cxc.venta_id,
-            instrumento_id=inst.id,
-            fecha=fecha_op,
-            tipo_movimiento=TipoMovimientoPago.INGRESO.value,
-            tipo_documento=TipoDocumentoPago.ABONO.value,
-            monto_moneda_origen=datos.monto_moneda_origen,
-            moneda=inst.moneda,
-            tasa_bcv_dia=tasa_bcv,
-            tasa_usdt_dia=tasa_usdt,
-            usd_nominal=usd_nominal,
-            usd_real=usd_real,
-            cubre_promo_usd=usd_nominal,
-            referencia=datos.referencia.strip(),
-            estado_verificacion=(
-                EstadoVerificacionPago.PENDIENTE.value
-                if inst.requiere_verificacion
-                else EstadoVerificacionPago.CONFIRMADO.value
+    for item in items_pago:
+        inst = bd.query(InstrumentoFinanciero).filter(InstrumentoFinanciero.id == item.instrumento_id).first()
+        if inst is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Instrumento #{item.instrumento_id} no encontrado.",
+            )
+        nom_low = (inst.nombre or "").lower()
+        if "cuenta por cobrar" in nom_low or "cashea" in nom_low:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"No se puede registrar un abono usando el instrumento '{inst.nombre}'.",
+            )
+        if inst.moneda == MonedaInstrumento.BS.value and (tasa is None or tasa_bcv <= 0):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No existe tasa BCV del día para registrar abonos en bolívares.",
+            )
+
+        if inst.moneda == MonedaInstrumento.BS.value:
+            usd_nominal = (item.monto_moneda_origen / tasa_bcv).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            usd_real = (
+                (item.monto_moneda_origen / tasa_usdt).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+                if tasa_usdt > 0
+                else usd_nominal
+            )
+        else:
+            usd_nominal = item.monto_moneda_origen.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            usd_real = usd_nominal
+
+        ref_limpia = (item.referencia or "").strip()
+        bd.add(
+            Pago(
+                venta_id=cxc.venta_id,
+                instrumento_id=inst.id,
+                fecha=fecha_op,
+                tipo_movimiento=TipoMovimientoPago.INGRESO.value,
+                tipo_documento=TipoDocumentoPago.ABONO.value,
+                monto_moneda_origen=item.monto_moneda_origen,
+                moneda=inst.moneda,
+                tasa_bcv_dia=tasa_bcv,
+                tasa_usdt_dia=tasa_usdt,
+                usd_nominal=usd_nominal,
+                usd_real=usd_real,
+                cubre_promo_usd=usd_nominal,
+                referencia=ref_limpia,
+                estado_verificacion=(
+                    EstadoVerificacionPago.PENDIENTE.value
+                    if inst.requiere_verificacion
+                    else EstadoVerificacionPago.CONFIRMADO.value
+                ),
+            )
+        )
+        total_usd_nominal += usd_nominal
+        pagos_registrados.append(
+            {
+                "instrumento_id": inst.id,
+                "instrumento": inst.nombre,
+                "moneda": inst.moneda,
+                "monto_moneda_origen": redondear_usd(item.monto_moneda_origen),
+                "usd_nominal": redondear_usd(usd_nominal),
+                "referencia": ref_limpia,
+            }
+        )
+
+    saldo_anterior = Decimal(cxc.saldo_pendiente_usd or 0)
+    if total_usd_nominal > saldo_anterior + Decimal("0.50"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"El total abonado (${total_usd_nominal:.2f}) excede el saldo pendiente "
+                f"(${saldo_anterior:.2f})."
             ),
         )
-    )
 
-    cxc.saldo_pendiente_usd = max(Decimal("0"), cxc.saldo_pendiente_usd - usd_nominal)
+    cxc.saldo_pendiente_usd = max(Decimal("0"), saldo_anterior - total_usd_nominal)
+    liquidada = False
     if cxc.saldo_pendiente_usd <= Decimal("0.50"):
         cxc.saldo_pendiente_usd = Decimal("0")
         cxc.estado = EstadoCuentaPorCobrar.PAGADA.value
+        liquidada = True
         venta = bd.query(Venta).filter(Venta.id == cxc.venta_id).first()
         if venta and venta.estado == EstadoVenta.CON_SALDO.value:
             venta.estado = EstadoVenta.CUADRADA.value
@@ -393,8 +500,12 @@ def registrar_abono_cxc(
     bd.commit()
     return {
         "id": cxc.id,
+        "venta_id": cxc.venta_id,
         "saldo_pendiente_usd": redondear_usd(cxc.saldo_pendiente_usd),
+        "total_abonado_usd": redondear_usd(total_usd_nominal),
         "estado": cxc.estado,
+        "liquidada": liquidada,
+        "pagos_registrados": pagos_registrados,
     }
 
 

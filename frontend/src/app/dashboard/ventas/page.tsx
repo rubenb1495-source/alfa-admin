@@ -13,6 +13,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import BuscadorTabla from "@/componentes/BuscadorTabla";
+import PanelApartadosCobros from "@/componentes/PanelApartadosCobros";
 import { usarSesion } from "@/contexto/SesionContexto";
 import {
   copiarTextoPortapapeles,
@@ -30,6 +31,8 @@ import type { VentaResumen } from "@/tipos/finanzas";
 export default function PaginaHistorialVentas() {
   const { usuario } = usarSesion();
   const esAdmin = usuario ? esRolAdministrativo(usuario.rol) : false;
+  const [tabActiva, setTabActiva] = useState<"historial" | "apartados">("historial");
+  const [conteoApartados, setConteoApartados] = useState<number>(0);
   const [ventas, setVentas] = useState<VentaResumen[]>([]);
   const [busqueda, setBusqueda] = useState("");
   const [copiadoId, setCopiadoId] = useState<number | null>(null);
@@ -45,8 +48,14 @@ export default function PaginaHistorialVentas() {
     setCargando(true);
     setError(null);
     try {
-      const lista = await solicitarApi<VentaResumen[]>("/api/ventas");
+      const [lista, cxcPend] = await Promise.all([
+        solicitarApi<VentaResumen[]>("/api/ventas"),
+        solicitarApi<unknown[]>(
+          "/api/finanzas/cuentas-por-cobrar?tipo=CLIENTE&estado=PENDIENTE"
+        ).catch(() => []),
+      ]);
       setVentas(lista);
+      setConteoApartados(Array.isArray(cxcPend) ? cxcPend.length : 0);
     } catch (err) {
       setError(
         err instanceof ErrorApi
@@ -142,6 +151,51 @@ export default function PaginaHistorialVentas() {
           Nueva venta POS
         </Link>
       </div>
+
+      {/* Pestañas: Historial vs Apartados y Cobros Pendientes */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-2">
+        <button
+          type="button"
+          onClick={() => setTabActiva("historial")}
+          className={`px-4 py-2 rounded-xl text-sm font-bold transition ${
+            tabActiva === "historial"
+              ? "bg-[#003566] text-white shadow-xs"
+              : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
+          }`}
+        >
+          Historial de Ventas
+        </button>
+        <button
+          type="button"
+          onClick={() => setTabActiva("apartados")}
+          className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition ${
+            tabActiva === "apartados"
+              ? "bg-[#003566] text-white shadow-xs"
+              : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
+          }`}
+        >
+          <span>Apartados y Cobros Pendientes</span>
+          {conteoApartados > 0 && (
+            <span
+              className={`px-2 py-0.5 rounded-full text-xs font-black ${
+                tabActiva === "apartados"
+                  ? "bg-white text-[#003566]"
+                  : "bg-blue-100 text-[#003566]"
+              }`}
+            >
+              {conteoApartados}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {tabActiva === "apartados" ? (
+        <PanelApartadosCobros
+          alActualizarConteo={setConteoApartados}
+          alRegistrarCobro={cargarVentas}
+        />
+      ) : (
+        <>
 
       {error && (
         <div className="flex items-center gap-2.5 p-4 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700">
@@ -352,6 +406,8 @@ export default function PaginaHistorialVentas() {
             </form>
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   );

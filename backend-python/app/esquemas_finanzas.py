@@ -76,11 +76,18 @@ class PagoConfirmarEntrada(BaseModel):
     nota: str = Field(default="", max_length=300)
 
 
-class AbonoCxcEntrada(BaseModel):
+class AbonoPagoItem(BaseModel):
     instrumento_id: int
     monto_moneda_origen: Decimal = Field(gt=0)
     referencia: str = Field(default="", max_length=120)
+
+
+class AbonoCxcEntrada(BaseModel):
+    instrumento_id: int | None = None
+    monto_moneda_origen: Decimal | None = Field(default=None, gt=0)
+    referencia: str = Field(default="", max_length=120)
     fecha: date | None = None
+    pagos: list[AbonoPagoItem] | None = None
 
 
 class CasheaLiquidarEntrada(BaseModel):
