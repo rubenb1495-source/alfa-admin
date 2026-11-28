@@ -1357,3 +1357,41 @@ def registrar_devolucion(
         "estado_reingreso": nc.estado_reingreso,
         "monto_reconocido_promo_usd": redondear_usd(nc.monto_reconocido_promo_usd),
     }
+
+
+@enrutador.get("/ventas/{venta_id}/etiqueta-envio")
+def descargar_etiqueta_envio_pdf(
+    venta_id: int,
+    bultos: int | None = Query(default=None, ge=1, le=99),
+    _usuario: Usuario = Depends(obtener_usuario_actual),
+    bd: Session = Depends(obtener_bd),
+) -> Response:
+    """Genera etiqueta tamaño Carta PDF 'FRÁGIL' para Delivery o Envío Nacional (sin precios ni costos)."""
+    from app.servicios.pdf_etiqueta_envio import (
+        generar_pdf_etiqueta_envio,
+        normalizar_tipo_entrega,
+    )
+
+    venta = (
+        bd.query(Venta)
+        .options(joinedload(Venta.sucursal), joinedload(Venta.cliente))
+        .filter(Venta.id == venta_id)
+        .first()
+    )
+    if venta is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Venta no encontrada.")
+
+    if normalizar_tipo_entrega(venta.tipo_entrega) == "RETIRO_TIENDA":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La etiqueta de envío FRÁGIL solo aplica para ventas con Delivery o Envío Nacional.",
+        )
+
+    pdf_bytes = generar_pdf_etiqueta_envio(venta, bultos=bultos)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="Etiqueta_Envio_{venta.numero_venta}.pdf"'
+        },
+    )

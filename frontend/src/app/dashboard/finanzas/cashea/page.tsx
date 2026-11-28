@@ -7,8 +7,10 @@ import {
   CreditCard,
   Download,
   Landmark,
+  Upload,
   X,
 } from "lucide-react";
+import ModalImportarCashea from "@/components/ModalImportarCashea";
 import { usarSesion } from "@/contexto/SesionContexto";
 import {
   ErrorApi,
@@ -99,6 +101,7 @@ export default function PaginaFinanzasCashea() {
   const [fechaCobro, setFechaCobro] = useState(fechaHoyCaracas());
   const [referenciaCobro, setReferenciaCobro] = useState("");
   const [guardandoCobro, setGuardandoCobro] = useState(false);
+  const [modalLoteAbierto, setModalLoteAbierto] = useState(false);
 
   const construirParams = useCallback(() => {
     const p = new URLSearchParams();
@@ -219,14 +222,26 @@ export default function PaginaFinanzasCashea() {
             Bs), comisiones 4%+4%, IVA 16%, ISLR 2% y control de cobros.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => void exportarExcel()}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold shadow-sm cursor-pointer"
-        >
-          <Download className="w-4 h-4" />
-          Exportar Excel (.xlsx)
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {esAdmin && (
+            <button
+              type="button"
+              onClick={() => setModalLoteAbierto(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#003566] hover:bg-[#001D3D] text-white text-xs font-bold shadow-sm cursor-pointer"
+            >
+              <Upload className="w-4 h-4" />
+              Importar Liquidación en Lote
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => void exportarExcel()}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold shadow-sm cursor-pointer"
+          >
+            <Download className="w-4 h-4" />
+            Exportar Excel (.xlsx)
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -567,6 +582,16 @@ export default function PaginaFinanzasCashea() {
           </div>
         </div>
       )}
+
+      <ModalImportarCashea
+        abierto={modalLoteAbierto}
+        instrumentos={instrumentos}
+        alCerrar={() => setModalLoteAbierto(false)}
+        alConfirmarExito={(msg) => {
+          setExito(msg);
+          void cargarDatos();
+        }}
+      />
     </div>
   );
 }

@@ -255,6 +255,23 @@ export default function PaginaHistorialVentas() {
                         <FileDown className="w-3.5 h-3.5" />
                         PDF
                       </button>
+                      {(v.tipo_entrega?.toLowerCase().includes("deliv") ||
+                        v.tipo_entrega?.toLowerCase().includes("env")) && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void descargarPdfApi(
+                              `/api/ventas/${v.id}/etiqueta-envio`,
+                              `Etiqueta_Envio_${v.numero_venta}.pdf`
+                            )
+                          }
+                          title="Descargar Etiqueta de Envío FRÁGIL (Carta PDF)"
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold cursor-pointer"
+                        >
+                          <FileDown className="w-3.5 h-3.5" />
+                          FRÁGIL
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => void copiarWhatsApp(v)}

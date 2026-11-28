@@ -327,6 +327,12 @@ export default function DisenoDashboard({
           icono: <BarChart3 className="w-4 h-4 shrink-0" />,
           visible: esAdmin,
         },
+        {
+          href: "/dashboard/finanzas/apertura",
+          etiqueta: "Apertura 01/12",
+          icono: <RefreshCw className="w-4 h-4 shrink-0" />,
+          visible: esAdmin,
+        },
       ],
     },
     {

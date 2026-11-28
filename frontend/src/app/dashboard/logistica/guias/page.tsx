@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertCircle, CheckCircle2, Plane, Plus } from "lucide-react";
 import BuscadorTabla from "@/componentes/BuscadorTabla";
+import PanelTrackingsInternacionales from "@/components/PanelTrackingsInternacionales";
 import { ErrorApi, formatearUsd, solicitarApi } from "@/servicios/api";
 import type {
   CompraResumen,
@@ -368,6 +369,8 @@ export default function PaginaGuias() {
           </div>
         </div>
       )}
+
+      <PanelTrackingsInternacionales compras={comprasPendientes} />
     </div>
   );
 }
