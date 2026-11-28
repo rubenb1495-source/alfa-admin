@@ -15,7 +15,7 @@ from app import modelos_finanzas as _modelos_finanzas  # noqa: F401
 from app import modelos_logistica as _modelos_logistica  # noqa: F401
 from app import modelos_operaciones as _modelos_operaciones  # noqa: F401
 from app import modelos_taller as _modelos_taller  # noqa: F401
-from app.rutas import admin_importacion, administracion, alertas, apertura, autenticacion, cashea_finanzas, catalogo, cierre_diario, contabilidad, direccion, finanzas, logistica, logistica_avanzada, operaciones, recepcion_tecnica, respaldo, taller, tasas, tesoreria, transito, usuarios, ventas
+from app.rutas import admin_importacion, administracion, alertas, apertura, autenticacion, cashea_finanzas, catalogo, cierre_diario, contabilidad, direccion, finanzas, importaciones_trazabilidad, logistica, logistica_avanzada, operaciones, recepcion_tecnica, respaldo, taller, tasas, tesoreria, transito, usuarios, ventas
 from app.semilla import ejecutar_semilla
 from app.semilla_contabilidad import ejecutar_semilla_contabilidad
 from app.semilla_finanzas import ejecutar_semilla_finanzas
@@ -103,6 +103,23 @@ def asegurar_columnas_compatibles() -> None:
                 with motor.begin() as conexion:
                     conexion.execute(
                         text(f"ALTER TABLE ventas ADD COLUMN {nombre_col} {ddl_col}")
+                    )
+    if inspector.has_table("equipos"):
+        columnas_eq = {col["name"] for col in inspector.get_columns("equipos")}
+        nuevas_equipos = [
+            ("lote_internacional_id", "INTEGER NULL"),
+            ("grado_estetico", "VARCHAR(40) NOT NULL DEFAULT ''"),
+            ("proceso_inicial", "VARCHAR(30) NOT NULL DEFAULT ''"),
+            ("primer_costo_usd", "NUMERIC(12, 2) NOT NULL DEFAULT 0"),
+            ("costo_componentes_usd", "NUMERIC(12, 2) NOT NULL DEFAULT 0"),
+            ("comision_preparacion_usd", "NUMERIC(12, 2) NOT NULL DEFAULT 0"),
+            ("costo_final_usd", "NUMERIC(12, 2) NOT NULL DEFAULT 0"),
+        ]
+        for nombre_col, ddl_col in nuevas_equipos:
+            if nombre_col not in columnas_eq:
+                with motor.begin() as conexion:
+                    conexion.execute(
+                        text(f"ALTER TABLE equipos ADD COLUMN {nombre_col} {ddl_col}")
                     )
     if inspector.has_table("tasas_diarias"):
         columnas_tasas = {col["name"] for col in inspector.get_columns("tasas_diarias")}
@@ -326,6 +343,7 @@ app.include_router(catalogo.enrutador)
 app.include_router(logistica.enrutador)
 app.include_router(logistica_avanzada.enrutador)
 app.include_router(transito.enrutador)
+app.include_router(importaciones_trazabilidad.enrutador)
 app.include_router(taller.enrutador)
 app.include_router(recepcion_tecnica.enrutador)
 app.include_router(ventas.enrutador)

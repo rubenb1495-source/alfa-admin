@@ -223,6 +223,18 @@ export default function DisenoDashboard({
           visible: esLogistica,
         },
         {
+          href: "/dashboard/logistica/importaciones",
+          etiqueta: "Importaciones y Costeo",
+          icono: <Plane className="w-4 h-4 shrink-0" />,
+          visible: esTallerOAdmin,
+        },
+        {
+          href: "/dashboard/logistica/trazabilidad",
+          etiqueta: "Trazabilidad por Serial",
+          icono: <ScanBarcode className="w-4 h-4 shrink-0" />,
+          visible: true,
+        },
+        {
           href: "/dashboard/logistica/recepcion",
           etiqueta: "Recepción por Serial",
           icono: <ScanBarcode className="w-4 h-4 shrink-0" />,

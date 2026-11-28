@@ -202,8 +202,13 @@ class Equipo(Base):
     articulo_id: Mapped[int | None] = mapped_column(ForeignKey("catalogo_articulos.id"), nullable=True)
     compra_id: Mapped[int | None] = mapped_column(ForeignKey("compras.id"), index=True, nullable=True)
     guia_id: Mapped[int | None] = mapped_column(ForeignKey("guias_importacion.id"), index=True, nullable=True)
+    lote_internacional_id: Mapped[int | None] = mapped_column(
+        ForeignKey("compras_internacionales_lotes.id"), index=True, nullable=True
+    )
     modelo: Mapped[str] = mapped_column(String(160), default="", nullable=False)
     configuracion: Mapped[str] = mapped_column(String(255), default="", nullable=False)
+    grado_estetico: Mapped[str] = mapped_column(String(40), default="", nullable=False)
+    proceso_inicial: Mapped[str] = mapped_column(String(30), default="", nullable=False)
     categoria: Mapped[str] = mapped_column(String(100), default="Laptop", nullable=False)
     ubicacion_id: Mapped[int] = mapped_column(ForeignKey("sucursales.id"), index=True, nullable=False)
     estado: Mapped[str] = mapped_column(String(25), default=EstadoEquipo.EN_TRANSITO.value, nullable=False, index=True)
@@ -211,6 +216,10 @@ class Equipo(Base):
     costo_compra_usd: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0"), nullable=False)
     costo_flete_usd: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0"), nullable=False)
     costo_taller_usd: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0"), nullable=False)
+    primer_costo_usd: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0"), nullable=False)
+    costo_componentes_usd: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0"), nullable=False)
+    comision_preparacion_usd: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0"), nullable=False)
+    costo_final_usd: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0"), nullable=False)
     precio_promo_usd: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0"), nullable=False)
     es_consignacion: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
     consignante_nombre: Mapped[str] = mapped_column(String(160), default="", nullable=False)
@@ -379,3 +388,34 @@ class LoteTransitoItem(Base):
 
     lote = relationship("LoteTransito", back_populates="items")
     articulo = relationship("CatalogoArticulo")
+
+
+class CompraInternacionalLote(Base):
+    __tablename__ = "compras_internacionales_lotes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    codigo: Mapped[str] = mapped_column(String(40), unique=True, index=True, nullable=False)
+    proveedor_nombre: Mapped[str] = mapped_column(String(160), nullable=False)
+    referencia: Mapped[str] = mapped_column(String(120), default="", nullable=False)
+    descripcion_previa: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    cantidad_equipos_esperados: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    cantidad_equipos_recibidos: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    monto_compra_usd: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"), nullable=False)
+    taxes_usd: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"), nullable=False)
+    envio_miami_usd: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"), nullable=False)
+    subtotal_miami_usd: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"), nullable=False)
+    gastos_envio_venezuela_usd: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"), nullable=False)
+    costo_total_aterrizado_usd: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"), nullable=False)
+
+    estado: Mapped[str] = mapped_column(String(25), default="EN_TRANSITO", nullable=False, index=True)
+    fecha_compra: Mapped[date] = mapped_column(Date, nullable=False)
+    fecha_recepcion: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    observaciones: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    creado_por_id: Mapped[int | None] = mapped_column(ForeignKey("usuarios.id"), nullable=True)
+    recibido_por_id: Mapped[int | None] = mapped_column(ForeignKey("usuarios.id"), nullable=True)
+    creado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    creado_por = relationship("Usuario", foreign_keys=[creado_por_id])
+    recibido_por = relationship("Usuario", foreign_keys=[recibido_por_id])
+    equipos = relationship("Equipo", foreign_keys="Equipo.lote_internacional_id")
